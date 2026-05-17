@@ -53,7 +53,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 52px 20px 16px;
+      padding: 4px 20px 2px;
     }
 
     .app-name {
@@ -607,6 +607,36 @@
     .ctrl-btn-label { font-size: 13px; font-weight: 600; color: var(--txt); }
     .ctrl-btn-sub   { font-size: 11px; color: var(--txt2); }
 
+    /* ── Inverter card ───────────────────────────── */
+    .inverter-card {
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .inv-limit {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .inv-limit-label { font-size: 11px; color: var(--txt2); font-weight: 500; }
+    .inv-limit-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .inv-amp {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--txt);
+      font-variant-numeric: tabular-nums;
+      min-width: 42px;
+      text-align: center;
+    }
+    .inv-amp-unit { font-size: 13px; color: var(--txt2); font-weight: 600; }
+
     /* ── Theme button ─────────────────────────────── */
     .theme-btn-wrap {
       display: flex;
@@ -759,7 +789,7 @@
 
   <header>
     <div class="app-name" id="nameDisplay">
-      <img src="logo.png" alt="GoGoVan" style="height:40px;width:40px;object-fit:contain;">
+      <img src="icons/LogoMark.png" alt="GoGoVan" style="width:260px;height:auto;max-width:65vw;">
     </div>
     <div class="status-pill">
       <div class="status-dot"></div>
@@ -859,6 +889,28 @@
       <div class="ctrl-btn-label">Tank Heater</div>
       <div class="ctrl-btn-sub" id="tankHeatState">Off</div>
     </button>
+  </div>
+
+  <!-- INVERTER -->
+  <span class="section-label section-label-solo">Inverter</span>
+  <div class="card">
+    <div class="inverter-card">
+      <div class="clim-group" style="flex:1;">
+        <span class="clim-group-label">Mode</span>
+        <div class="clim-seg">
+          <button class="clim-seg-btn active" id="invModeOn"  onclick="setInverterMode(3)">⚡ On</button>
+          <button class="clim-seg-btn"        id="invModeOff" onclick="setInverterMode(4)">Off</button>
+        </div>
+      </div>
+      <div class="inv-limit">
+        <span class="inv-limit-label">Shore Limit</span>
+        <div class="inv-limit-row">
+          <button class="climate-btn" onclick="adjustInputAmps(-1)">▼</button>
+          <div class="inv-amp"><span id="inputAmps">—</span><span class="inv-amp-unit">A</span></div>
+          <button class="climate-btn" onclick="adjustInputAmps(1)">▲</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- THEME BUTTON -->
@@ -996,16 +1048,16 @@ function publishLight(id, onOff) {
 // ── Lights ────────────────────────────────────────
 const LIGHT_GROUPS = [
   { id:'interior', label:'Interior', lights:[
-    { id:'main',    name:'Main Ceiling', on:true,  level:80 },
-    { id:'kitchen', name:'Kitchen',      on:true,  level:60 },
-    { id:'bed',     name:'Bed',          on:true,  level:45 },
-    { id:'cargo',   name:'Cargo',        on:false, level:0  },
-    { id:'bunk',    name:'Bunk Accent',  on:false, level:0  },
-    { id:'bench',   name:'Bench',        on:false, level:0  },
+    { id:'main',    name:'Main Ceiling', on:true,  level:80, lastLevel:80 },
+    { id:'kitchen', name:'Kitchen',      on:true,  level:60, lastLevel:60 },
+    { id:'bed',     name:'Bed',          on:true,  level:45, lastLevel:45 },
+    { id:'cargo',   name:'Cargo',        on:false, level:0,  lastLevel:80 },
+    { id:'bunk',    name:'Bunk Accent',  on:false, level:0,  lastLevel:80 },
+    { id:'bench',   name:'Bench',        on:false, level:0,  lastLevel:80 },
   ]},
   { id:'exterior', label:'Exterior', lights:[
-    { id:'awning',  name:'Awning',       on:false, level:0  },
-    { id:'step',    name:'Step',         on:false, level:0  },
+    { id:'awning',  name:'Awning',       on:false, level:0,  lastLevel:80 },
+    { id:'step',    name:'Step',         on:false, level:0,  lastLevel:80 },
   ]},
 ];
 
@@ -1059,8 +1111,11 @@ function updateMasterBtn() {
 function toggleLight(id) {
   const l = findLight(id);
   l.on = !l.on;
-  if (l.on && l.level === 0) l.level = 80;
-  if (!l.on) l.level = 0;
+  if (l.on) {
+    l.level = l.lastLevel || 80;
+  } else {
+    if (l.level > 0) l.lastLevel = l.level;
+  }
   publishLight(id, l.on ? String(l.level) : 'off');
   renderLights();
   markSceneDirty();
@@ -1089,6 +1144,8 @@ function dimLightUI(id, value) {
 function dimLightSend(id, value) {
   // MQTT publish — called only when slider is released (onchange)
   const v = parseInt(value);
+  const l = findLight(id);
+  if (l && v > 0) l.lastLevel = v;
   publishLight(id, v > 0 ? String(v) : 'off');
   markSceneDirty();
 }
@@ -1163,7 +1220,19 @@ function renderScenes() {
     const showSave = isActive && sceneIsDirty;
     chip.className = 'scene-chip' + (isActive ? ' active' : '');
 
-    chip.appendChild(document.createTextNode(showSave ? 'Save' : scene.name));
+    // Stack both labels in the same grid cell so width never changes
+    const emoji = [...scene.name][0];
+    const inner = document.createElement('span');
+    inner.style.cssText = 'display:inline-grid;';
+    const normalSpan = document.createElement('span');
+    normalSpan.textContent = scene.name;
+    normalSpan.style.cssText = 'grid-area:1/1;' + (showSave ? 'visibility:hidden;' : '');
+    const saveSpan = document.createElement('span');
+    saveSpan.textContent = emoji + ' Save';
+    saveSpan.style.cssText = 'grid-area:1/1;' + (!showSave ? 'visibility:hidden;' : '');
+    inner.appendChild(normalSpan);
+    inner.appendChild(saveSpan);
+    chip.appendChild(inner);
 
     const badge = document.createElement('span');
     badge.className = 'scene-delete-badge';
@@ -1368,6 +1437,32 @@ function toggleTankHeater() {
   console.log(`MQTT → van/light/tank-heater: ${tankHeatOn ? 'on' : 'off'}`);
 }
 
+// ── Inverter / Shore Power ────────────────────────
+let inverterMode = 3;   // 3=On, 4=Off
+let inputAmps    = null;
+const INPUT_AMPS_MIN = 2;
+const INPUT_AMPS_MAX = 50;
+
+function setInverterMode(mode) {
+  inverterMode = mode;
+  updateInverterUI();
+  if (mqttClient?.connected)
+    mqttClient.publish(`W/${PORTAL_ID}/vebus/276/Mode`, JSON.stringify({value: mode}));
+}
+
+function updateInverterUI() {
+  document.getElementById('invModeOn').classList.toggle('active',  inverterMode === 3);
+  document.getElementById('invModeOff').classList.toggle('active', inverterMode === 4);
+}
+
+function adjustInputAmps(delta) {
+  if (inputAmps === null) return;
+  inputAmps = Math.max(INPUT_AMPS_MIN, Math.min(INPUT_AMPS_MAX, inputAmps + delta));
+  document.getElementById('inputAmps').textContent = inputAmps;
+  if (mqttClient?.connected)
+    mqttClient.publish(`W/${PORTAL_ID}/vebus/276/Ac/In/1/CurrentLimit`, JSON.stringify({value: inputAmps}));
+}
+
 // ── Local MQTT (direct to Cerbo GX) ──────────────
 const PORTAL_ID = 'c0619ab5dcfb';
 const CERBO_IP  = localStorage.getItem('cerboIp') || '192.168.12.140';
@@ -1417,6 +1512,8 @@ function connectMQTT() {
     client.subscribe('van/status/light/+');
     client.subscribe('van/status/ac/+');
     client.publish(`R/${PORTAL_ID}/system/0/Serial`, '');
+    client.publish(`R/${PORTAL_ID}/vebus/276/Mode`, '');
+    client.publish(`R/${PORTAL_ID}/vebus/276/Ac/In/1/CurrentLimit`, '');
   });
 
   client.on('message', (topic, msg) => {
@@ -1491,6 +1588,15 @@ function connectMQTT() {
     if      (topic === `${P}/system/0/Dc/Battery/Soc`)   updateSoc(val);
     else if (topic === `${P}/system/0/Dc/Battery/Power`) updatePower(val);
     else if (topic.includes('/solarcharger/') && topic.endsWith('/Yield/Power')) updateSolar(val);
+    else if (topic === `${P}/vebus/276/Mode`) {
+      inverterMode = val;
+      updateInverterUI();
+    }
+    else if (topic === `${P}/vebus/276/Ac/In/1/CurrentLimit`) {
+      const a = Math.round(val);
+      inputAmps = a;
+      document.getElementById('inputAmps').textContent = a;
+    }
   });
 
   client.on('error',   e  => { console.warn('MQTT:', e); setLiveStatus(false); });
