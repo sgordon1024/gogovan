@@ -104,6 +104,39 @@
       border-radius: 50%;
       background: var(--green);
       box-shadow: 0 0 6px var(--green);
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+
+    .status-dot.connecting {
+      background: var(--amber);
+      box-shadow: 0 0 6px var(--amber);
+      animation: dot-pulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes dot-pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.35; }
+    }
+
+    /* ── Skeleton shimmer ─────────────────────────── */
+    @keyframes shimmer {
+      0%   { background-position: -200% center; }
+      100% { background-position:  200% center; }
+    }
+
+    .skel {
+      background: linear-gradient(
+        90deg,
+        var(--surface2) 25%,
+        rgba(255,255,255,0.07) 50%,
+        var(--surface2) 75%
+      );
+      background-size: 200% 100%;
+      animation: shimmer 1.4s linear infinite;
+      border-radius: 5px;
+      color: transparent !important;
+      min-width: 36px;
+      display: inline-block;
     }
 
     /* ── Section labels ───────────────────────────── */
@@ -162,9 +195,9 @@
     .power-cell:first-child { border-radius: var(--radius) 0 0 var(--radius); }
     .power-cell:last-child  { border-radius: 0 var(--radius) var(--radius) 0; }
 
-    .power-label { font-size: 11px; color: var(--txt2); font-weight: 500; }
-    .power-value { font-size: clamp(18px,5vw,22px); font-weight: 700; letter-spacing: -0.5px; line-height: 1; }
-    .power-sub   { font-size: 11px; color: var(--txt2); }
+    .power-label { font-size: 11px; color: var(--txt2); font-weight: 500; white-space: nowrap; overflow: hidden; }
+    .power-value { font-size: clamp(15px,4vw,20px); font-weight: 700; letter-spacing: -0.5px; line-height: 1; white-space: nowrap; overflow: hidden; }
+    .power-sub   { font-size: 11px; color: var(--txt2); white-space: nowrap; overflow: hidden; }
 
     /* ── Scenes ───────────────────────────────────── */
     .scenes-wrap {
@@ -814,8 +847,8 @@
       <img src="icons/LogoMark.png" alt="GoGoVan" style="width:260px;height:auto;max-width:65vw;">
     </div>
     <div class="status-pill">
-      <div class="status-dot"></div>
-      <span>Live</span>
+      <div class="status-dot connecting" id="statusDot"></div>
+      <span id="statusText">Connecting…</span>
     </div>
   </header>
 
@@ -824,22 +857,22 @@
   <div class="power-strip">
     <div class="power-cell">
       <div class="power-label">Battery</div>
-      <div class="power-value" style="color:var(--green)" id="battPct">100%</div>
-      <div class="power-sub" id="battSub">Full</div>
+      <div class="power-value" id="battPct"><span class="skel">&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+      <div class="power-sub" id="battSub"><span class="skel">&nbsp;&nbsp;&nbsp;</span></div>
     </div>
     <div class="power-cell">
       <div class="power-label">Solar</div>
-      <div class="power-value" style="color:var(--amber)" id="solarW">11 W</div>
+      <div class="power-value" id="solarW"><span class="skel">&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
       <div class="power-sub">PV Charger</div>
     </div>
     <div class="power-cell">
       <div class="power-label">Power</div>
-      <div class="power-value" id="battA" style="color:var(--blue)">0 W</div>
-      <div class="power-sub" id="battALabel">Idle</div>
+      <div class="power-value" id="battA"><span class="skel">&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+      <div class="power-sub" id="battALabel">—</div>
     </div>
     <div class="power-cell">
       <div class="power-label">Time to Empty</div>
-      <div class="power-value" id="battTTE" style="color:var(--txt);font-size:clamp(14px,4vw,18px)">—</div>
+      <div class="power-value" id="battTTE" style="font-size:clamp(14px,4vw,18px)"><span class="skel">&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
       <div class="power-sub" id="battTTESub">to 10% SOC</div>
     </div>
   </div>
@@ -1514,21 +1547,31 @@ const PORTAL_ID = 'c0619ab5dcfb';
 const CERBO_IP  = localStorage.getItem('cerboIp') || '192.168.12.140';
 
 function setLiveStatus(live) {
-  const dot  = document.querySelector('.status-dot');
-  const pill = document.querySelector('.status-pill span');
-  const c = live ? 'var(--green)' : 'var(--red)';
-  dot.style.background = c;
-  dot.style.boxShadow  = `0 0 6px ${c}`;
-  pill.textContent = live ? 'Live' : 'Offline';
+  const dot  = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+  dot.classList.remove('connecting');
+  if (live) {
+    dot.style.background = 'var(--green)';
+    dot.style.boxShadow  = '0 0 6px var(--green)';
+    text.textContent = 'Live';
+  } else {
+    dot.style.background = 'var(--red)';
+    dot.style.boxShadow  = '0 0 6px var(--red)';
+    text.textContent = 'Offline';
+  }
+}
+
+function clearSkel(el) {
+  if (el && el.querySelector('.skel')) el.innerHTML = '';
 }
 
 function updateSoc(val) {
   const pct = Math.round(val);
   const el  = document.getElementById('battPct');
+  clearSkel(el);
   el.textContent = pct + '%';
   el.style.color = pct > 50 ? 'var(--green)' : pct > 20 ? 'var(--amber)' : 'var(--red)';
-  document.getElementById('battSub').textContent =
-    pct > 80 ? 'Full' : pct > 50 ? 'Good' : pct > 20 ? 'Low' : 'Critical';
+  // battSub shows voltage (set by Batteries handler); leave it alone here
 }
 
 let battPower  = 0;     // W, updated by updatePower
@@ -1539,6 +1582,7 @@ let lastTTG    = null;  // seconds from BMS, or null
 function updatePower(val) {
   battPower = Math.round(val);
   const el = document.getElementById('battA');
+  clearSkel(el);
   el.textContent = (battPower > 0 ? '+' : '') + battPower + ' W';
   el.style.color = battPower > 10 ? 'var(--green)' : battPower < -10 ? 'var(--red)' : 'var(--blue)';
   document.getElementById('battALabel').textContent =
@@ -1579,11 +1623,14 @@ function recalcTTE() {
   }
 
   if (tteSecs != null && tteSecs > 60) {
+    clearSkel(el);
     el.textContent  = formatTTE(tteSecs);
     const h = tteSecs / 3600;
     el.style.color  = h < 3 ? 'var(--red)' : h < 8 ? 'var(--amber)' : 'var(--txt)';
     sub.textContent = 'to 10% SOC';
-  } else {
+  } else if (battPower !== 0 || battSoc !== null) {
+    // Only clear skeleton once we have some real data to show
+    clearSkel(el);
     el.textContent  = '—';
     el.style.color  = 'var(--txt)';
     sub.textContent = battPower < -10 ? 'Discharging' : 'Standby';
@@ -1603,7 +1650,9 @@ function formatTTE(secs) {
 }
 
 function updateSolar(val) {
-  document.getElementById('solarW').textContent = Math.round(val) + ' W';
+  const el = document.getElementById('solarW');
+  clearSkel(el);
+  el.textContent = Math.round(val) + ' W';
 }
 
 function connectMQTT() {
@@ -1699,8 +1748,11 @@ function connectMQTT() {
         const arr = JSON.parse(msg.toString())?.value;
         const b = Array.isArray(arr) ? arr[0] : null;
         if (b?.soc != null) { battSoc = b.soc; updateSoc(b.soc); }
-        if (b?.voltage != null)
-          document.getElementById('battSub').textContent = b.voltage.toFixed(1) + 'V';
+        if (b?.voltage != null) {
+          const sub = document.getElementById('battSub');
+          clearSkel(sub);
+          sub.textContent = b.voltage.toFixed(1) + 'V';
+        }
       } catch {}
       return;
     }
