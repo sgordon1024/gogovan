@@ -611,17 +611,15 @@
     .inverter-card {
       padding: 16px 20px;
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 20px;
+      flex-direction: column;
+      gap: 14px;
     }
     .inv-limit {
       display: flex;
-      flex-direction: column;
       align-items: center;
-      gap: 4px;
+      justify-content: space-between;
     }
-    .inv-limit-label { font-size: 11px; color: var(--txt2); font-weight: 500; }
+    .inv-limit-label { font-size: 12px; color: var(--txt2); font-weight: 500; }
     .inv-limit-row {
       display: flex;
       align-items: center;
@@ -895,15 +893,17 @@
   <span class="section-label section-label-solo">Inverter</span>
   <div class="card">
     <div class="inverter-card">
-      <div class="clim-group" style="flex:1;">
+      <div class="clim-group">
         <span class="clim-group-label">Mode</span>
         <div class="clim-seg">
-          <button class="clim-seg-btn active" id="invModeOn"  onclick="setInverterMode(3)">⚡ On</button>
-          <button class="clim-seg-btn"        id="invModeOff" onclick="setInverterMode(4)">Off</button>
+          <button class="clim-seg-btn active" id="invMode3" onclick="setInverterMode(3)">On</button>
+          <button class="clim-seg-btn"        id="invMode1" onclick="setInverterMode(1)">Charger</button>
+          <button class="clim-seg-btn"        id="invMode2" onclick="setInverterMode(2)">Inverter</button>
+          <button class="clim-seg-btn"        id="invMode4" onclick="setInverterMode(4)">Off</button>
         </div>
       </div>
       <div class="inv-limit">
-        <span class="inv-limit-label">Shore Limit</span>
+        <span class="inv-limit-label">Grid Current Limit</span>
         <div class="inv-limit-row">
           <button class="climate-btn" onclick="adjustInputAmps(-1)">▼</button>
           <div class="inv-amp"><span id="inputAmps">—</span><span class="inv-amp-unit">A</span></div>
@@ -1451,8 +1451,10 @@ function setInverterMode(mode) {
 }
 
 function updateInverterUI() {
-  document.getElementById('invModeOn').classList.toggle('active',  inverterMode === 3);
-  document.getElementById('invModeOff').classList.toggle('active', inverterMode === 4);
+  [1, 2, 3, 4].forEach(m => {
+    const el = document.getElementById(`invMode${m}`);
+    if (el) el.classList.toggle('active', inverterMode === m);
+  });
 }
 
 function adjustInputAmps(delta) {
