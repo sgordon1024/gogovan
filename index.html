@@ -839,8 +839,8 @@
     </div>
     <div class="power-cell">
       <div class="power-label">Time to Empty</div>
-      <div class="power-value" id="battTTE" style="color:var(--txt)">—</div>
-      <div class="power-sub" id="battTTESub">Battery life</div>
+      <div class="power-value" id="battTTE" style="color:var(--txt);font-size:clamp(14px,4vw,18px)">—</div>
+      <div class="power-sub" id="battTTESub">to 10% SOC</div>
     </div>
   </div>
 
@@ -1531,47 +1531,75 @@ function updateSoc(val) {
     pct > 80 ? 'Full' : pct > 50 ? 'Good' : pct > 20 ? 'Low' : 'Critical';
 }
 
+let battPower  = 0;     // W, updated by updatePower
+let battSoc    = null;  // %, updated by Batteries handler
+let battCapWh  = null;  // Wh, derived from first reliable TTG observation
+let lastTTG    = null;  // seconds from BMS, or null
+
 function updatePower(val) {
-  const w  = Math.round(val);
+  battPower = Math.round(val);
   const el = document.getElementById('battA');
-  el.textContent = (w > 0 ? '+' : '') + w + ' W';
-  el.style.color = w > 10 ? 'var(--green)' : w < -10 ? 'var(--red)' : 'var(--blue)';
+  el.textContent = (battPower > 0 ? '+' : '') + battPower + ' W';
+  el.style.color = battPower > 10 ? 'var(--green)' : battPower < -10 ? 'var(--red)' : 'var(--blue)';
   document.getElementById('battALabel').textContent =
-    w > 10 ? 'Charging' : w < -10 ? 'Discharging' : 'Idle';
-  // Update TTE sub-label when TTG not available from BMS
-  if (lastTTG == null) {
-    document.getElementById('battTTESub').textContent =
-      w > 10 ? 'Charging' : w < -10 ? 'Discharging' : 'Idle';
+    battPower > 10 ? 'Charging' : battPower < -10 ? 'Discharging' : 'Idle';
+  recalcTTE();
+}
+
+function updateTTE(ttgSeconds) {
+  lastTTG = ttgSeconds;
+  // Learn battery capacity from BMS TTG whenever we have a clean reading
+  if (ttgSeconds != null && ttgSeconds > 3600 && battSoc != null && battSoc > 15 && battPower < -5) {
+    battCapWh = (Math.abs(battPower) * (ttgSeconds / 3600)) / (battSoc / 100);
+  }
+  recalcTTE();
+}
+
+function recalcTTE() {
+  const el  = document.getElementById('battTTE');
+  const sub = document.getElementById('battTTESub');
+  if (!el || !sub) return;
+
+  if (battPower > 10) {
+    el.textContent  = 'Charging';
+    el.style.color  = 'var(--green)';
+    sub.textContent = 'Battery';
+    return;
+  }
+
+  let tteSecs = null;
+
+  if (lastTTG != null && lastTTG > 0 && battSoc != null && battSoc > 10) {
+    // BMS-provided TTG scaled from 0% target down to 10% target
+    tteSecs = lastTTG * Math.max(0, battSoc - 10) / battSoc;
+  } else if (battCapWh != null && battSoc != null && battSoc > 10 && battPower < -5) {
+    // Use derived capacity when BMS TTG is unavailable
+    const remainWh = Math.max(0, (battSoc - 10) / 100 * battCapWh);
+    tteSecs = (remainWh / Math.abs(battPower)) * 3600;
+  }
+
+  if (tteSecs != null && tteSecs > 60) {
+    el.textContent  = formatTTE(tteSecs);
+    const h = tteSecs / 3600;
+    el.style.color  = h < 3 ? 'var(--red)' : h < 8 ? 'var(--amber)' : 'var(--txt)';
+    sub.textContent = 'to 10% SOC';
+  } else {
+    el.textContent  = '—';
+    el.style.color  = 'var(--txt)';
+    sub.textContent = battPower < -10 ? 'Discharging' : 'Standby';
   }
 }
 
-let lastTTG = null;
-
-function updateTTE(seconds) {
-  lastTTG = seconds;
-  const el  = document.getElementById('battTTE');
-  const sub = document.getElementById('battTTESub');
-  if (seconds == null || seconds <= 0) {
-    el.textContent  = '—';
-    el.style.color  = 'var(--txt)';
-    // sub-label will be updated by updatePower
-    return;
-  }
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  let display;
+function formatTTE(secs) {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
   if (h >= 48) {
     const d = Math.floor(h / 24);
     const rh = h % 24;
-    display = rh > 0 ? `${d}d ${rh}h` : `${d}d`;
-  } else if (h >= 1) {
-    display = m > 0 ? `${h}h ${m}m` : `${h}h`;
-  } else {
-    display = `${m}m`;
+    return rh ? `${d}d ${rh}h` : `${d}d`;
   }
-  el.textContent  = display;
-  el.style.color  = h < 3 ? 'var(--red)' : h < 8 ? 'var(--amber)' : 'var(--txt)';
-  sub.textContent = 'Time to empty';
+  if (h >= 1) return m ? `${h}h ${m}m` : `${h}h`;
+  return `${m}m`;
 }
 
 function updateSolar(val) {
@@ -1670,7 +1698,7 @@ function connectMQTT() {
       try {
         const arr = JSON.parse(msg.toString())?.value;
         const b = Array.isArray(arr) ? arr[0] : null;
-        if (b?.soc != null) updateSoc(b.soc);
+        if (b?.soc != null) { battSoc = b.soc; updateSoc(b.soc); }
         if (b?.voltage != null)
           document.getElementById('battSub').textContent = b.voltage.toFixed(1) + 'V';
       } catch {}
