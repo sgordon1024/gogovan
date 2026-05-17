@@ -142,7 +142,7 @@
     /* ── Power strip ──────────────────────────────── */
     .power-strip {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
       gap: 1px;
       background: var(--border);
       border-radius: var(--radius);
@@ -836,6 +836,11 @@
       <div class="power-label">Power</div>
       <div class="power-value" id="battA" style="color:var(--blue)">0 W</div>
       <div class="power-sub" id="battALabel">Idle</div>
+    </div>
+    <div class="power-cell">
+      <div class="power-label">Time to Empty</div>
+      <div class="power-value" id="battTTE" style="color:var(--txt)">—</div>
+      <div class="power-sub" id="battTTESub">Battery life</div>
     </div>
   </div>
 
@@ -1570,6 +1575,40 @@ function updatePower(val) {
   el.style.color = w > 10 ? 'var(--green)' : w < -10 ? 'var(--red)' : 'var(--blue)';
   document.getElementById('battALabel').textContent =
     w > 10 ? 'Charging' : w < -10 ? 'Discharging' : 'Idle';
+  // Update TTE sub-label when TTG not available from BMS
+  if (lastTTG == null) {
+    document.getElementById('battTTESub').textContent =
+      w > 10 ? 'Charging' : w < -10 ? 'Discharging' : 'Idle';
+  }
+}
+
+let lastTTG = null;
+
+function updateTTE(seconds) {
+  lastTTG = seconds;
+  const el  = document.getElementById('battTTE');
+  const sub = document.getElementById('battTTESub');
+  if (seconds == null || seconds <= 0) {
+    el.textContent  = '—';
+    el.style.color  = 'var(--txt)';
+    // sub-label will be updated by updatePower
+    return;
+  }
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  let display;
+  if (h >= 48) {
+    const d = Math.floor(h / 24);
+    const rh = h % 24;
+    display = rh > 0 ? `${d}d ${rh}h` : `${d}d`;
+  } else if (h >= 1) {
+    display = m > 0 ? `${h}h ${m}m` : `${h}h`;
+  } else {
+    display = `${m}m`;
+  }
+  el.textContent  = display;
+  el.style.color  = h < 3 ? 'var(--red)' : h < 8 ? 'var(--amber)' : 'var(--txt)';
+  sub.textContent = 'Time to empty';
 }
 
 function updateSolar(val) {
@@ -1686,6 +1725,8 @@ function connectMQTT() {
 
     let val;
     try { val = JSON.parse(msg.toString())?.value; } catch { return; }
+    // Note: val may be null (BMS sends null TTG when not discharging)
+    if (topic === `${P}/battery/1/TimeToGo`) { updateTTE(val); return; }
     if (val == null) return;
     if      (topic === `${P}/system/0/Dc/Battery/Power`) updatePower(val);
     else if (topic.includes('/solarcharger/') && topic.endsWith('/Yield/Power')) updateSolar(val);
