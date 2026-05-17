@@ -635,6 +635,30 @@
     }
     .inv-amp-unit { font-size: 13px; color: var(--txt2); font-weight: 600; }
 
+    /* ── Shore power indicator ────────────────────── */
+    .inv-shore-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .inv-shore-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--txt2);
+      flex-shrink: 0;
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+    .inv-shore-dot.connected {
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+    }
+    .inv-shore-label {
+      font-size: 11px;
+      color: var(--txt2);
+      font-weight: 500;
+    }
+
     /* ── Theme button ─────────────────────────────── */
     .theme-btn-wrap {
       display: flex;
@@ -866,17 +890,24 @@
 
   <!-- CONTROLS -->
   <span class="section-label section-label-solo">Controls</span>
-  <div class="controls-grid">
-    <button class="ctrl-btn" onclick="awningExtend()">
+  <div class="awning-grid">
+    <button class="ctrl-btn" id="awningExtBtn" onclick="awningExtend()">
       <div class="ctrl-btn-icon">↗️</div>
-      <div class="ctrl-btn-label">Awning Extend</div>
-      <div class="ctrl-btn-sub">Tap to extend</div>
+      <div class="ctrl-btn-label">Extend</div>
+      <div class="ctrl-btn-sub" id="awningExtState">Tap to extend</div>
     </button>
-    <button class="ctrl-btn" onclick="awningRetract()">
+    <button class="ctrl-btn" onclick="awningStop()">
+      <div class="ctrl-btn-icon">⏹️</div>
+      <div class="ctrl-btn-label">Awning Stop</div>
+      <div class="ctrl-btn-sub">Stop motor</div>
+    </button>
+    <button class="ctrl-btn" id="awningRetBtn" onclick="awningRetract()">
       <div class="ctrl-btn-icon">↙️</div>
-      <div class="ctrl-btn-label">Awning Retract</div>
-      <div class="ctrl-btn-sub">Tap to retract</div>
+      <div class="ctrl-btn-label">Retract</div>
+      <div class="ctrl-btn-sub" id="awningRetState">Tap to retract</div>
     </button>
+  </div>
+  <div class="controls-grid" style="margin-top:10px">
     <button class="ctrl-btn" id="pumpBtn" onclick="togglePump()">
       <div class="ctrl-btn-icon">💧</div>
       <div class="ctrl-btn-label">Water Pump</div>
@@ -893,6 +924,10 @@
   <span class="section-label section-label-solo">Inverter</span>
   <div class="card">
     <div class="inverter-card">
+      <div class="inv-shore-row">
+        <div class="inv-shore-dot" id="invShoreDot"></div>
+        <span class="inv-shore-label" id="invShoreLabel">Shore not connected</span>
+      </div>
       <div class="clim-group">
         <span class="clim-group-label">Mode</span>
         <div class="clim-seg">
@@ -1412,15 +1447,56 @@ function updateAcFanUI() {
   });
 }
 
+// ── Shore power ───────────────────────────────────
+let shoreConnected = false;
+function updateShoreUI(connected) {
+  if (connected === shoreConnected) return;
+  shoreConnected = connected;
+  document.getElementById('invShoreDot').classList.toggle('connected', connected);
+  document.getElementById('invShoreLabel').textContent =
+    connected ? 'Shore power connected' : 'Shore not connected';
+}
+
 // ── Controls ─────────────────────────────────────
 let pumpOn = false;
 let tankHeatOn = false;
+let awningTimer = null;
 
-function awningExtend()  {
-  if (mqttClient?.connected) mqttClient.publish('van/motor/awning-extend',  'on');
+function awningExtend() {
+  if (!mqttClient?.connected) return;
+  clearTimeout(awningTimer);
+  mqttClient.publish('van/motor/awning-extend', 'on');
+  document.getElementById('awningExtBtn').classList.add('active');
+  document.getElementById('awningRetBtn').classList.remove('active');
+  document.getElementById('awningExtState').textContent = 'Extending…';
+  document.getElementById('awningRetState').textContent = 'Tap to retract';
+  awningTimer = setTimeout(() => {
+    document.getElementById('awningExtBtn').classList.remove('active');
+    document.getElementById('awningExtState').textContent = 'Tap to extend';
+  }, 22000);
 }
+
 function awningRetract() {
-  if (mqttClient?.connected) mqttClient.publish('van/motor/awning-retract', 'on');
+  if (!mqttClient?.connected) return;
+  clearTimeout(awningTimer);
+  mqttClient.publish('van/motor/awning-retract', 'on');
+  document.getElementById('awningRetBtn').classList.add('active');
+  document.getElementById('awningExtBtn').classList.remove('active');
+  document.getElementById('awningRetState').textContent = 'Retracting…';
+  document.getElementById('awningExtState').textContent = 'Tap to extend';
+  awningTimer = setTimeout(() => {
+    document.getElementById('awningRetBtn').classList.remove('active');
+    document.getElementById('awningRetState').textContent = 'Tap to retract';
+  }, 22000);
+}
+
+function awningStop() {
+  clearTimeout(awningTimer);
+  document.getElementById('awningExtBtn').classList.remove('active');
+  document.getElementById('awningRetBtn').classList.remove('active');
+  document.getElementById('awningExtState').textContent = 'Tap to extend';
+  document.getElementById('awningRetState').textContent = 'Tap to retract';
+  if (mqttClient?.connected) mqttClient.publish('van/motor/awning-extend', 'off');
 }
 function togglePump() {
   pumpOn = !pumpOn;
@@ -1491,9 +1567,9 @@ function updatePower(val) {
   const w  = Math.round(val);
   const el = document.getElementById('battA');
   el.textContent = (w > 0 ? '+' : '') + w + ' W';
-  el.style.color = w > 50 ? 'var(--green)' : w < -50 ? 'var(--red)' : 'var(--blue)';
+  el.style.color = w > 10 ? 'var(--green)' : w < -10 ? 'var(--red)' : 'var(--blue)';
   document.getElementById('battALabel').textContent =
-    w > 50 ? 'Charging' : w < -50 ? 'Discharging' : 'Idle';
+    w > 10 ? 'Charging' : w < -10 ? 'Discharging' : 'Idle';
 }
 
 function updateSolar(val) {
@@ -1513,6 +1589,8 @@ function connectMQTT() {
     client.subscribe(`N/${PORTAL_ID}/#`);
     client.subscribe('van/status/light/+');
     client.subscribe('van/status/ac/+');
+    // Keepalive tells the Cerbo to start streaming live data immediately
+    client.publish(`R/${PORTAL_ID}/keepalive`, '');
     client.publish(`R/${PORTAL_ID}/system/0/Serial`, '');
     client.publish(`R/${PORTAL_ID}/vebus/276/Mode`, '');
     client.publish(`R/${PORTAL_ID}/vebus/276/Ac/In/1/CurrentLimit`, '');
@@ -1583,12 +1661,33 @@ function connectMQTT() {
       return;
     }
 
+    const P = `N/${PORTAL_ID}`;
+
+    // system/0/Batteries is a JSON array — parse SOC and voltage from it
+    if (topic === `${P}/system/0/Batteries`) {
+      try {
+        const arr = JSON.parse(msg.toString())?.value;
+        const b = Array.isArray(arr) ? arr[0] : null;
+        if (b?.soc != null) updateSoc(b.soc);
+        if (b?.voltage != null)
+          document.getElementById('battSub').textContent = b.voltage.toFixed(1) + 'V';
+      } catch {}
+      return;
+    }
+
+    // Shore power: AC input voltage from MultiPlus
+    if (topic === `${P}/vebus/276/Ac/In/1/L1/V`) {
+      try {
+        const v = JSON.parse(msg.toString())?.value ?? 0;
+        updateShoreUI(v > 50);
+      } catch {}
+      return;
+    }
+
     let val;
     try { val = JSON.parse(msg.toString())?.value; } catch { return; }
     if (val == null) return;
-    const P = `N/${PORTAL_ID}`;
-    if      (topic === `${P}/system/0/Dc/Battery/Soc`)   updateSoc(val);
-    else if (topic === `${P}/system/0/Dc/Battery/Power`) updatePower(val);
+    if      (topic === `${P}/system/0/Dc/Battery/Power`) updatePower(val);
     else if (topic.includes('/solarcharger/') && topic.endsWith('/Yield/Power')) updateSolar(val);
     else if (topic === `${P}/vebus/276/Mode`) {
       inverterMode = val;
