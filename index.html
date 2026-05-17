@@ -1,0 +1,1516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" href="icons/app%20icon.png">
+  <link rel="shortcut icon" href="icons/app%20icon.png">
+  <link rel="apple-touch-icon" href="icons/app%20icon.png">
+  <title>GoGoVan</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Default (Night) theme ────────────────────── */
+    :root {
+      --bg:         #07070F;
+      --surface:    #11111E;
+      --surface2:   #18182A;
+      --border:     rgba(255,255,255,0.07);
+      --txt:        #E8E8F0;
+      --txt2:       #6868A0;
+      --blue:       #4FC3F7;
+      --amber:      #FFA040;
+      --amber-dim:  rgba(255,160,64,0.15);
+      --green:      #66BB6A;
+      --red:        #EF5350;
+      --tog-off:    #3a3a4a;
+      --radius:     16px;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--txt);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+      min-height: 100dvh;
+      -webkit-font-smoothing: antialiased;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    body {
+      max-width: 430px;
+      margin: 0 auto;
+      padding: 0 0 48px;
+      min-width: 320px;
+    }
+
+    /* ── Header ───────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 52px 20px 16px;
+    }
+
+    .app-name {
+      font-size: clamp(18px, 5vw, 22px);
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--txt);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .app-name:hover .edit-icon { opacity: 0.5; }
+    .edit-icon { opacity: 0; font-size: 13px; transition: opacity 0.2s; flex-shrink: 0; }
+
+    .name-input {
+      font-size: clamp(18px, 5vw, 22px);
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--txt);
+      background: transparent;
+      border: none;
+      border-bottom: 1.5px solid var(--amber);
+      outline: none;
+      width: 180px;
+      max-width: 55vw;
+      padding-bottom: 1px;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 5px 10px;
+      font-size: 12px;
+      color: var(--txt2);
+      flex-shrink: 0;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+    }
+
+    /* ── Section labels ───────────────────────────── */
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--txt2);
+    }
+
+    /* aligned to card interior edge */
+    .section-label-solo {
+      padding: 0 28px;
+      margin: 24px 0 10px;
+      display: block;
+    }
+
+    .section-label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      margin: 24px 0 10px;
+    }
+
+    /* ── Card ─────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin: 0 12px;
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    /* ── Power strip ──────────────────────────────── */
+    .power-strip {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin: 0 12px;
+    }
+
+    .power-cell {
+      background: var(--surface);
+      padding: clamp(12px,3vw,16px) clamp(10px,3vw,14px);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      transition: background 0.3s;
+    }
+
+    .power-cell:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+    .power-cell:last-child  { border-radius: 0 var(--radius) var(--radius) 0; }
+
+    .power-label { font-size: 11px; color: var(--txt2); font-weight: 500; }
+    .power-value { font-size: clamp(18px,5vw,22px); font-weight: 700; letter-spacing: -0.5px; line-height: 1; }
+    .power-sub   { font-size: 11px; color: var(--txt2); }
+
+    /* ── Scenes ───────────────────────────────────── */
+    .scenes-wrap {
+      padding: 0 12px;
+      margin: 0 0 10px;
+    }
+
+    .scenes-scroll {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 4px 2px 6px;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+      align-items: center;
+    }
+
+    .scenes-scroll::-webkit-scrollbar { display: none; }
+
+    .scene-chip {
+      display: flex;
+      align-items: center;
+      padding: 7px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--txt2);
+      white-space: nowrap;
+      cursor: pointer;
+      flex-shrink: 0;
+      position: relative;
+      transition: all 0.2s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .scene-chip.active {
+      background: var(--amber-dim);
+      border-color: var(--amber);
+      color: var(--amber);
+    }
+
+    .scene-chip:active { transform: scale(0.95); }
+
+    .scene-delete-badge {
+      display: none;
+      position: absolute;
+      top: -7px;
+      right: -7px;
+      width: 18px;
+      height: 18px;
+      background: var(--red);
+      border-radius: 50%;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      border: none;
+      cursor: pointer;
+      z-index: 2;
+      padding: 0;
+    }
+
+    .scenes-editing .scene-delete-badge { display: flex; }
+
+    .scene-add-btn {
+      width: 34px;
+      height: 34px;
+      background: var(--surface2);
+      border: 1.5px dashed var(--border);
+      border-radius: 50%;
+      font-size: 20px;
+      color: var(--txt2);
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+      transition: all 0.2s;
+    }
+
+    .scene-edit-btn {
+      width: 34px;
+      height: 34px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      font-size: 14px;
+      color: var(--txt2);
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+      transition: all 0.2s;
+    }
+
+    .scene-edit-btn.active {
+      background: var(--amber-dim);
+      border-color: var(--amber);
+      color: var(--amber);
+    }
+
+    .scene-name-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .scene-name-input {
+      width: 120px;
+      padding: 6px 10px;
+      background: var(--surface2);
+      border: 1px solid var(--amber);
+      border-radius: 16px;
+      color: var(--txt);
+      font-size: 13px;
+      font-weight: 500;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    .scene-save-btn {
+      padding: 6px 12px;
+      background: var(--amber-dim);
+      border: 1px solid var(--amber);
+      border-radius: 16px;
+      color: var(--amber);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── Apple toggle ─────────────────────────────── */
+    .toggle-switch {
+      position: relative;
+      width: 36px;
+      height: 8px;
+      background: var(--tog-off);
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      flex-shrink: 0;
+      overflow: visible;
+      transition: background 0.25s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: -4px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .toggle-switch.on { background: var(--amber); }
+    .toggle-switch.on::after { transform: translateX(18px); }
+
+    /* ── Group header ─────────────────────────────── */
+    .group-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .group-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--txt2);
+    }
+
+    .group-divider { height: 1px; background: var(--border); }
+
+    /* ── Light rows ───────────────────────────────── */
+    .light-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+
+    .light-row:last-child { border-bottom: none; }
+
+    .light-toggle {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1.5px solid var(--border);
+      background: transparent;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .light-toggle svg { opacity: 0.3; transition: opacity 0.2s; }
+    .light-row.on .light-toggle { background: var(--amber-dim); border-color: var(--amber); }
+    .light-row.on .light-toggle svg { opacity: 1; }
+
+    .light-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--txt);
+      width: 95px;
+      flex-shrink: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: color 0.2s;
+    }
+
+    .light-row:not(.on) .light-name { color: var(--txt2); }
+
+    .slider-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .dim-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      flex: 1;
+      min-width: 0;
+      height: 4px;
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+      background: var(--surface2);
+    }
+
+    .light-row.on .dim-slider {
+      background: linear-gradient(
+        to right,
+        var(--amber) 0%,
+        var(--amber) var(--pct, 0%),
+        var(--surface2) var(--pct, 0%),
+        var(--surface2) 100%
+      );
+    }
+
+    .dim-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+
+    .dim-slider:active::-webkit-slider-thumb { transform: scale(1.2); }
+    .light-row:not(.on) .dim-slider::-webkit-slider-thumb { background: #3a3a5a; box-shadow: none; }
+
+    .dim-pct {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--txt2);
+      width: 28px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+
+    .light-row.on .dim-pct { color: var(--amber); }
+
+    /* ── Climate ──────────────────────────────────── */
+    .climate-card {
+      padding: 18px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .climate-left { display: flex; flex-direction: column; gap: 4px; }
+
+    .climate-mode {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--blue);
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .climate-mode.off { color: var(--txt2); }
+
+    .climate-temp-actual {
+      font-size: clamp(34px, 9vw, 42px);
+      font-weight: 700;
+      letter-spacing: -1.5px;
+      line-height: 1;
+    }
+
+    .climate-sub { font-size: 12px; color: var(--txt2); }
+
+    .climate-controls {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .climate-set { font-size: 18px; font-weight: 700; color: var(--txt); font-variant-numeric: tabular-nums; }
+
+    .climate-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 1.5px solid var(--border);
+      background: var(--surface2);
+      color: var(--txt);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s, transform 0.1s;
+      user-select: none;
+    }
+
+    .climate-btn:active { transform: scale(0.93); }
+
+    .climate-buttons {
+      border-top: 1px solid var(--border);
+      padding: 14px 16px;
+      display: flex;
+      gap: 16px;
+    }
+
+    .clim-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .clim-group-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--txt2);
+    }
+
+    .clim-seg {
+      display: flex;
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 3px;
+      gap: 2px;
+    }
+
+    .clim-seg-btn {
+      flex: 1;
+      padding: 7px 4px;
+      border-radius: 7px;
+      border: none;
+      background: transparent;
+      color: var(--txt2);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s;
+      -webkit-tap-highlight-color: transparent;
+      white-space: nowrap;
+    }
+
+    .clim-seg-btn:active { transform: scale(0.95); }
+
+    .clim-seg-btn.active {
+      background: var(--surface);
+      color: var(--blue);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+
+    /* ── Quick controls ───────────────────────────── */
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      padding: 0 12px;
+    }
+
+    .ctrl-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s, transform 0.1s, border-color 0.2s;
+      text-align: left;
+    }
+
+    .ctrl-btn:active { transform: scale(0.97); }
+    .ctrl-btn.active { background: rgba(79,195,247,0.1); border-color: rgba(79,195,247,0.3); }
+
+    .awning-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      padding: 0 12px;
+    }
+
+    .ctrl-btn-icon  { font-size: 20px; }
+    .ctrl-btn-label { font-size: 13px; font-weight: 600; color: var(--txt); }
+    .ctrl-btn-sub   { font-size: 11px; color: var(--txt2); }
+
+    /* ── Theme button ─────────────────────────────── */
+    .theme-btn-wrap {
+      display: flex;
+      justify-content: center;
+      padding: 32px 0 8px;
+    }
+
+    .theme-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 10px 20px;
+      color: var(--txt2);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: all 0.2s;
+    }
+
+    .theme-btn:active { transform: scale(0.96); }
+
+    /* ── Theme picker overlay ─────────────────────── */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 100;
+      align-items: flex-end;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+
+    .overlay.open { display: flex; }
+
+    .theme-sheet {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px 24px 0 0;
+      padding: 16px 20px 40px;
+      width: 100%;
+      max-width: 430px;
+      animation: slideUp 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0); }
+    }
+
+    .sheet-handle {
+      width: 36px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 0 auto 16px;
+    }
+
+    .sheet-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--txt);
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .theme-group-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--txt2);
+      margin-bottom: 10px;
+    }
+
+    .theme-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-wrap: nowrap;
+      justify-content: space-between;
+    }
+
+    .theme-swatch {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      flex: 1;
+      min-width: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .swatch-circle {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      position: relative;
+      border: 2px solid transparent;
+      transition: border-color 0.2s, transform 0.15s;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .swatch-circle::after {
+      content: '';
+      position: absolute;
+      bottom: 6px;
+      right: 6px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+    }
+
+    .swatch-check {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      background: rgba(0,0,0,0.25);
+    }
+
+    .theme-swatch.active .swatch-circle { border-color: var(--amber); }
+    .theme-swatch.active .swatch-check { display: flex; }
+    .theme-swatch:active .swatch-circle { transform: scale(0.93); }
+
+    .swatch-name {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--txt2);
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%;
+    }
+
+    .theme-swatch.active .swatch-name { color: var(--amber); }
+  </style>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+</head>
+<body>
+
+  <header>
+    <div class="app-name" id="nameDisplay">
+      <img src="logo.png" alt="GoGoVan" style="height:40px;width:40px;object-fit:contain;">
+    </div>
+    <div class="status-pill">
+      <div class="status-dot"></div>
+      <span>Live</span>
+    </div>
+  </header>
+
+  <!-- POWER -->
+  <span class="section-label section-label-solo">Power</span>
+  <div class="power-strip">
+    <div class="power-cell">
+      <div class="power-label">Battery</div>
+      <div class="power-value" style="color:var(--green)" id="battPct">100%</div>
+      <div class="power-sub" id="battSub">Full</div>
+    </div>
+    <div class="power-cell">
+      <div class="power-label">Solar</div>
+      <div class="power-value" style="color:var(--amber)" id="solarW">11 W</div>
+      <div class="power-sub">PV Charger</div>
+    </div>
+    <div class="power-cell">
+      <div class="power-label">Power</div>
+      <div class="power-value" id="battA" style="color:var(--blue)">0 W</div>
+      <div class="power-sub" id="battALabel">Idle</div>
+    </div>
+  </div>
+
+  <!-- LIGHTS -->
+  <div class="section-label-row">
+    <span class="section-label">Lights</span>
+    <button class="toggle-switch" id="masterBtn" onclick="toggleAllLights()" aria-label="All lights"></button>
+  </div>
+  <div class="scenes-wrap">
+    <div class="scenes-scroll" id="scenesScroll"></div>
+  </div>
+  <div class="card">
+    <div id="lightsList"></div>
+  </div>
+
+  <!-- CLIMATE -->
+  <span class="section-label section-label-solo">Climate</span>
+  <div class="card">
+    <div class="climate-card">
+      <div class="climate-left">
+        <div class="climate-mode off" id="climateModeLine">
+          <span id="climateIcon">🌡️</span>
+          <span id="climateMode">Off</span>
+        </div>
+        <div class="climate-temp-actual" id="climateActual">—°</div>
+        <div class="climate-sub">Current temp</div>
+      </div>
+      <div class="climate-controls">
+        <button class="climate-btn" onclick="acTempUp()">▲</button>
+        <div class="climate-set"><span id="climateSet">—</span>°</div>
+        <button class="climate-btn" onclick="acTempDown()">▼</button>
+      </div>
+    </div>
+    <div class="climate-buttons">
+      <div class="clim-group">
+        <span class="clim-group-label">Mode</span>
+        <div class="clim-seg">
+          <button class="clim-seg-btn" id="acModeCool" onclick="setAcMode('cool')">❄️ Cool</button>
+          <button class="clim-seg-btn active" id="acModeOff"  onclick="setAcMode('off')">Off</button>
+        </div>
+      </div>
+      <div class="clim-group">
+        <span class="clim-group-label">Fan</span>
+        <div class="clim-seg">
+          <button class="clim-seg-btn" id="acFanHigh" onclick="setAcFan('high')">High</button>
+          <button class="clim-seg-btn" id="acFanLow"  onclick="setAcFan('low')">Low</button>
+          <button class="clim-seg-btn active" id="acFanAuto" onclick="setAcFan('auto')">Auto</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <span class="section-label section-label-solo">Controls</span>
+  <div class="controls-grid">
+    <button class="ctrl-btn" onclick="awningExtend()">
+      <div class="ctrl-btn-icon">↗️</div>
+      <div class="ctrl-btn-label">Awning Extend</div>
+      <div class="ctrl-btn-sub">Tap to extend</div>
+    </button>
+    <button class="ctrl-btn" onclick="awningRetract()">
+      <div class="ctrl-btn-icon">↙️</div>
+      <div class="ctrl-btn-label">Awning Retract</div>
+      <div class="ctrl-btn-sub">Tap to retract</div>
+    </button>
+    <button class="ctrl-btn" id="pumpBtn" onclick="togglePump()">
+      <div class="ctrl-btn-icon">💧</div>
+      <div class="ctrl-btn-label">Water Pump</div>
+      <div class="ctrl-btn-sub" id="pumpState">Off</div>
+    </button>
+    <button class="ctrl-btn" id="tankHeatBtn" onclick="toggleTankHeater()">
+      <div class="ctrl-btn-icon">🔥</div>
+      <div class="ctrl-btn-label">Tank Heater</div>
+      <div class="ctrl-btn-sub" id="tankHeatState">Off</div>
+    </button>
+  </div>
+
+  <!-- THEME BUTTON -->
+  <div class="theme-btn-wrap">
+    <button class="theme-btn" onclick="openThemePicker()">
+      <span>🎨</span>
+      <span>Appearance</span>
+    </button>
+  </div>
+
+  <!-- THEME PICKER -->
+  <div class="overlay" id="overlay" onclick="overlayClick(event)">
+    <div class="theme-sheet" id="themeSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Appearance</div>
+      <div class="theme-group-label">Dark</div>
+      <div class="theme-row" id="darkRow"></div>
+      <div class="theme-group-label">Light</div>
+      <div class="theme-row" id="lightRow"></div>
+    </div>
+  </div>
+
+<script>
+// ── Themes ────────────────────────────────────────
+const THEMES = [
+  { id:'night',   name:'Night',   dark:true,  bg:'#07070F', accent:'#FFA040',
+    vars:{'--bg':'#07070F','--surface':'#11111E','--surface2':'#18182A','--border':'rgba(255,255,255,0.07)','--txt':'#E8E8F0','--txt2':'#6868A0','--blue':'#4FC3F7','--amber':'#FFA040','--amber-dim':'rgba(255,160,64,0.15)','--green':'#66BB6A','--red':'#EF5350','--tog-off':'#3a3a4a'}},
+  { id:'forest',  name:'Forest',  dark:true,  bg:'#060E07', accent:'#7CB87C',
+    vars:{'--bg':'#060E07','--surface':'#0E1A10','--surface2':'#162018','--border':'rgba(255,255,255,0.07)','--txt':'#DDEEDD','--txt2':'#527A5A','--blue':'#4DB6AC','--amber':'#7CB87C','--amber-dim':'rgba(124,184,124,0.15)','--green':'#81C784','--red':'#EF5350','--tog-off':'#2A3A2C'}},
+  { id:'carbon',  name:'Carbon',  dark:true,  bg:'#0A0A0A', accent:'#00BCD4',
+    vars:{'--bg':'#0A0A0A','--surface':'#161616','--surface2':'#202020','--border':'rgba(255,255,255,0.06)','--txt':'#F0F0F0','--txt2':'#606060','--blue':'#00BCD4','--amber':'#00BCD4','--amber-dim':'rgba(0,188,212,0.12)','--green':'#66BB6A','--red':'#EF5350','--tog-off':'#333333'}},
+  { id:'dusk',    name:'Dusk',    dark:true,  bg:'#0A080F', accent:'#B48AFF',
+    vars:{'--bg':'#0A080F','--surface':'#14111E','--surface2':'#1E1928','--border':'rgba(255,255,255,0.07)','--txt':'#EAE8F0','--txt2':'#7060A0','--blue':'#7EB3FF','--amber':'#B48AFF','--amber-dim':'rgba(180,138,255,0.15)','--green':'#66BB6A','--red':'#EF5350','--tog-off':'#3A3050'}},
+  { id:'ember',   name:'Ember',   dark:true,  bg:'#0F0A07', accent:'#FF6B35',
+    vars:{'--bg':'#0F0A07','--surface':'#1A1208','--surface2':'#231A0E','--border':'rgba(255,255,255,0.07)','--txt':'#F0EBE5','--txt2':'#806050','--blue':'#FF9F57','--amber':'#FF6B35','--amber-dim':'rgba(255,107,53,0.15)','--green':'#66BB6A','--red':'#EF5350','--tog-off':'#3A2A1C'}},
+  { id:'cloud',   name:'Cloud',   dark:false, bg:'#F2F2F7', accent:'#007AFF',
+    vars:{'--bg':'#F2F2F7','--surface':'#FFFFFF','--surface2':'#F0F0F5','--border':'rgba(0,0,0,0.08)','--txt':'#1C1C1E','--txt2':'#8E8E93','--blue':'#007AFF','--amber':'#FF9500','--amber-dim':'rgba(255,149,0,0.12)','--green':'#34C759','--red':'#FF3B30','--tog-off':'#E5E5EA'}},
+  { id:'sand',    name:'Sand',    dark:false, bg:'#F5F0E8', accent:'#D4832A',
+    vars:{'--bg':'#F5F0E8','--surface':'#FFFCF5','--surface2':'#EDE8DF','--border':'rgba(0,0,0,0.07)','--txt':'#2D2417','--txt2':'#8B7355','--blue':'#5B8AC0','--amber':'#D4832A','--amber-dim':'rgba(212,131,42,0.12)','--green':'#5A8F5A','--red':'#C0392B','--tog-off':'#D9D0C0'}},
+  { id:'meadow',  name:'Meadow',  dark:false, bg:'#EFF4EE', accent:'#2E7D32',
+    vars:{'--bg':'#EFF4EE','--surface':'#FFFFFF','--surface2':'#E5EEE4','--border':'rgba(0,0,0,0.07)','--txt':'#1A2E1A','--txt2':'#5A7A5A','--blue':'#2196F3','--amber':'#2E7D32','--amber-dim':'rgba(46,125,50,0.12)','--green':'#2E7D32','--red':'#D32F2F','--tog-off':'#C8D8C8'}},
+  { id:'frost',   name:'Frost',   dark:false, bg:'#EFF4F8', accent:'#0288D1',
+    vars:{'--bg':'#EFF4F8','--surface':'#FFFFFF','--surface2':'#E5EEF5','--border':'rgba(0,0,0,0.07)','--txt':'#1A2535','--txt2':'#5B7A9A','--blue':'#0288D1','--amber':'#FF8F00','--amber-dim':'rgba(255,143,0,0.12)','--green':'#2E7D32','--red':'#D32F2F','--tog-off':'#C5D5E5'}},
+  { id:'rose',    name:'Rose',    dark:false, bg:'#FBF0F0', accent:'#C2185B',
+    vars:{'--bg':'#FBF0F0','--surface':'#FFFFFF','--surface2':'#F5E5E8','--border':'rgba(0,0,0,0.07)','--txt':'#2D1515','--txt2':'#9A6A6A','--blue':'#E91E8C','--amber':'#C2185B','--amber-dim':'rgba(194,24,91,0.12)','--green':'#388E3C','--red':'#D32F2F','--tog-off':'#E8C8CC'}},
+];
+
+let activeTheme = localStorage.getItem('theme') || 'night';
+
+function applyTheme(id) {
+  const t = THEMES.find(t => t.id === id) || THEMES[0];
+  const root = document.documentElement;
+  Object.entries(t.vars).forEach(([k,v]) => root.style.setProperty(k, v));
+  activeTheme = id;
+  localStorage.setItem('theme', id);
+  renderThemePicker();
+  // re-render sliders since their gradient uses CSS vars via inline style
+  renderLights();
+}
+
+function renderThemePicker() {
+  ['darkRow','lightRow'].forEach(rowId => {
+    const isDark = rowId === 'darkRow';
+    const row = document.getElementById(rowId);
+    row.innerHTML = '';
+    THEMES.filter(t => t.dark === isDark).forEach(t => {
+      const el = document.createElement('div');
+      el.className = 'theme-swatch' + (t.id === activeTheme ? ' active' : '');
+      el.onclick = () => { applyTheme(t.id); };
+      el.innerHTML = `
+        <div class="swatch-circle" style="background:${t.bg};">
+          <div class="swatch-check">✓</div>
+          <div style="position:absolute;bottom:7px;right:7px;width:13px;height:13px;border-radius:50%;background:${t.accent};"></div>
+        </div>
+        <span class="swatch-name">${t.name}</span>`;
+      row.appendChild(el);
+    });
+  });
+}
+
+function openThemePicker() {
+  renderThemePicker();
+  document.getElementById('overlay').classList.add('open');
+}
+
+function overlayClick(e) {
+  if (e.target === document.getElementById('overlay')) {
+    document.getElementById('overlay').classList.remove('open');
+  }
+}
+
+// ── Van name ─────────────────────────────────────
+function startEditName() {
+  const display = document.getElementById('nameDisplay');
+  const current = localStorage.getItem('vanName') || 'GoGoVan';
+  display.innerHTML = `<input class="name-input" id="nameInput" value="${current}" maxlength="24" autofocus>`;
+  const input = document.getElementById('nameInput');
+  input.select();
+  input.addEventListener('blur', saveName);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); });
+}
+
+function saveName() {
+  const input = document.getElementById('nameInput');
+  const val = (input?.value || '').trim() || 'GoGoVan';
+  localStorage.setItem('vanName', val);
+  document.getElementById('nameDisplay').innerHTML = `
+    <span id="nameText">${val}</span>
+    <span class="edit-icon">✎</span>`;
+  document.getElementById('nameDisplay').onclick = startEditName;
+}
+
+// ── MQTT publish helper ───────────────────────────
+let mqttClient = null;
+
+// Maps dashboard light IDs → MQTT topic keys (must match can-bridge.py LIGHTS dict)
+const LIGHT_MQTT_KEY = {
+  main:    'ceiling',
+  kitchen: 'kitchen',
+  bed:     'bed',
+  cargo:   'cargo',
+  bunk:    'bunk',
+  bench:   'bench',
+  awning:  'awning',
+  step:    'step',
+};
+
+function publishLight(id, onOff) {
+  const key = LIGHT_MQTT_KEY[id];
+  if (!key || !mqttClient || !mqttClient.connected) return;
+  mqttClient.publish(`van/light/${key}`, onOff);
+  console.log(`MQTT → van/light/${key}: ${onOff}`);
+}
+
+// ── Lights ────────────────────────────────────────
+const LIGHT_GROUPS = [
+  { id:'interior', label:'Interior', lights:[
+    { id:'main',    name:'Main Ceiling', on:true,  level:80 },
+    { id:'kitchen', name:'Kitchen',      on:true,  level:60 },
+    { id:'bed',     name:'Bed',          on:true,  level:45 },
+    { id:'cargo',   name:'Cargo',        on:false, level:0  },
+    { id:'bunk',    name:'Bunk Accent',  on:false, level:0  },
+    { id:'bench',   name:'Bench',        on:false, level:0  },
+  ]},
+  { id:'exterior', label:'Exterior', lights:[
+    { id:'awning',  name:'Awning',       on:false, level:0  },
+    { id:'step',    name:'Step',         on:false, level:0  },
+  ]},
+];
+
+const allLights = () => LIGHT_GROUPS.flatMap(g => g.lights);
+const findLight = id => allLights().find(l => l.id === id);
+
+function lightRowHTML(light) {
+  const { on, level, id, name } = light;
+  const lvl = on ? level : 0;
+  const stroke = on ? 'var(--amber)' : 'var(--txt2)';
+  return `<div class="light-row${on?' on':''}" id="row-${id}">
+    <button class="light-toggle" onclick="toggleLight('${id}')" aria-label="Toggle ${name}">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${stroke}" stroke-width="2.5" stroke-linecap="round">
+        <circle cx="12" cy="12" r="5"/>
+        <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    </button>
+    <span class="light-name">${name}</span>
+    <div class="slider-wrap">
+      <input type="range" class="dim-slider" min="0" max="100" value="${lvl}" style="--pct:${lvl}%"
+        oninput="dimLightUI('${id}',this.value)"
+        onchange="dimLightSend('${id}',this.value)"
+        aria-label="${name} brightness">
+      <span class="dim-pct">${on ? lvl+'%' : '—'}</span>
+    </div>
+  </div>`;
+}
+
+function renderLights() {
+  let html = '';
+  LIGHT_GROUPS.forEach((group, gi) => {
+    const anyOn = group.lights.some(l => l.on);
+    html += `<div class="group-header">
+      <span class="group-label">${group.label}</span>
+      <button class="toggle-switch${anyOn?' on':''}" onclick="toggleGroup('${group.id}')" aria-label="${group.label} lights"></button>
+    </div>`;
+    group.lights.forEach(l => { html += lightRowHTML(l); });
+    if (gi < LIGHT_GROUPS.length - 1) html += `<div class="group-divider"></div>`;
+  });
+  document.getElementById('lightsList').innerHTML = html;
+  updateMasterBtn();
+}
+
+function updateMasterBtn() {
+  document.getElementById('masterBtn').classList.toggle('on', allLights().some(l => l.on));
+}
+
+function toggleLight(id) {
+  const l = findLight(id);
+  l.on = !l.on;
+  if (l.on && l.level === 0) l.level = 80;
+  if (!l.on) l.level = 0;
+  publishLight(id, l.on ? String(l.level) : 'off');
+  renderLights();
+  markSceneDirty();
+}
+
+function dimLightUI(id, value) {
+  // Visual update only — called on every drag tick (oninput)
+  const l = findLight(id); if (!l) return;
+  const v = parseInt(value);
+  l.level = v; l.on = v > 0;
+  const row = document.getElementById('row-' + id);
+  row.querySelector('.dim-slider').style.setProperty('--pct', v + '%');
+  row.classList.toggle('on', v > 0);
+  row.querySelector('.dim-pct').textContent = v > 0 ? v + '%' : '—';
+  updateMasterBtn();
+  const group = LIGHT_GROUPS.find(g => g.lights.some(x => x.id === id));
+  if (group) {
+    const anyOn = group.lights.some(l => l.on);
+    row.closest('.card').querySelectorAll('.group-header').forEach(h => {
+      if (h.querySelector('.group-label').textContent === group.label)
+        h.querySelector('.toggle-switch').classList.toggle('on', anyOn);
+    });
+  }
+}
+
+function dimLightSend(id, value) {
+  // MQTT publish — called only when slider is released (onchange)
+  const v = parseInt(value);
+  publishLight(id, v > 0 ? String(v) : 'off');
+  markSceneDirty();
+}
+
+function dimLight(id, value) {
+  dimLightUI(id, value);
+  dimLightSend(id, value);
+}
+
+function toggleGroup(groupId) {
+  const g = LIGHT_GROUPS.find(g => g.id === groupId); if (!g) return;
+  const anyOn = g.lights.some(l => l.on);
+  g.lights.forEach(l => {
+    l.on = !anyOn; l.level = !anyOn ? 80 : 0;
+    publishLight(l.id, l.on ? '80' : 'off');
+  });
+  renderLights();
+  markSceneDirty();
+}
+
+function toggleAllLights() {
+  const anyOn = allLights().some(l => l.on);
+  LIGHT_GROUPS.forEach(g => g.lights.forEach(l => {
+    l.on = !anyOn; l.level = !anyOn ? 80 : 0;
+    publishLight(l.id, l.on ? '80' : 'off');
+  }));
+  renderLights();
+  markSceneDirty();
+}
+
+// ── Scenes ────────────────────────────────────────
+const DEFAULT_SCENES = [
+  { id:'sleep',   name:'🌙 Sleep',
+    lights:{ main:{on:false,level:0}, kitchen:{on:false,level:0}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:false,level:0}, awning:{on:false,level:0}, step:{on:false,level:0} }},
+  { id:'movie',   name:'🎬 Movie',
+    lights:{ main:{on:true,level:15}, kitchen:{on:false,level:0}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:true,level:20}, bench:{on:true,level:15}, awning:{on:false,level:0}, step:{on:false,level:0} }},
+  { id:'morning', name:'☀️ Morning',
+    lights:{ main:{on:true,level:60}, kitchen:{on:true,level:80}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:false,level:0}, awning:{on:false,level:0}, step:{on:false,level:0} }},
+  { id:'dinner',  name:'🍽️ Dinner',
+    lights:{ main:{on:true,level:70}, kitchen:{on:true,level:100}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:true,level:50}, awning:{on:false,level:0}, step:{on:false,level:0} }},
+];
+
+let scenes = [];
+let scenesEditing = false;
+let lastAppliedSceneId = null;
+let sceneIsDirty = false;
+
+function loadScenes() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('scenes'));
+    scenes = Array.isArray(saved) && saved.length
+      ? saved
+      : DEFAULT_SCENES.map(s => ({ ...s, lights: { ...s.lights } }));
+  } catch {
+    scenes = DEFAULT_SCENES.map(s => ({ ...s, lights: { ...s.lights } }));
+  }
+}
+
+function saveScenes() {
+  localStorage.setItem('scenes', JSON.stringify(scenes));
+}
+
+function renderScenes() {
+  const wrap = document.getElementById('scenesScroll');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  wrap.parentElement.classList.toggle('scenes-editing', scenesEditing);
+
+  scenes.forEach(scene => {
+    const chip = document.createElement('button');
+    const isActive = scene.id === lastAppliedSceneId;
+    const showSave = isActive && sceneIsDirty;
+    chip.className = 'scene-chip' + (isActive ? ' active' : '');
+
+    chip.appendChild(document.createTextNode(showSave ? 'Save' : scene.name));
+
+    const badge = document.createElement('span');
+    badge.className = 'scene-delete-badge';
+    badge.textContent = '×';
+    badge.addEventListener('click', e => { e.stopPropagation(); deleteScene(scene.id); });
+    chip.appendChild(badge);
+
+    // Long-press to delete
+    let pressTimer;
+    chip.addEventListener('touchstart', () => {
+      pressTimer = setTimeout(() => deleteScene(scene.id), 600);
+    }, { passive: true });
+    chip.addEventListener('touchend',  () => clearTimeout(pressTimer));
+    chip.addEventListener('touchmove', () => clearTimeout(pressTimer));
+
+    chip.addEventListener('click', () => {
+      if (!scenesEditing) {
+        if (scene.id === lastAppliedSceneId && sceneIsDirty) saveToScene(scene.id);
+        else applyScene(scene.id);
+      }
+    });
+    wrap.appendChild(chip);
+  });
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'scene-add-btn';
+  addBtn.textContent = '+';
+  addBtn.addEventListener('click', promptNewScene);
+  wrap.appendChild(addBtn);
+
+  const editBtn = document.createElement('button');
+  editBtn.className = 'scene-edit-btn' + (scenesEditing ? ' active' : '');
+  editBtn.textContent = '✎';
+  editBtn.addEventListener('click', toggleSceneEditMode);
+  wrap.appendChild(editBtn);
+}
+
+function applyScene(id) {
+  const scene = scenes.find(s => s.id === id);
+  if (!scene) return;
+  allLights().forEach(l => {
+    const s = scene.lights[l.id];
+    if (!s) return;
+    l.on = s.on;
+    l.level = s.level;
+    publishLight(l.id, l.on ? String(l.level) : 'off');
+  });
+  lastAppliedSceneId = id;
+  sceneIsDirty = false;
+  renderLights();
+  renderScenes();
+}
+
+function saveToScene(id) {
+  const scene = scenes.find(s => s.id === id);
+  if (!scene) return;
+  allLights().forEach(l => { scene.lights[l.id] = { on: l.on, level: l.level }; });
+  sceneIsDirty = false;
+  saveScenes();
+  renderScenes();
+}
+
+function markSceneDirty() {
+  if (!lastAppliedSceneId) return;
+  const scene = scenes.find(s => s.id === lastAppliedSceneId);
+  if (!scene) return;
+  const dirty = allLights().some(l => {
+    const s = scene.lights[l.id];
+    return s && (s.on !== l.on || (l.on && s.level !== l.level));
+  });
+  if (dirty !== sceneIsDirty) {
+    sceneIsDirty = dirty;
+    renderScenes();
+  }
+}
+
+function deleteScene(id) {
+  scenes = scenes.filter(s => s.id !== id);
+  if (lastAppliedSceneId === id) { lastAppliedSceneId = null; sceneIsDirty = false; }
+  saveScenes();
+  renderScenes();
+}
+
+function toggleSceneEditMode() {
+  scenesEditing = !scenesEditing;
+  renderScenes();
+}
+
+function promptNewScene() {
+  const scroll = document.getElementById('scenesScroll');
+  scroll.querySelector('.scene-add-btn').style.display = 'none';
+  scroll.querySelector('.scene-edit-btn').style.display = 'none';
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'scene-name-input-wrap';
+  wrapper.innerHTML = `<input class="scene-name-input" id="sceneNameInput" placeholder="Name…" maxlength="20">
+    <button class="scene-save-btn" id="sceneSaveBtn">Save</button>`;
+  scroll.appendChild(wrapper);
+
+  setTimeout(() => scroll.scrollLeft = scroll.scrollWidth, 30);
+
+  const input = document.getElementById('sceneNameInput');
+  input.focus();
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') saveNewScene();
+    if (e.key === 'Escape') renderScenes();
+  });
+  document.getElementById('sceneSaveBtn').addEventListener('click', saveNewScene);
+}
+
+function saveNewScene() {
+  const input = document.getElementById('sceneNameInput');
+  const name = (input?.value || '').trim();
+  if (!name) { renderScenes(); return; }
+  const id = 'scene_' + Date.now();
+  const lights = {};
+  allLights().forEach(l => { lights[l.id] = { on: l.on, level: l.level }; });
+  scenes.push({ id, name, lights });
+  saveScenes();
+  renderScenes();
+}
+
+// ── Climate ───────────────────────────────────────
+// Setpoint: load from localStorage so the last-known value persists across reloads
+// even when AC is off (MQTT only sends it when AC is actively cooling).
+const _savedSp = parseInt(localStorage.getItem('acSetpoint'));
+let climateSet = (!isNaN(_savedSp) && _savedSp >= 55 && _savedSp <= 95) ? _savedSp : null;
+if (climateSet !== null) document.getElementById('climateSet').textContent = climateSet;
+
+let acMode = 'off';
+let acFan  = 'auto';
+
+function acTempUp() {
+  if (climateSet !== null) {
+    climateSet = Math.min(85, climateSet + 1);
+    document.getElementById('climateSet').textContent = climateSet;
+    localStorage.setItem('acSetpoint', climateSet);
+  }
+  if (mqttClient?.connected) mqttClient.publish('van/ac/setpoint', 'up');
+}
+
+function acTempDown() {
+  if (climateSet !== null) {
+    climateSet = Math.max(60, climateSet - 1);
+    document.getElementById('climateSet').textContent = climateSet;
+    localStorage.setItem('acSetpoint', climateSet);
+  }
+  if (mqttClient?.connected) mqttClient.publish('van/ac/setpoint', 'down');
+}
+
+function setAcMode(mode) {
+  acMode = mode;
+  updateAcModeUI();
+  if (mqttClient?.connected) mqttClient.publish('van/ac/mode', mode);
+}
+
+function setAcFan(speed) {
+  acFan = speed;
+  updateAcFanUI();
+  if (mqttClient?.connected) mqttClient.publish('van/ac/fan', speed);
+}
+
+function updateAcModeUI() {
+  const on = acMode === 'cool';
+  const modeEl = document.getElementById('climateModeLine');
+  modeEl.classList.toggle('off', !on);
+  document.getElementById('climateIcon').textContent = on ? '❄️' : '🌡️';
+  document.getElementById('climateMode').textContent = on ? 'Cooling' : 'Off';
+  document.getElementById('acModeCool').classList.toggle('active',  on);
+  document.getElementById('acModeOff').classList.toggle('active',  !on);
+}
+
+function updateAcFanUI() {
+  ['high', 'low', 'auto'].forEach(s => {
+    const el = document.getElementById('acFan' + s[0].toUpperCase() + s.slice(1));
+    if (el) el.classList.toggle('active', acFan === s);
+  });
+}
+
+// ── Controls ─────────────────────────────────────
+let pumpOn = false;
+let tankHeatOn = false;
+
+function awningExtend()  {
+  if (mqttClient?.connected) mqttClient.publish('van/motor/awning-extend',  'on');
+}
+function awningRetract() {
+  if (mqttClient?.connected) mqttClient.publish('van/motor/awning-retract', 'on');
+}
+function togglePump() {
+  pumpOn = !pumpOn;
+  document.getElementById('pumpBtn').classList.toggle('active', pumpOn);
+  document.getElementById('pumpState').textContent = pumpOn ? 'Running' : 'Off';
+  if (mqttClient?.connected) mqttClient.publish('van/light/pump', pumpOn ? 'on' : 'off');
+  console.log(`MQTT → van/light/pump: ${pumpOn ? 'on' : 'off'}`);
+}
+function toggleTankHeater() {
+  tankHeatOn = !tankHeatOn;
+  document.getElementById('tankHeatBtn').classList.toggle('active', tankHeatOn);
+  document.getElementById('tankHeatState').textContent = tankHeatOn ? 'On' : 'Off';
+  if (mqttClient?.connected) mqttClient.publish('van/light/tank-heater', tankHeatOn ? 'on' : 'off');
+  console.log(`MQTT → van/light/tank-heater: ${tankHeatOn ? 'on' : 'off'}`);
+}
+
+// ── Local MQTT (direct to Cerbo GX) ──────────────
+const PORTAL_ID = 'c0619ab5dcfb';
+const CERBO_IP  = localStorage.getItem('cerboIp') || '192.168.12.140';
+
+function setLiveStatus(live) {
+  const dot  = document.querySelector('.status-dot');
+  const pill = document.querySelector('.status-pill span');
+  const c = live ? 'var(--green)' : 'var(--red)';
+  dot.style.background = c;
+  dot.style.boxShadow  = `0 0 6px ${c}`;
+  pill.textContent = live ? 'Live' : 'Offline';
+}
+
+function updateSoc(val) {
+  const pct = Math.round(val);
+  const el  = document.getElementById('battPct');
+  el.textContent = pct + '%';
+  el.style.color = pct > 50 ? 'var(--green)' : pct > 20 ? 'var(--amber)' : 'var(--red)';
+  document.getElementById('battSub').textContent =
+    pct > 80 ? 'Full' : pct > 50 ? 'Good' : pct > 20 ? 'Low' : 'Critical';
+}
+
+function updatePower(val) {
+  const w  = Math.round(val);
+  const el = document.getElementById('battA');
+  el.textContent = (w > 0 ? '+' : '') + w + ' W';
+  el.style.color = w > 50 ? 'var(--green)' : w < -50 ? 'var(--red)' : 'var(--blue)';
+  document.getElementById('battALabel').textContent =
+    w > 50 ? 'Charging' : w < -50 ? 'Discharging' : 'Idle';
+}
+
+function updateSolar(val) {
+  document.getElementById('solarW').textContent = Math.round(val) + ' W';
+}
+
+function connectMQTT() {
+  const client = mqttClient = mqtt.connect(`ws://${window.location.hostname}:9001`, {
+    clientId: 'gogovan_' + Math.random().toString(36).substr(2, 9),
+    clean: true,
+    reconnectPeriod: 10000,
+    keepalive: 60
+  });
+
+  client.on('connect', () => {
+    setLiveStatus(true);
+    client.subscribe(`N/${PORTAL_ID}/#`);
+    client.subscribe('van/status/light/+');
+    client.subscribe('van/status/ac/+');
+    client.publish(`R/${PORTAL_ID}/system/0/Serial`, '');
+  });
+
+  client.on('message', (topic, msg) => {
+    // G12 status updates from can-bridge.py CAN listener (plain strings, not JSON)
+    if (topic.startsWith('van/status/light/')) {
+      const key    = topic.split('/')[3];
+      const msgStr = msg.toString().trim();
+
+      if (key === 'pump') {
+        const newOn = (msgStr !== 'off' && msgStr !== '0');
+        if (newOn !== pumpOn) {
+          pumpOn = newOn;
+          document.getElementById('pumpBtn').classList.toggle('active', pumpOn);
+          document.getElementById('pumpState').textContent = pumpOn ? 'Running' : 'Off';
+        }
+        return;
+      }
+      if (key === 'tank-heater') {
+        const newOn = (msgStr !== 'off' && msgStr !== '0');
+        if (newOn !== tankHeatOn) {
+          tankHeatOn = newOn;
+          document.getElementById('tankHeatBtn').classList.toggle('active', tankHeatOn);
+          document.getElementById('tankHeatState').textContent = tankHeatOn ? 'On' : 'Off';
+        }
+        return;
+      }
+
+      const id = Object.keys(LIGHT_MQTT_KEY).find(k => LIGHT_MQTT_KEY[k] === key);
+      if (!id) return;
+      const l = findLight(id);
+      if (!l) return;
+      if (msgStr === 'off' || msgStr === '0') {
+        l.on = false; l.level = 0;
+      } else {
+        const pct = parseInt(msgStr);
+        if (!isNaN(pct)) { l.on = pct > 0; l.level = pct; }
+      }
+      renderLights();
+      return;
+    }
+
+    // AC status updates from can-bridge.py (plain strings)
+    if (topic.startsWith('van/status/ac/')) {
+      const key    = topic.split('/')[3];
+      const msgStr = msg.toString().trim();
+      if (key === 'setpoint') {
+        const sp = parseInt(msgStr);
+        if (!isNaN(sp) && sp >= 50 && sp <= 95) {
+          climateSet = sp;
+          document.getElementById('climateSet').textContent = sp;
+          localStorage.setItem('acSetpoint', sp);
+        }
+      } else if (key === 'mode') {
+        acMode = msgStr;
+        updateAcModeUI();
+      } else if (key === 'fan') {
+        acFan = msgStr;
+        updateAcFanUI();
+      } else if (key === 'temp') {
+        const t = parseInt(msgStr);
+        if (!isNaN(t)) {
+          document.getElementById('climateActual').textContent = t + '°';
+        }
+      }
+      return;
+    }
+
+    let val;
+    try { val = JSON.parse(msg.toString())?.value; } catch { return; }
+    if (val == null) return;
+    const P = `N/${PORTAL_ID}`;
+    if      (topic === `${P}/system/0/Dc/Battery/Soc`)   updateSoc(val);
+    else if (topic === `${P}/system/0/Dc/Battery/Power`) updatePower(val);
+    else if (topic.includes('/solarcharger/') && topic.endsWith('/Yield/Power')) updateSolar(val);
+  });
+
+  client.on('error',   e  => { console.warn('MQTT:', e); setLiveStatus(false); });
+  client.on('offline', () => setLiveStatus(false));
+
+  // Keepalive: tells the Cerbo to keep streaming data
+  setInterval(() => { if (client.connected) client.publish(`R/${PORTAL_ID}/keepalive`, ''); }, 30000);
+}
+
+connectMQTT();
+
+// ── Init ─────────────────────────────────────────
+const savedName = localStorage.getItem('vanName') || 'GoGoVan';
+const _nameEl = document.getElementById('nameText');
+if (_nameEl) _nameEl.textContent = savedName;
+document.title = savedName;
+applyTheme(activeTheme);
+loadScenes();
+renderLights();
+renderScenes();
+</script>
+</body>
+</html>
