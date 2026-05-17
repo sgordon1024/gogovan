@@ -11,10 +11,10 @@ A custom web dashboard for a **2024 Entegra Launch camper van**, served from a R
 iPhone / Browser
      │  WebSocket :9001
      ▼
-Pi mosquitto broker (192.168.12.122 :1883 / :9001)
+Pi mosquitto broker (YOUR_PI_IP :1883 / :9001)
      │  MQTT bridge
      ▼
-Victron Cerbo GX (192.168.12.140 :1883)   ← Victron telemetry only (read)
+Victron Cerbo GX (YOUR_CERBO_IP :1883)   ← Victron telemetry only (read)
      │
      └── CAN bus (VE.Can / can0, RV-C 250kbps) ← LISTEN ONLY on Cerbo
 
@@ -31,8 +31,8 @@ Pi CAN HAT (Waveshare 2-CH CAN HAT+)
 
 | Device | Address | Notes |
 |---|---|---|
-| Raspberry Pi 4 | 192.168.12.122 | Dashboard host, SSH: sgordon1024/windows |
-| Victron Cerbo GX | 192.168.12.140 | VRM Portal ID: c0619ab5dcfb |
+| Raspberry Pi 4 | YOUR_PI_IP | Dashboard host, SSH: YOUR_PI_USER/YOUR_PI_PASSWORD |
+| Victron Cerbo GX | YOUR_CERBO_IP | VRM Portal ID: YOUR_VRM_PORTAL_ID |
 | Firefly G12 controller | SA=0x9B | Controls lights, HVAC, awning, pump, tank heater |
 | G12 LCD ("Bed Wall") | SA=0x9F | Touchscreen panel, Bluetooth to VegaTouch Mira |
 | Lithionics Battery | SA=0x46 | |
@@ -52,23 +52,23 @@ Pi CAN HAT (Waveshare 2-CH CAN HAT+)
 
 | File | Location | Purpose |
 |---|---|---|
-| `index.html` | Pi: `/home/sgordon1024/index.html` | Dashboard UI, served at :8080 |
-| `can-bridge.py` | Pi: `/home/sgordon1024/can-bridge.py` | MQTT subscriber → CAN sender + CAN listener → MQTT publisher |
+| `index.html` | Pi: `/home/YOUR_PI_USER/index.html` | Dashboard UI, served at :8080 |
+| `can-bridge.py` | Pi: `/home/YOUR_PI_USER/can-bridge.py` | MQTT subscriber → CAN sender + CAN listener → MQTT publisher |
 
 **Deploy command:**
 ```bash
-sshpass -p "windows" scp index.html can-bridge.py sgordon1024@192.168.12.122:/home/sgordon1024/
-sshpass -p "windows" ssh sgordon1024@192.168.12.122 "echo 'windows' | sudo -S systemctl restart can-bridge"
+sshpass -p "YOUR_PI_PASSWORD" scp index.html can-bridge.py YOUR_PI_USER@YOUR_PI_IP:/home/YOUR_PI_USER/
+sshpass -p "YOUR_PI_PASSWORD" ssh YOUR_PI_USER@YOUR_PI_IP "echo 'YOUR_PI_PASSWORD' | sudo -S systemctl restart can-bridge"
 ```
 
 ---
 
 ## Remote Access
-- Tailscale installed on Pi (`vanpi`) and iPhone
-- Pi Tailscale IP: `100.98.52.107`
-- MagicDNS: `vanpi.tail27a0b4.ts.net`
-- Dashboard URL (remote): `http://vanpi.tail27a0b4.ts.net:8080`
-- **Important:** Disable Tailscale key expiry on vanpi in admin panel to avoid 5-month re-auth
+- Tailscale installed on Pi and iPhone
+- Pi Tailscale IP: `YOUR_TAILSCALE_IP`
+- MagicDNS: `YOUR_TAILSCALE_HOSTNAME`
+- Dashboard URL (remote): `http://YOUR_TAILSCALE_HOSTNAME:8080`
+- **Important:** Disable Tailscale key expiry on the Pi in admin panel to avoid 5-month re-auth
 
 ---
 
