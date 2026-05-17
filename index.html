@@ -895,24 +895,17 @@
 
   <!-- CONTROLS -->
   <span class="section-label section-label-solo">Controls</span>
-  <div class="awning-grid">
-    <button class="ctrl-btn" id="awningExtBtn" onclick="awningExtend()">
+  <div class="controls-grid">
+    <button class="ctrl-btn" onclick="awningExtend()">
       <div class="ctrl-btn-icon">↗️</div>
-      <div class="ctrl-btn-label">Extend</div>
-      <div class="ctrl-btn-sub" id="awningExtState">Tap to extend</div>
+      <div class="ctrl-btn-label">Awning Extend</div>
+      <div class="ctrl-btn-sub">Tap to extend</div>
     </button>
-    <button class="ctrl-btn" onclick="awningStop()">
-      <div class="ctrl-btn-icon">⏹️</div>
-      <div class="ctrl-btn-label">Awning Stop</div>
-      <div class="ctrl-btn-sub">Stop motor</div>
-    </button>
-    <button class="ctrl-btn" id="awningRetBtn" onclick="awningRetract()">
+    <button class="ctrl-btn" onclick="awningRetract()">
       <div class="ctrl-btn-icon">↙️</div>
-      <div class="ctrl-btn-label">Retract</div>
-      <div class="ctrl-btn-sub" id="awningRetState">Tap to retract</div>
+      <div class="ctrl-btn-label">Awning Retract</div>
+      <div class="ctrl-btn-sub">Tap to retract</div>
     </button>
-  </div>
-  <div class="controls-grid" style="margin-top:10px">
     <button class="ctrl-btn" id="pumpBtn" onclick="togglePump()">
       <div class="ctrl-btn-icon">💧</div>
       <div class="ctrl-btn-label">Water Pump</div>
@@ -1465,43 +1458,13 @@ function updateShoreUI(connected) {
 // ── Controls ─────────────────────────────────────
 let pumpOn = false;
 let tankHeatOn = false;
-let awningTimer = null;
 
 function awningExtend() {
-  if (!mqttClient?.connected) return;
-  clearTimeout(awningTimer);
-  mqttClient.publish('van/motor/awning-extend', 'on');
-  document.getElementById('awningExtBtn').classList.add('active');
-  document.getElementById('awningRetBtn').classList.remove('active');
-  document.getElementById('awningExtState').textContent = 'Extending…';
-  document.getElementById('awningRetState').textContent = 'Tap to retract';
-  awningTimer = setTimeout(() => {
-    document.getElementById('awningExtBtn').classList.remove('active');
-    document.getElementById('awningExtState').textContent = 'Tap to extend';
-  }, 22000);
+  if (mqttClient?.connected) mqttClient.publish('van/motor/awning-extend', 'on');
 }
 
 function awningRetract() {
-  if (!mqttClient?.connected) return;
-  clearTimeout(awningTimer);
-  mqttClient.publish('van/motor/awning-retract', 'on');
-  document.getElementById('awningRetBtn').classList.add('active');
-  document.getElementById('awningExtBtn').classList.remove('active');
-  document.getElementById('awningRetState').textContent = 'Retracting…';
-  document.getElementById('awningExtState').textContent = 'Tap to extend';
-  awningTimer = setTimeout(() => {
-    document.getElementById('awningRetBtn').classList.remove('active');
-    document.getElementById('awningRetState').textContent = 'Tap to retract';
-  }, 22000);
-}
-
-function awningStop() {
-  clearTimeout(awningTimer);
-  document.getElementById('awningExtBtn').classList.remove('active');
-  document.getElementById('awningRetBtn').classList.remove('active');
-  document.getElementById('awningExtState').textContent = 'Tap to extend';
-  document.getElementById('awningRetState').textContent = 'Tap to retract';
-  if (mqttClient?.connected) mqttClient.publish('van/motor/awning-extend', 'off');
+  if (mqttClient?.connected) mqttClient.publish('van/motor/awning-retract', 'on');
 }
 function togglePump() {
   pumpOn = !pumpOn;
