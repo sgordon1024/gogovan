@@ -32,6 +32,8 @@
       --radius:     16px;
     }
 
+    [hidden] { display: none !important; }
+
     html, body {
       background: var(--bg);
       color: var(--txt);
@@ -2909,7 +2911,11 @@ function updateSolar(val) {
 }
 
 function connectMQTT() {
-  const client = mqttClient = mqtt.connect(`ws://${window.location.hostname}:9001`, {
+  const isHttps = window.location.protocol === 'https:';
+  const mqttUrl = isHttps
+    ? `wss://${window.location.hostname}/mqtt`
+    : `ws://${window.location.hostname}:9001`;
+  const client = mqttClient = mqtt.connect(mqttUrl, {
     clientId: 'gogovan_' + Math.random().toString(36).substr(2, 9),
     clean: true,
     reconnectPeriod: 10000,

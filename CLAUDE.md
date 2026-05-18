@@ -45,6 +45,7 @@ Pi CAN HAT (Waveshare 2-CH CAN HAT+)
 - `can1-setup` — brings up can1 at 250kbps
 - `can-bridge` — `can-bridge.py` MQTT↔CAN bridge
 - `gogovan-web` — `python3 -m http.server 80` (port 80, runs as root)
+- `nginx` — serves HTTPS on port 443 via Tailscale cert; proxies `/mqtt` WebSocket to mosquitto:9001
 
 ---
 
@@ -72,7 +73,10 @@ The Pi acts as a Wi-Fi hotspot and travel router:
 | Context | URL |
 |---|---|
 | On GoGoVan network | http://vanpi.local |
-| Via Tailscale (any network) | http://100.98.52.107 |
+| Via Tailscale (HTTP) | http://100.98.52.107 |
+| Via Tailscale (HTTPS) | https://vanpi.tail27a0b4.ts.net |
+
+**Use the HTTPS URL whenever GPS/speedometer is needed** — iOS Safari blocks the Geolocation API on plain HTTP pages (reports as "permission denied" regardless of what the user taps). The HTTPS URL uses a Tailscale-issued Let's Encrypt cert served by nginx on the Pi.
 
 **Arc browser cannot access local HTTP (http://vanpi.local or http://192.168.4.1) — Arc blocks private IP HTTP requests internally.** Use Safari, or the Tailscale URL in any browser.
 
@@ -117,14 +121,15 @@ Uses Tailscale IP (`100.98.52.107`) so it works from any network — GoGoVan, T-
 
 Do not change this back to a CDN `<script src="https://unpkg.com/mqtt/...">` tag — that was the root cause of the persistent "Connecting…" spinner on the GoGoVan network.
 
-MQTT connection: `mqtt.connect(`ws://${window.location.hostname}:9001`, {...})` — the hostname dynamically resolves to either `vanpi.local` (local) or `100.98.52.107` (Tailscale).
+MQTT connection auto-detects protocol: `ws://${hostname}:9001` on HTTP, `wss://${hostname}/mqtt` on HTTPS. The `/mqtt` path is proxied by nginx to `localhost:9001` — required because browsers block mixed-content WebSocket on HTTPS pages.
 
 ---
 
 ## Remote Access
 
 - Pi Tailscale IP: `100.98.52.107` (key expiry disabled — no re-auth)
-- Dashboard URL (remote): `http://100.98.52.107`
+- Dashboard URL (HTTP): `http://100.98.52.107`
+- Dashboard URL (HTTPS + GPS): `https://vanpi.tail27a0b4.ts.net`
 - SSH: `ssh sgordon1024@100.98.52.107` (password: `windows`)
 
 ---
@@ -280,6 +285,33 @@ WantedBy=multi-user.target
 ```
 Runs as root (required for port 80). Serves `index.html` at `http://vanpi.local` and `http://192.168.4.1`.
 
+### `/etc/nginx/sites-available/gogovan`
+```nginx
+server {
+    listen 443 ssl;
+    server_name vanpi.tail27a0b4.ts.net;
+
+    ssl_certificate     /home/sgordon1024/vanpi.tail27a0b4.ts.net.crt;
+    ssl_certificate_key /home/sgordon1024/vanpi.tail27a0b4.ts.net.key;
+
+    root /home/sgordon1024;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    location /mqtt {
+        proxy_pass http://localhost:9001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+    }
+}
+```
+Symlinked to `/etc/nginx/sites-enabled/gogovan`. Default site removed (`/etc/nginx/sites-enabled/default` deleted) so nginx doesn't conflict with the Python HTTP server on port 80.
+
 ### `/etc/avahi/avahi-daemon.conf` (relevant diff)
 ```ini
 [server]
@@ -337,6 +369,12 @@ Automatic tests run every 30 min, so a year of history is ~17,500 entries. Rende
 
 **Why the speed test list paginates to 50 entries at a time:**  
 Same scale problem — 17,500 DOM nodes at once would freeze the UI. The stats overlay loads 50 entries initially with a "Load more" button to append the next batch.
+
+**Why HTTPS is required for GPS (drive mode speedometer):**
+iOS Safari treats `GeolocationAPI.watchPosition()` as a secure-context-only feature. On plain HTTP, the permission dialog either doesn't appear or immediately returns error code 1 (PERMISSION_DENIED) regardless of user action. The Tailscale HTTPS URL with a valid Let's Encrypt cert is required. nginx on the Pi handles TLS termination and proxies the MQTT WebSocket (`/mqtt` → `localhost:9001`) so the `wss://` connection works from the HTTPS page.
+
+**Renewing the Tailscale cert (expires periodically):**
+SSH into Pi and run: `sudo tailscale cert vanpi.tail27a0b4.ts.net` — writes new `.crt`/`.key` to `/home/sgordon1024/`, then `sudo systemctl restart nginx`.
 
 **Why the offline banner uses `env(safe-area-inset-top)` instead of `top: 20px`:**  
 The Dynamic Island on iPhone 14 Pro and later sits ~59px from the top, so a fixed `20px` offset placed the banner behind it. `env(safe-area-inset-top)` is set by the browser to the exact inset height for the current device (Dynamic Island, notch, or 0 on older models).
