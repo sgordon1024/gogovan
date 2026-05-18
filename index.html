@@ -990,7 +990,7 @@
     body.driving .theme-btn-wrap   { display: none; }
     body.driving .app-name         { display: none; }
     body.driving #modeChip         { display: none !important; }
-    body.driving                   { padding-bottom: 0; }
+    body.driving                   { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
 
     body.driving header {
       position: fixed;
@@ -1001,15 +1001,96 @@
       z-index: 50;
     }
 
-    body.driving #tab-power {
+    body.driving #tab-power,
+    body.driving #tab-internet {
       padding-top: calc(max(env(safe-area-inset-top), 12px) + 44px);
     }
 
-    body.driving #tab-power > .card {
+    /* Drive-mode two-tab nav */
+    #drive-nav {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 430px;
+      height: calc(88px + env(safe-area-inset-bottom));
+      padding-bottom: env(safe-area-inset-bottom);
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      z-index: 50;
+    }
+    body.driving #drive-nav { display: flex; }
+
+    .drive-nav-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: transparent;
+      border: none;
+      color: var(--txt2);
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: color 0.15s;
+    }
+    .drive-nav-btn.active { color: var(--amber); }
+    .drive-nav-btn svg { width: 28px; height: 28px; }
+
+    /* Full-width, full-height panels in drive mode */
+    body.driving .card {
       margin: 0;
       border-radius: 0;
       border-left: none;
       border-right: none;
+      margin-bottom: 1px;
+    }
+
+    body.driving #tab-power {
+      display: flex;
+      flex-direction: column;
+    }
+
+    body.driving #tab-internet {
+      padding-left: 0;
+      padding-right: 0;
+    }
+
+    body.driving .section-label-solo {
+      padding: 20px 16px 8px;
+      margin: 0;
+    }
+
+    body.driving #tab-internet .net-selector {
+      padding: 0;
+      gap: 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    body.driving #tab-internet .net-btn {
+      border-radius: 0;
+      border: none;
+      border-right: 1px solid var(--border);
+      padding: 32px 12px;
+    }
+
+    body.driving #tab-internet .net-btn:last-child {
+      border-right: none;
+    }
+
+    body.driving #tab-internet .net-btn-name {
+      font-size: 18px;
+    }
+
+    body.driving #tab-internet .net-hint {
+      padding: 10px 16px;
     }
 
     /* ── Speed panel ─────────────────────────────── */
@@ -1018,7 +1099,9 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 28px 0 24px;
+      flex: 1;
+      min-height: 200px;
+      padding: 0;
     }
 
     body.driving #drive-speed-panel { display: flex; }
@@ -1288,6 +1371,7 @@ safe-buffer/index.js:
     <div id="drive-speed-panel">
       <div id="drive-speed-number">—</div>
       <div id="drive-speed-unit">mph</div>
+      <div id="drive-gps-status" style="font-size:13px;color:var(--txt2);margin-top:8px;letter-spacing:0.3px;"></div>
     </div>
 
     <div class="card">
@@ -1598,6 +1682,18 @@ safe-buffer/index.js:
     <button class="tab-btn" data-tab="internet" onclick="switchTab('internet')">
       <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg></span>
       <span class="tab-label">Internet</span>
+    </button>
+  </nav>
+
+  <!-- Drive-mode nav — shown only while driving -->
+  <nav id="drive-nav">
+    <button class="drive-nav-btn active" id="driveNavSpeed" onclick="switchDriveTab('speed')">
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+      Speed
+    </button>
+    <button class="drive-nav-btn" id="driveNavInternet" onclick="switchDriveTab('internet')">
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg>
+      Internet
     </button>
   </nav>
 
@@ -2218,17 +2314,32 @@ const STOP_SPEED_MPH   = 2;    // below this = stopped
 const HIGH_IDLE_EXCESS = 150;  // excess charge watts over solar → alternator likely
 
 function watchGPS() {
-  if (!navigator.geolocation) return;
+  if (!navigator.geolocation) {
+    setGPSStatus('GPS not available');
+    return;
+  }
+  setGPSStatus('Acquiring GPS…');
   navigator.geolocation.watchPosition(onGPSUpdate, onGPSError, {
-    enableHighAccuracy: false,
-    maximumAge: 4000,
+    enableHighAccuracy: true,
+    maximumAge: 2000,
     timeout: 15000
   });
 }
 
+function setGPSStatus(msg) {
+  const el = document.getElementById('drive-gps-status');
+  if (el) el.textContent = msg;
+}
+
 function onGPSUpdate(pos) {
-  const raw = pos.coords.speed; // m/s, null if unavailable
-  currentSpeedMph = (raw != null && raw >= 0) ? raw * 2.237 : 0;
+  const raw = pos.coords.speed; // m/s — only populated with enableHighAccuracy: true
+  if (raw == null) {
+    setGPSStatus('Speed unavailable — check GPS permissions');
+    currentSpeedMph = 0;
+  } else {
+    currentSpeedMph = raw * 2.237;
+    setGPSStatus('');
+  }
 
   if (currentSpeedMph >= DRIVE_SPEED_MPH) {
     if (!drivingMode && !drivingTimer)
@@ -2240,8 +2351,10 @@ function onGPSUpdate(pos) {
   refreshModeChip();
 }
 
-function onGPSError() {
+function onGPSError(err) {
   currentSpeedMph = null;
+  const msgs = { 1: 'Location permission denied', 2: 'GPS signal unavailable', 3: 'GPS timed out' };
+  setGPSStatus(msgs[err?.code] ?? 'GPS error');
   refreshModeChip();
 }
 
@@ -2267,10 +2380,11 @@ function enterDrivingMode() {
   // 3. Retract awning (G12 stops at limit switch if already retracted)
   if (mqttClient?.connected) mqttClient.publish('van/motor/awning-retract', 'on');
 
-  // 4. Lock UI to power tab only
+  // 4. Lock UI to speed/internet only
   preDriveTab = activeTab;
   switchTab('power');
   document.body.classList.add('driving');
+  switchDriveTab('speed');
 
   renderLights();
   refreshModeChip();
@@ -2283,13 +2397,19 @@ function exitDrivingMode() {
   refreshModeChip();
 }
 
+function switchDriveTab(name) {
+  switchTab(name === 'speed' ? 'power' : 'internet');
+  document.getElementById('driveNavSpeed').classList.toggle('active', name === 'speed');
+  document.getElementById('driveNavInternet').classList.toggle('active', name === 'internet');
+}
+
 function toggleDriveTest() {
   if (drivingMode) {
     currentSpeedMph = 0;
     exitDrivingMode();
   } else {
     if (drivingTimer) { clearTimeout(drivingTimer); drivingTimer = null; }
-    currentSpeedMph = 35; // fake speed so chip shows "35 mph"
+    if (currentSpeedMph == null) currentSpeedMph = 0;
     enterDrivingMode();
   }
 }
@@ -2668,8 +2788,11 @@ let battPower  = 0;
 let battSoc    = null;
 let battCapWh  = null;
 let lastTTG    = null;
+let chargeStartSoc  = null;
+let chargeStartTime = null;
 
 function updatePower(val) {
+  const wasCharging = battPower > 10;
   battPower = Math.round(val);
   const el = document.getElementById('battA');
   clearSkel(el);
@@ -2677,8 +2800,43 @@ function updatePower(val) {
   el.style.color = battPower > 10 ? 'var(--green)' : battPower < -10 ? 'var(--red)' : 'var(--blue)';
   document.getElementById('battALabel').textContent =
     battPower > 10 ? 'Charging' : battPower < -10 ? 'Discharging' : 'Idle';
+
+  if (battPower > 10 && !wasCharging) {
+    chargeStartSoc  = battSoc;
+    chargeStartTime = Date.now();
+  } else if (battPower <= 10) {
+    chargeStartSoc  = null;
+    chargeStartTime = null;
+  }
+
   recalcTTE();
   checkHighIdle();
+}
+
+function estimateTTF() {
+  if (battSoc == null || battSoc >= 100 || battPower <= 10) return null;
+  const remaining = 100 - battSoc;
+  let rawSecs = null;
+
+  // Method 1: known capacity from a prior discharge cycle
+  if (battCapWh != null && battCapWh > 200) {
+    rawSecs = (remaining / 100 * battCapWh / battPower) * 3600;
+  }
+
+  // Method 2: SOC rate of change (needs 2+ min of charge data)
+  if (rawSecs == null && chargeStartTime != null && chargeStartSoc != null && battSoc > chargeStartSoc) {
+    const elapsedH = (Date.now() - chargeStartTime) / 3600000;
+    if (elapsedH > 0.033) {
+      const ratePerH = (battSoc - chargeStartSoc) / elapsedH;
+      if (ratePerH > 0.05) rawSecs = (remaining / ratePerH) * 3600;
+    }
+  }
+
+  if (rawSecs == null) return null;
+
+  // LiFePO4 CV-phase taper: current drops above ~90% SOC
+  const taper = battSoc >= 97 ? 2.0 : battSoc >= 90 ? 1.4 : 1.1;
+  return rawSecs * taper;
 }
 
 function updateTTE(ttgSeconds) {
@@ -2695,9 +2853,15 @@ function recalcTTE() {
   if (!el || !sub) return;
 
   if (battPower > 10) {
-    el.textContent  = 'Charging';
-    el.style.color  = 'var(--green)';
-    sub.textContent = 'Battery';
+    el.style.color = 'var(--green)';
+    const ttfSecs = estimateTTF();
+    if (ttfSecs != null && ttfSecs > 60) {
+      el.textContent  = formatTTE(ttfSecs);
+      sub.textContent = 'to full';
+    } else {
+      el.textContent  = 'Charging';
+      sub.textContent = 'Battery';
+    }
     return;
   }
 

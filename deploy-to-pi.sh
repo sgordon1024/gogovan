@@ -1,6 +1,6 @@
 #!/bin/bash
 # Deploy updated can-bridge.py and index.html to GoGoVan Pi
-# Run this when connected to the GoGoVan hotspot (192.168.12.122)
+# Dashboard URLs: http://vanpi.local  (on GoGoVan) | http://100.98.52.107 (via Tailscale)
 
 PI="sgordon1024@100.98.52.107"
 PASS="windows"
