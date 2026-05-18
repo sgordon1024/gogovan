@@ -2,7 +2,7 @@
 # Deploy updated can-bridge.py and index.html to GoGoVan Pi
 # Run this when connected to the GoGoVan hotspot (192.168.12.122)
 
-PI="sgordon1024@192.168.12.122"
+PI="sgordon1024@100.98.52.107"
 PASS="windows"
 DIR="$(cd "$(dirname "$0")" && pwd)"
 

@@ -20,15 +20,15 @@
       --bg:         #07070F;
       --surface:    #11111E;
       --surface2:   #18182A;
-      --border:     rgba(255,255,255,0.07);
+      --border:     rgba(255,255,255,0.13);
       --txt:        #E8E8F0;
-      --txt2:       #9090C0;
+      --txt2:       #B0B0D8;
       --blue:       #4FC3F7;
       --amber:      #FFA040;
       --amber-dim:  rgba(255,160,64,0.15);
       --green:      #66BB6A;
       --red:        #EF5350;
-      --tog-off:    #3a3a4a;
+      --tog-off:    #444458;
       --radius:     16px;
     }
 
@@ -209,9 +209,9 @@
 
     /* ── Section labels ───────────────────────────── */
     .section-label {
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 1px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
       text-transform: uppercase;
       color: var(--txt2);
     }
@@ -1402,7 +1402,7 @@
     <p class="net-hint">Switching takes ~10 seconds. GoGoVan internet will be briefly interrupted.</p>
 
     <!-- Speed test -->
-    <span class="section-label" style="margin-top:20px">Speed Test</span>
+    <span class="section-label section-label-solo">Speed Test</span>
     <div class="card" style="margin-bottom:8px">
       <div class="speed-row">
         <div class="speed-cell">
@@ -1434,7 +1434,7 @@
     </button>
 
     <!-- Starlink power section -->
-    <span class="section-label" style="margin-top:20px">Starlink</span>
+    <span class="section-label section-label-solo">Starlink</span>
     <div class="card" style="margin-bottom:12px">
       <div class="starlink-power-row">
         <div class="starlink-power-info">
@@ -1520,25 +1520,25 @@ function switchTab(tab) {
 // ── Themes ────────────────────────────────────────
 const THEMES = [
   { id:'night',   name:'Night',   dark:true,  bg:'#07070F', accent:'#FF8C00',
-    vars:{'--bg':'#07070F','--surface':'#11111E','--surface2':'#18182A','--border':'rgba(255,255,255,0.09)','--txt':'#F0F0FF','--txt2':'#9090C0','--blue':'#00D4FF','--amber':'#FF8C00','--amber-dim':'rgba(255,140,0,0.18)','--green':'#00E676','--red':'#FF1744','--tog-off':'#3a3a4a'}},
+    vars:{'--bg':'#07070F','--surface':'#11111E','--surface2':'#18182A','--border':'rgba(255,255,255,0.14)','--txt':'#F0F0FF','--txt2':'#B8B8D8','--blue':'#00D4FF','--amber':'#FF8C00','--amber-dim':'rgba(255,140,0,0.18)','--green':'#00E676','--red':'#FF1744','--tog-off':'#444458'}},
   { id:'forest',  name:'Forest',  dark:true,  bg:'#060E07', accent:'#00E676',
-    vars:{'--bg':'#060E07','--surface':'#0E1A10','--surface2':'#162018','--border':'rgba(255,255,255,0.09)','--txt':'#E0FFE8','--txt2':'#72A87A','--blue':'#00E5FF','--amber':'#00E676','--amber-dim':'rgba(0,230,118,0.15)','--green':'#69F0AE','--red':'#FF5252','--tog-off':'#2A3A2C'}},
+    vars:{'--bg':'#060E07','--surface':'#0E1A10','--surface2':'#162018','--border':'rgba(255,255,255,0.14)','--txt':'#E0FFE8','--txt2':'#98C8A0','--blue':'#00E5FF','--amber':'#00E676','--amber-dim':'rgba(0,230,118,0.15)','--green':'#69F0AE','--red':'#FF5252','--tog-off':'#364A38'}},
   { id:'carbon',  name:'Carbon',  dark:true,  bg:'#0A0A0A', accent:'#18FFFF',
-    vars:{'--bg':'#0A0A0A','--surface':'#161616','--surface2':'#202020','--border':'rgba(255,255,255,0.08)','--txt':'#F5F5F5','--txt2':'#909090','--blue':'#18FFFF','--amber':'#18FFFF','--amber-dim':'rgba(24,255,255,0.12)','--green':'#B2FF59','--red':'#FF5252','--tog-off':'#333333'}},
+    vars:{'--bg':'#0A0A0A','--surface':'#161616','--surface2':'#202020','--border':'rgba(255,255,255,0.13)','--txt':'#F5F5F5','--txt2':'#B8B8B8','--blue':'#18FFFF','--amber':'#18FFFF','--amber-dim':'rgba(24,255,255,0.12)','--green':'#B2FF59','--red':'#FF5252','--tog-off':'#404040'}},
   { id:'dusk',    name:'Dusk',    dark:true,  bg:'#0A080F', accent:'#EA80FC',
-    vars:{'--bg':'#0A080F','--surface':'#14111E','--surface2':'#1E1928','--border':'rgba(255,255,255,0.09)','--txt':'#F0EEFF','--txt2':'#9080C0','--blue':'#82B1FF','--amber':'#EA80FC','--amber-dim':'rgba(234,128,252,0.15)','--green':'#69F0AE','--red':'#FF5252','--tog-off':'#3A3050'}},
+    vars:{'--bg':'#0A080F','--surface':'#14111E','--surface2':'#1E1928','--border':'rgba(255,255,255,0.14)','--txt':'#F0EEFF','--txt2':'#B8A8D8','--blue':'#82B1FF','--amber':'#EA80FC','--amber-dim':'rgba(234,128,252,0.15)','--green':'#69F0AE','--red':'#FF5252','--tog-off':'#484060'}},
   { id:'ember',   name:'Ember',   dark:true,  bg:'#0F0A07', accent:'#FF3D00',
-    vars:{'--bg':'#0F0A07','--surface':'#1A1208','--surface2':'#231A0E','--border':'rgba(255,255,255,0.09)','--txt':'#FFF3EE','--txt2':'#A08070','--blue':'#FFAB40','--amber':'#FF3D00','--amber-dim':'rgba(255,61,0,0.15)','--green':'#B2FF59','--red':'#FF5252','--tog-off':'#3A2A1C'}},
+    vars:{'--bg':'#0F0A07','--surface':'#1A1208','--surface2':'#231A0E','--border':'rgba(255,255,255,0.14)','--txt':'#FFF3EE','--txt2':'#C8A898','--blue':'#FFAB40','--amber':'#FF3D00','--amber-dim':'rgba(255,61,0,0.15)','--green':'#B2FF59','--red':'#FF5252','--tog-off':'#4A3828'}},
   { id:'cloud',   name:'Cloud',   dark:false, bg:'#F0F2FF', accent:'#0055FF',
-    vars:{'--bg':'#F0F2FF','--surface':'#FFFFFF','--surface2':'#E8ECFF','--border':'rgba(0,0,0,0.08)','--txt':'#0A0A1A','--txt2':'#4455AA','--blue':'#0055FF','--amber':'#FF6200','--amber-dim':'rgba(255,98,0,0.12)','--green':'#00C853','--red':'#FF1744','--tog-off':'#C8CCEE'}},
+    vars:{'--bg':'#F0F2FF','--surface':'#FFFFFF','--surface2':'#E8ECFF','--border':'rgba(0,0,0,0.13)','--txt':'#0A0A1A','--txt2':'#2A3D99','--blue':'#0055FF','--amber':'#FF6200','--amber-dim':'rgba(255,98,0,0.12)','--green':'#00C853','--red':'#FF1744','--tog-off':'#B8BEDD'}},
   { id:'sand',    name:'Sand',    dark:false, bg:'#FFF8F0', accent:'#FF6200',
-    vars:{'--bg':'#FFF8F0','--surface':'#FFFFFF','--surface2':'#FFE8D0','--border':'rgba(0,0,0,0.07)','--txt':'#1A0A00','--txt2':'#7A4400','--blue':'#2979FF','--amber':'#FF6200','--amber-dim':'rgba(255,98,0,0.12)','--green':'#00C853','--red':'#DD2C00','--tog-off':'#FFCCAA'}},
+    vars:{'--bg':'#FFF8F0','--surface':'#FFFFFF','--surface2':'#FFE8D0','--border':'rgba(0,0,0,0.12)','--txt':'#1A0A00','--txt2':'#5A3000','--blue':'#2979FF','--amber':'#FF6200','--amber-dim':'rgba(255,98,0,0.12)','--green':'#00C853','--red':'#DD2C00','--tog-off':'#EEBF99'}},
   { id:'meadow',  name:'Meadow',  dark:false, bg:'#F0FFF4', accent:'#00C853',
-    vars:{'--bg':'#F0FFF4','--surface':'#FFFFFF','--surface2':'#CCFFDD','--border':'rgba(0,0,0,0.07)','--txt':'#001A08','--txt2':'#007730','--blue':'#2979FF','--amber':'#00C853','--amber-dim':'rgba(0,200,83,0.12)','--green':'#00C853','--red':'#DD2C00','--tog-off':'#AAEEBB'}},
+    vars:{'--bg':'#F0FFF4','--surface':'#FFFFFF','--surface2':'#CCFFDD','--border':'rgba(0,0,0,0.12)','--txt':'#001A08','--txt2':'#005A22','--blue':'#2979FF','--amber':'#00C853','--amber-dim':'rgba(0,200,83,0.12)','--green':'#00C853','--red':'#DD2C00','--tog-off':'#99DDB0'}},
   { id:'frost',   name:'Frost',   dark:false, bg:'#F0F8FF', accent:'#0091EA',
-    vars:{'--bg':'#F0F8FF','--surface':'#FFFFFF','--surface2':'#CCE8FF','--border':'rgba(0,0,0,0.07)','--txt':'#001428','--txt2':'#005588','--blue':'#0091EA','--amber':'#FF6D00','--amber-dim':'rgba(255,109,0,0.12)','--green':'#00C853','--red':'#DD2C00','--tog-off':'#AACCEE'}},
+    vars:{'--bg':'#F0F8FF','--surface':'#FFFFFF','--surface2':'#CCE8FF','--border':'rgba(0,0,0,0.12)','--txt':'#001428','--txt2':'#003D6E','--blue':'#0091EA','--amber':'#FF6D00','--amber-dim':'rgba(255,109,0,0.12)','--green':'#00C853','--red':'#DD2C00','--tog-off':'#99BBDD'}},
   { id:'rose',    name:'Rose',    dark:false, bg:'#FFF0F5', accent:'#F50057',
-    vars:{'--bg':'#FFF0F5','--surface':'#FFFFFF','--surface2':'#FFCCDD','--border':'rgba(0,0,0,0.07)','--txt':'#1A0010','--txt2':'#880033','--blue':'#FF4081','--amber':'#F50057','--amber-dim':'rgba(245,0,87,0.12)','--green':'#00C853','--red':'#DD2C00','--tog-off':'#FFAAC8'}},
+    vars:{'--bg':'#FFF0F5','--surface':'#FFFFFF','--surface2':'#FFCCDD','--border':'rgba(0,0,0,0.12)','--txt':'#1A0010','--txt2':'#6A0028','--blue':'#FF4081','--amber':'#F50057','--amber-dim':'rgba(245,0,87,0.12)','--green':'#00C853','--red':'#DD2C00','--tog-off':'#EE99BB'}},
 ];
 
 let activeTheme = localStorage.getItem('theme') || 'night';
