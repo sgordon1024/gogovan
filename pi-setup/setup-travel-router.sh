@@ -96,9 +96,20 @@ echo $PASS | sudo -S systemctl start uap0-setup.service
 echo $PASS | sudo -S systemctl start hostapd
 echo $PASS | sudo -S systemctl restart dnsmasq
 
+echo "=== Step 10: Add upstream Wi-Fi networks ==="
+# T-Mobile hotspot — primary (priority 10, already in preconfigured profile)
+echo $PASS | sudo -S nmcli connection modify preconfigured connection.autoconnect-priority 10
+
+# WiFi Blaster (Starlink) — fallback (priority 5)
+echo $PASS | sudo -S nmcli connection add type wifi con-name 'wifi-blaster' ifname wlan0 ssid 'WiFi Blaster' connection.autoconnect yes connection.autoconnect-priority 5 2>/dev/null || true
+echo $PASS | sudo -S nmcli connection modify 'wifi-blaster' wifi-sec.key-mgmt wpa-psk
+echo $PASS | sudo -S nmcli connection modify 'wifi-blaster' wifi-sec.psk '1234567890'
+echo $PASS | sudo -S nmcli connection modify 'wifi-blaster' connection.autoconnect-priority 5
+
 echo ""
 echo "=== Done! ==="
 echo "GoGoVan hotspot should be broadcasting now."
 echo "Clients connect to: $AP_SSID / $AP_PASS"
 echo "Pi AP address: $AP_IP"
+echo "Upstream networks: T-Mobile (priority 10), WiFi Blaster/Starlink (priority 5)"
 echo "Pi T-Mobile address: check with 'ip addr show wlan0'"
