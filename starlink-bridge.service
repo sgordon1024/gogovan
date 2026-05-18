@@ -1,0 +1,14 @@
+[Unit]
+Description=Starlink smart plug MQTT bridge
+After=network.target mosquitto.service
+Wants=mosquitto.service
+
+[Service]
+ExecStart=/usr/bin/python3 /home/sgordon1024/gogovan/starlink-bridge.py
+WorkingDirectory=/home/sgordon1024/gogovan
+Restart=always
+RestartSec=10
+User=sgordon1024
+
+[Install]
+WantedBy=multi-user.target

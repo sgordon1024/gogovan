@@ -1146,6 +1146,34 @@
     .net-btn-name { font-size:15px; font-weight:600; color:var(--txt); }
     .net-btn-sub { font-size:12px; color:var(--txt2); }
     .net-hint { font-size:12px; color:var(--txt2); text-align:center; padding:12px 16px 0; }
+    /* ── Starlink power card ──────────────────────────── */
+    .starlink-power-row { display:flex; align-items:center; justify-content:space-between; padding:16px; }
+    .starlink-power-label { font-size:17px; font-weight:600; color:var(--txt); }
+    .starlink-power-sub { font-size:13px; color:var(--txt2); margin-top:2px; }
+    .starlink-toggle { width:54px; height:32px; border-radius:16px; background:var(--tog-off); border:none; cursor:pointer; position:relative; transition:background .2s; flex-shrink:0; -webkit-tap-highlight-color:transparent; }
+    .starlink-toggle.on { background:var(--amber); }
+    .starlink-toggle-knob { width:26px; height:26px; border-radius:50%; background:#fff; position:absolute; top:3px; left:3px; transition:transform .2s; box-shadow:0 1px 3px rgba(0,0,0,.4); }
+    .starlink-toggle.on .starlink-toggle-knob { transform:translateX(22px); }
+    /* ── T-Mobile signal + auto row ─────────────────── */
+    .starlink-auto-row { display:flex; align-items:center; justify-content:space-between; padding:14px 16px 6px; gap:12px; }
+    .starlink-signal-wrap { display:flex; align-items:center; gap:10px; }
+    .starlink-signal-label { font-size:14px; color:var(--txt2); }
+    .starlink-signal-bars { display:flex; align-items:flex-end; gap:3px; height:18px; }
+    .sig-bar { width:5px; border-radius:2px 2px 0 0; background:var(--border); transition:background .3s; }
+    #sigBar1 { height:5px; }
+    #sigBar2 { height:9px; }
+    #sigBar3 { height:13px; }
+    #sigBar4 { height:18px; }
+    .sig-bar.lit { background:var(--green); }
+    .sig-bar.warn { background:var(--amber); }
+    .sig-bar.bad  { background:var(--red); }
+    .starlink-signal-val { font-size:13px; color:var(--txt2); font-variant-numeric:tabular-nums; min-width:28px; }
+    .starlink-auto-toggle-wrap { display:flex; align-items:center; gap:10px; }
+    .starlink-auto-label { font-size:14px; color:var(--txt2); }
+    .starlink-auto-btn { width:44px; height:26px; border-radius:13px; background:var(--tog-off); border:none; cursor:pointer; position:relative; transition:background .2s; flex-shrink:0; -webkit-tap-highlight-color:transparent; }
+    .starlink-auto-btn.on { background:var(--amber); }
+    .starlink-auto-knob { width:20px; height:20px; border-radius:50%; background:#fff; position:absolute; top:3px; left:3px; transition:transform .2s; box-shadow:0 1px 3px rgba(0,0,0,.4); }
+    .starlink-auto-btn.on .starlink-auto-knob { transform:translateX(18px); }
   </style>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
@@ -1360,6 +1388,42 @@
       </button>
     </div>
     <p class="net-hint">Switching takes ~10 seconds. GoGoVan internet will be briefly interrupted.</p>
+
+    <!-- Starlink power section -->
+    <span class="section-label" style="margin-top:20px">Starlink</span>
+    <div class="card" style="margin-bottom:12px">
+      <div class="starlink-power-row">
+        <div class="starlink-power-info">
+          <div class="starlink-power-label" id="starlinkPowerLabel">Unknown</div>
+          <div class="starlink-power-sub" id="starlinkPowerSub">Plug not yet configured</div>
+        </div>
+        <button class="starlink-toggle" id="starlinkToggleBtn" onclick="toggleStarlink()">
+          <div class="starlink-toggle-knob"></div>
+        </button>
+      </div>
+    </div>
+    <!-- T-Mobile signal + auto row -->
+    <div class="card">
+      <div class="starlink-auto-row">
+        <div class="starlink-signal-wrap">
+          <div class="starlink-signal-label">T-Mobile signal</div>
+          <div class="starlink-signal-bars" id="starlinkSignalBars">
+            <div class="sig-bar" id="sigBar1"></div>
+            <div class="sig-bar" id="sigBar2"></div>
+            <div class="sig-bar" id="sigBar3"></div>
+            <div class="sig-bar" id="sigBar4"></div>
+          </div>
+          <div class="starlink-signal-val" id="starlinkSignalVal">—</div>
+        </div>
+        <div class="starlink-auto-toggle-wrap">
+          <div class="starlink-auto-label">Auto-switch</div>
+          <button class="starlink-auto-btn" id="starlinkAutoBtn" onclick="toggleStarlinkAuto()">
+            <div class="starlink-auto-knob"></div>
+          </button>
+        </div>
+      </div>
+      <div class="net-hint" style="padding-top:8px;text-align:left">When on, Starlink powers up automatically if T-Mobile signal drops below 35.</div>
+    </div>
   </div>
 
   <!-- THEME PICKER -->
@@ -2174,6 +2238,63 @@ function switchNetwork(target) {
   mqttClient.publish('van/network/upstream', target);
 }
 
+// ── Starlink power control ────────────────────────
+let starlinkOn   = null;   // true / false / null (unknown)
+let starlinkAuto = false;
+
+function updateStarlinkPower(state) {
+  starlinkOn = (state === 'on');
+  const btn   = document.getElementById('starlinkToggleBtn');
+  const label = document.getElementById('starlinkPowerLabel');
+  const sub   = document.getElementById('starlinkPowerSub');
+  btn.classList.toggle('on', starlinkOn);
+  label.textContent = starlinkOn ? 'Starlink On' : 'Starlink Off';
+  sub.textContent   = starlinkOn ? 'Plug is powered on' : 'Plug is powered off';
+}
+
+function updateTmobileSignal(sig) {
+  const valEl = document.getElementById('starlinkSignalVal');
+  const bars  = [
+    document.getElementById('sigBar1'),
+    document.getElementById('sigBar2'),
+    document.getElementById('sigBar3'),
+    document.getElementById('sigBar4'),
+  ];
+  if (sig < 0) {
+    valEl.textContent = '—';
+    bars.forEach(b => b.className = 'sig-bar');
+    return;
+  }
+  valEl.textContent = sig;
+  // Determine colour class based on thresholds
+  const cls = sig < 35 ? 'bad' : sig < 55 ? 'warn' : 'lit';
+  // Light up bars proportionally: 0-25 → 1 bar, 26-50 → 2, 51-75 → 3, 76-100 → 4
+  const lit = sig <= 0 ? 0 : sig <= 25 ? 1 : sig <= 50 ? 2 : sig <= 75 ? 3 : 4;
+  bars.forEach((b, i) => {
+    b.className = 'sig-bar' + (i < lit ? ` ${cls}` : '');
+  });
+}
+
+function updateStarlinkAuto(on) {
+  starlinkAuto = on;
+  document.getElementById('starlinkAutoBtn').classList.toggle('on', on);
+}
+
+function toggleStarlink() {
+  if (!mqttClient?.connected) return;
+  const target = starlinkOn ? 'off' : 'on';
+  mqttClient.publish('van/starlink/power', target);
+  // Optimistic UI update while we wait for confirmation
+  updateStarlinkPower(target);
+}
+
+function toggleStarlinkAuto() {
+  if (!mqttClient?.connected) return;
+  const target = starlinkAuto ? 'off' : 'on';
+  mqttClient.publish('van/starlink/auto', target);
+  updateStarlinkAuto(!starlinkAuto);
+}
+
 // ── MQTT ──────────────────────────────────────────
 const PORTAL_ID = 'c0619ab5dcfb';
 const CERBO_IP  = localStorage.getItem('cerboIp') || '192.168.12.140';
@@ -2325,6 +2446,7 @@ function connectMQTT() {
     client.subscribe('van/status/light/+');
     client.subscribe('van/status/ac/+');
     client.subscribe('van/status/network/+');
+    client.subscribe('van/status/starlink/+');
     client.publish(`R/${PORTAL_ID}/keepalive`, '');
     client.publish(`R/${PORTAL_ID}/system/0/Serial`, '');
     client.publish(`R/${PORTAL_ID}/vebus/276/Mode`, '');
@@ -2399,6 +2521,15 @@ function connectMQTT() {
       if (key === 'upstream') {
         updateNetworkUI(msg.toString().trim());
       }
+      return;
+    }
+
+    if (topic.startsWith('van/status/starlink/')) {
+      const key = topic.split('/')[3];
+      const val = msg.toString().trim();
+      if (key === 'power')          updateStarlinkPower(val);
+      else if (key === 'tmobile-signal') updateTmobileSignal(parseInt(val));
+      else if (key === 'auto')      updateStarlinkAuto(val === 'on');
       return;
     }
 
