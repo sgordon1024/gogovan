@@ -119,54 +119,69 @@
       50%       { opacity: 0.35; }
     }
 
+    /* ── Offline indicator (2px top bar) ─────────── */
+    #offline-indicator {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--amber);
+      z-index: 1001;
+      display: none;
+    }
+    #offline-indicator.show { display: block; }
+
     /* ── Offline banner ───────────────────────────── */
     @keyframes banner-in {
-      0%   { transform: translateY(-110%); }
-      55%  { transform: translateY(6px); }
-      72%  { transform: translateY(-4px); }
-      85%  { transform: translateY(3px); }
-      93%  { transform: translateY(-2px); }
-      100% { transform: translateY(0); }
+      0%   { transform: translateX(-50%) translateY(calc(-100% - 30px)); }
+      58%  { transform: translateX(-50%) translateY(6px); }
+      74%  { transform: translateX(-50%) translateY(-4px); }
+      87%  { transform: translateX(-50%) translateY(2px); }
+      100% { transform: translateX(-50%) translateY(0); }
     }
     @keyframes banner-out {
-      0%   { transform: translateY(0); opacity: 1; }
-      100% { transform: translateY(-110%); opacity: 0; }
+      0%   { transform: translateX(-50%) translateY(0); opacity: 1; }
+      100% { transform: translateX(-50%) translateY(calc(-100% - 30px)); opacity: 0; }
     }
     .offline-banner {
-      background: rgba(255,160,64,0.12);
-      border-bottom: 1px solid rgba(255,160,64,0.3);
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      width: calc(100vw - 32px);
+      max-width: 398px;
+      z-index: 1000;
+      background: rgba(40,20,0,0.92);
+      border: 1px solid rgba(255,160,64,0.6);
+      border-radius: 12px;
       color: var(--amber);
       font-size: 13px;
       font-weight: 600;
-      padding: 8px 16px;
+      padding: 10px 16px;
       letter-spacing: 0.2px;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 6px;
-      position: relative;
-      transform: translateY(-110%);
-      overflow: hidden;
+      transform: translateX(-50%) translateY(calc(-100% - 30px));
     }
     .offline-banner.visible {
-      animation: banner-in 0.6s cubic-bezier(0.22,1,0.36,1) forwards;
+      animation: banner-in 0.55s cubic-bezier(0.22,1,0.36,1) forwards;
     }
     .offline-banner.hiding {
-      animation: banner-out 0.25s ease-in forwards;
+      animation: banner-out 0.22s ease-in forwards;
     }
     .offline-banner-close {
       position: absolute;
-      right: 14px;
+      right: 12px;
       top: 50%;
       transform: translateY(-50%);
       background: none;
       border: none;
       color: var(--amber);
-      opacity: 0.7;
+      opacity: 0.65;
       cursor: pointer;
       display: flex;
       align-items: center;
-      padding: 4px;
+      padding: 6px;
       -webkit-tap-highlight-color: transparent;
     }
     .offline-banner-close:active { opacity: 1; }
@@ -737,9 +752,10 @@
     }
 
     .ctrl-btn:active { transform: scale(0.97); }
-    .ctrl-btn.active { background: rgba(79,195,247,0.1); border-color: rgba(79,195,247,0.3); }
+    .ctrl-btn.active { background: var(--amber-dim); border-color: var(--amber); }
+    .ctrl-btn.active .ctrl-btn-icon { color: var(--amber); }
 
-    .ctrl-btn-icon  { font-size: 22px; display: flex; }
+    .ctrl-btn-icon  { font-size: 22px; display: flex; color: var(--txt2); }
     .ctrl-btn-label { font-size: 14px; font-weight: 600; color: var(--txt); }
     .ctrl-btn-sub   { font-size: 12px; color: var(--txt2); }
 
@@ -968,6 +984,79 @@
       color: var(--blue);
     }
 
+    /* ── Driving mode full-screen layout ────────── */
+    body.driving .tab-bar      { display: none; }
+    body.driving #inverter-section { display: none; }
+    body.driving .theme-btn-wrap   { display: none; }
+    body.driving .app-name         { display: none; }
+    body.driving #modeChip         { display: none !important; }
+    body.driving                   { padding-bottom: 0; }
+
+    body.driving header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      padding: max(env(safe-area-inset-top), 12px) 16px 12px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      z-index: 50;
+    }
+
+    body.driving #tab-power {
+      padding-top: calc(max(env(safe-area-inset-top), 12px) + 44px);
+    }
+
+    body.driving #tab-power > .card {
+      margin: 0;
+      border-radius: 0;
+      border-left: none;
+      border-right: none;
+    }
+
+    /* ── Speed panel ─────────────────────────────── */
+    #drive-speed-panel {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 0 24px;
+    }
+
+    body.driving #drive-speed-panel { display: flex; }
+
+    #drive-speed-number {
+      font-size: clamp(96px, 28vw, 148px);
+      font-weight: 800;
+      letter-spacing: -4px;
+      line-height: 1;
+      color: var(--amber);
+      font-variant-numeric: tabular-nums;
+    }
+
+    #drive-speed-unit {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--txt2);
+      margin-top: 2px;
+    }
+
+    /* ── Drive test button (dev only) ────────────── */
+    .drive-test-btn {
+      position: absolute;
+      top: max(env(safe-area-inset-top), 14px);
+      right: 14px;
+      background: none;
+      border: none;
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--border);
+      cursor: pointer;
+      padding: 4px 6px;
+      -webkit-tap-highlight-color: transparent;
+      letter-spacing: 0.5px;
+    }
+
     /* ── Pull to refresh ─────────────────────────── */
     #ptr-backdrop {
       position: fixed;
@@ -1064,8 +1153,10 @@
       <div class="status-dot connecting" id="statusDot"></div>
       <span id="statusText">Connecting…</span>
     </div>
+    <button id="driveTestBtn" class="drive-test-btn" onclick="toggleDriveTest()">drive</button>
   </header>
 
+  <div id="offline-indicator"></div>
   <div id="offline-banner" class="offline-banner">
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
     Reconnecting…
@@ -1076,6 +1167,13 @@
 
   <!-- TAB: POWER -->
   <div id="tab-power" class="tab-panel">
+
+    <!-- Speed display — only visible in driving mode -->
+    <div id="drive-speed-panel">
+      <div id="drive-speed-number">—</div>
+      <div id="drive-speed-unit">mph</div>
+    </div>
+
     <div class="card">
       <div class="batt-hero-area">
         <div class="batt-hero-label">Battery</div>
@@ -1101,6 +1199,7 @@
       </div>
     </div>
 
+    <div id="inverter-section">
     <div class="section-label-row mt">
       <span class="section-label">Inverter</span>
     </div>
@@ -1129,6 +1228,7 @@
         </div>
       </div>
     </div>
+    </div><!-- /#inverter-section -->
 
     <div class="theme-btn-wrap">
       <button class="theme-btn" onclick="openThemePicker()">
@@ -1859,6 +1959,7 @@ let highIdleMode    = false;
 let drivingTimer    = null;
 let currentSpeedMph = null;
 let currentSolarW   = 0;
+let preDriveTab     = 'power';
 
 const DRIVE_SPEED_MPH  = 5;    // mph to consider driving
 const DRIVE_CONFIRM_MS = 4000; // must hold above threshold before activating
@@ -1915,13 +2016,31 @@ function enterDrivingMode() {
   // 3. Retract awning (G12 stops at limit switch if already retracted)
   if (mqttClient?.connected) mqttClient.publish('van/motor/awning-retract', 'on');
 
+  // 4. Lock UI to power tab only
+  preDriveTab = activeTab;
+  switchTab('power');
+  document.body.classList.add('driving');
+
   renderLights();
   refreshModeChip();
 }
 
 function exitDrivingMode() {
   drivingMode = false;
+  document.body.classList.remove('driving');
+  switchTab(preDriveTab);
   refreshModeChip();
+}
+
+function toggleDriveTest() {
+  if (drivingMode) {
+    currentSpeedMph = 0;
+    exitDrivingMode();
+  } else {
+    if (drivingTimer) { clearTimeout(drivingTimer); drivingTimer = null; }
+    currentSpeedMph = 35; // fake speed so chip shows "35 mph"
+    enterDrivingMode();
+  }
 }
 
 function checkHighIdle() {
@@ -1936,9 +2055,19 @@ function refreshModeChip() {
   const chip  = document.getElementById('modeChip');
   const icon  = document.getElementById('modeChipIcon');
   const label = document.getElementById('modeChipLabel');
+  const speedEl = document.getElementById('drive-speed-number');
+
+  // Update large speed panel when driving
+  if (speedEl) {
+    speedEl.textContent = (drivingMode && currentSpeedMph != null)
+      ? Math.round(currentSpeedMph)
+      : '—';
+  }
+
   if (!chip) return;
 
   if (drivingMode) {
+    // Speed shown in panel — chip hidden by CSS in driving mode
     chip.style.display = 'flex';
     chip.className = 'mode-chip driving';
     icon.textContent  = '🚗';
@@ -1983,6 +2112,7 @@ function dismissBanner() {
 function setLiveStatus(live) {
   const dot  = document.getElementById('statusDot');
   const text = document.getElementById('statusText');
+  const ind  = document.getElementById('offline-indicator');
   dot.classList.remove('connecting');
   if (live) {
     dot.style.background = 'var(--green)';
@@ -1990,10 +2120,12 @@ function setLiveStatus(live) {
     text.textContent = 'Live';
     bannerDismissed = false;
     hideBanner();
+    ind.classList.remove('show');
   } else {
     dot.style.background = 'var(--red)';
     dot.style.boxShadow  = '0 0 6px var(--red)';
     text.textContent = 'Offline';
+    ind.classList.add('show');
     if (!bannerDismissed) showBanner();
   }
 }
