@@ -128,24 +128,63 @@ def get_current_upstream():
     return "unknown"
 
 def handle_network(key, payload):
-    """Switch upstream Wi-Fi connection based on MQTT command."""
+    """Switch upstream Wi-Fi or trigger speed test."""
     global mqtt_client_ref
-    if key != "upstream":
+    if key == "upstream":
+        if payload == "tmobile":
+            conn_name = "preconfigured"
+        elif payload == "starlink":
+            conn_name = "wifi-blaster"
+        else:
+            print(f"Unknown network target: {payload}")
+            return
+        print(f"Switching upstream to {payload} ({conn_name})")
+        subprocess.run(["sudo", "nmcli", "connection", "up", conn_name])
+        time.sleep(5)
+        upstream = get_current_upstream()
+        if mqtt_client_ref is not None:
+            mqtt_client_ref.publish("van/status/network/upstream", upstream, retain=True)
+            print(f"Network upstream → {upstream}")
+    elif key == "speedtest":
+        # Run speed test in background thread so MQTT loop stays alive
+        t = threading.Thread(target=run_speedtest, daemon=True)
+        t.start()
+
+def run_speedtest():
+    """Run speedtest-cli and publish results to MQTT."""
+    global mqtt_client_ref
+    if mqtt_client_ref is None:
         return
-    if payload == "tmobile":
-        conn_name = "preconfigured"
-    elif payload == "starlink":
-        conn_name = "wifi-blaster"
-    else:
-        print(f"Unknown network target: {payload}")
-        return
-    print(f"Switching upstream to {payload} ({conn_name})")
-    subprocess.run(["sudo", "nmcli", "connection", "up", conn_name])
-    time.sleep(5)
+    print("Speed test starting…")
+    mqtt_client_ref.publish("van/status/network/speedtest/running", "true", retain=True)
     upstream = get_current_upstream()
-    if mqtt_client_ref is not None:
-        mqtt_client_ref.publish("van/status/network/upstream", upstream, retain=True)
-        print(f"Network upstream → {upstream}")
+    try:
+        r = subprocess.run(
+            ["speedtest-cli", "--json", "--secure"],
+            capture_output=True, text=True, timeout=120
+        )
+        import json as _json
+        data = _json.loads(r.stdout)
+        result = {
+            "download": round(data["download"] / 1e6, 1),
+            "upload":   round(data["upload"]   / 1e6, 1),
+            "ping":     round(data["ping"]),
+            "server":   data.get("server", {}).get("sponsor", "Unknown"),
+            "upstream": upstream,
+            "timestamp": data.get("timestamp", ""),
+            "error":    None
+        }
+        print(f"Speed test: ↓{result['download']} ↑{result['upload']} ping={result['ping']}ms via {upstream}")
+    except Exception as e:
+        result = {
+            "download": None, "upload": None, "ping": None,
+            "server": None, "upstream": upstream,
+            "timestamp": "", "error": str(e)
+        }
+        print(f"Speed test failed: {e}")
+    import json as _json
+    mqtt_client_ref.publish("van/status/network/speedtest", _json.dumps(result), retain=True)
+    mqtt_client_ref.publish("van/status/network/speedtest/running", "false", retain=True)
 
 def can_listener(mqtt_client):
     """

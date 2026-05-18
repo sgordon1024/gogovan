@@ -1146,6 +1146,18 @@
     .net-btn-name { font-size:15px; font-weight:600; color:var(--txt); }
     .net-btn-sub { font-size:12px; color:var(--txt2); }
     .net-hint { font-size:12px; color:var(--txt2); text-align:center; padding:12px 16px 0; }
+    /* ── Speed test card ─────────────────────────────── */
+    .speed-row { display:flex; align-items:stretch; padding:16px 16px 8px; gap:0; }
+    .speed-cell { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; }
+    .speed-divider { width:1px; background:var(--border); margin:0 4px; }
+    .speed-dir { font-size:11px; color:var(--txt2); text-transform:uppercase; letter-spacing:.5px; }
+    .speed-val { font-size:28px; font-weight:700; color:var(--amber); line-height:1.1; }
+    .speed-unit { font-size:11px; color:var(--txt2); }
+    .speed-meta { font-size:12px; color:var(--txt2); text-align:center; padding:4px 16px 12px; }
+    .speed-error { font-size:12px; color:#e05; text-align:center; padding:0 16px 12px; }
+    .speed-test-btn { display:flex; align-items:center; justify-content:center; gap:8px; width:calc(100% - 32px); margin:0 16px 16px; padding:14px; background:var(--amber); color:#000; font-size:15px; font-weight:600; border:none; border-radius:12px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+    .speed-test-btn:disabled { opacity:.5; pointer-events:none; }
+    .speed-test-btn.running { background:var(--surface); color:var(--txt2); border:1px solid var(--border); }
     /* ── Starlink power card ──────────────────────────── */
     .starlink-power-row { display:flex; align-items:center; justify-content:space-between; padding:16px; }
     .starlink-power-label { font-size:17px; font-weight:600; color:var(--txt); }
@@ -1388,6 +1400,38 @@
       </button>
     </div>
     <p class="net-hint">Switching takes ~10 seconds. GoGoVan internet will be briefly interrupted.</p>
+
+    <!-- Speed test -->
+    <span class="section-label" style="margin-top:20px">Speed Test</span>
+    <div class="card" style="margin-bottom:8px">
+      <div class="speed-row">
+        <div class="speed-cell">
+          <div class="speed-dir">↓ Download</div>
+          <div class="speed-val" id="speedDown">—</div>
+          <div class="speed-unit">Mbps</div>
+        </div>
+        <div class="speed-divider"></div>
+        <div class="speed-cell">
+          <div class="speed-dir">↑ Upload</div>
+          <div class="speed-val" id="speedUp">—</div>
+          <div class="speed-unit">Mbps</div>
+        </div>
+        <div class="speed-divider"></div>
+        <div class="speed-cell">
+          <div class="speed-dir">Ping</div>
+          <div class="speed-val" id="speedPing">—</div>
+          <div class="speed-unit">ms</div>
+        </div>
+      </div>
+      <div class="speed-meta">
+        <span id="speedNetwork">—</span> · <span id="speedServer">—</span> · <span id="speedTime">Never tested</span>
+      </div>
+      <div class="speed-error" id="speedError" style="display:none"></div>
+    </div>
+    <button class="speed-test-btn" id="speedTestBtn" onclick="runSpeedTest()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+      Test Now
+    </button>
 
     <!-- Starlink power section -->
     <span class="section-label" style="margin-top:20px">Starlink</span>
@@ -2238,6 +2282,56 @@ function switchNetwork(target) {
   mqttClient.publish('van/network/upstream', target);
 }
 
+// ── Speed test ────────────────────────────────────
+let speedTestRunning = false;
+
+function runSpeedTest() {
+  if (!mqttClient?.connected || speedTestRunning) return;
+  speedTestRunning = true;
+  const btn = document.getElementById('speedTestBtn');
+  btn.disabled = true;
+  btn.classList.add('running');
+  btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:ptr-spin .75s linear infinite"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg> Testing… (~60s)`;
+  mqttClient.publish('van/network/speedtest', 'run');
+}
+
+function updateSpeedUI(payload) {
+  speedTestRunning = false;
+  const btn = document.getElementById('speedTestBtn');
+  btn.disabled = false;
+  btn.classList.remove('running');
+  btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg> Test Now`;
+
+  if (payload === 'running') {
+    speedTestRunning = true;
+    btn.disabled = true; btn.classList.add('running');
+    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:ptr-spin .75s linear infinite"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg> Testing… (~60s)`;
+    return;
+  }
+
+  try {
+    const d = JSON.parse(payload);
+    const errEl = document.getElementById('speedError');
+    if (d.error) {
+      errEl.textContent = 'Test failed: ' + d.error;
+      errEl.style.display = 'block';
+      return;
+    }
+    errEl.style.display = 'none';
+    document.getElementById('speedDown').textContent  = d.download ?? '—';
+    document.getElementById('speedUp').textContent    = d.upload   ?? '—';
+    document.getElementById('speedPing').textContent  = d.ping     ?? '—';
+    const netLabel = d.upstream === 'tmobile' ? 'T-Mobile' : d.upstream === 'starlink' ? 'Starlink' : d.upstream ?? '—';
+    document.getElementById('speedNetwork').textContent = netLabel;
+    document.getElementById('speedServer').textContent  = d.server ?? '—';
+    // Time ago
+    if (d.timestamp) {
+      const ago = Math.round((Date.now() - new Date(d.timestamp)) / 60000);
+      document.getElementById('speedTime').textContent = ago < 1 ? 'Just now' : `${ago}m ago`;
+    }
+  } catch(e) {}
+}
+
 // ── Starlink power control ────────────────────────
 let starlinkOn   = null;   // true / false / null (unknown)
 let starlinkAuto = false;
@@ -2517,9 +2611,14 @@ function connectMQTT() {
     }
 
     if (topic.startsWith('van/status/network/')) {
-      const key = topic.split('/')[3];
+      const key   = topic.split('/').slice(3).join('/');
+      const val   = msg.toString().trim();
       if (key === 'upstream') {
-        updateNetworkUI(msg.toString().trim());
+        updateNetworkUI(val);
+      } else if (key === 'speedtest') {
+        updateSpeedUI(val);
+      } else if (key === 'speedtest/running') {
+        if (val === 'true') updateSpeedUI('running');
       }
       return;
     }
