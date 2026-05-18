@@ -1131,6 +1131,21 @@
       display: block;
       animation: ptr-spin 0.75s linear infinite;
     }
+
+    /* ── Internet / Network tab ───────────────────── */
+    .net-status-row { display:flex; align-items:center; gap:14px; padding:16px; }
+    .net-status-icon { font-size:32px; }
+    .net-status-label { font-size:17px; font-weight:600; color:var(--txt); }
+    .net-status-sub { font-size:13px; color:var(--txt2); margin-top:2px; }
+    .net-selector { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:0 16px; }
+    .net-btn { background:var(--surface); border:2px solid var(--border); border-radius:16px; padding:20px 12px; display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer; transition:border-color .15s; -webkit-tap-highlight-color:transparent; }
+    .net-btn.active { border-color:var(--amber); background:var(--amber-dim, rgba(255,160,0,.12)); }
+    .net-btn.switching { opacity:.6; pointer-events:none; }
+    .net-btn-icon { color:var(--txt2); }
+    .net-btn.active .net-btn-icon { color:var(--amber); }
+    .net-btn-name { font-size:15px; font-weight:600; color:var(--txt); }
+    .net-btn-sub { font-size:12px; color:var(--txt2); }
+    .net-hint { font-size:12px; color:var(--txt2); text-align:center; padding:12px 16px 0; }
   </style>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
@@ -1318,6 +1333,35 @@
     </div>
   </div>
 
+  <!-- TAB: INTERNET -->
+  <div id="tab-internet" class="tab-panel" hidden>
+    <span class="section-label section-label-solo">Internet</span>
+    <!-- Status card -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="net-status-row">
+        <div class="net-status-icon" id="netStatusIcon">📶</div>
+        <div>
+          <div class="net-status-label" id="netStatusLabel">Detecting…</div>
+          <div class="net-status-sub" id="netStatusSub">Checking upstream</div>
+        </div>
+      </div>
+    </div>
+    <!-- Network selector -->
+    <div class="net-selector">
+      <button class="net-btn" id="netBtnTmobile" onclick="switchNetwork('tmobile')">
+        <div class="net-btn-icon"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg></div>
+        <div class="net-btn-name">T-Mobile</div>
+        <div class="net-btn-sub">Primary</div>
+      </button>
+      <button class="net-btn" id="netBtnStarlink" onclick="switchNetwork('starlink')">
+        <div class="net-btn-icon"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+        <div class="net-btn-name">Starlink</div>
+        <div class="net-btn-sub">Fallback</div>
+      </button>
+    </div>
+    <p class="net-hint">Switching takes ~10 seconds. GoGoVan internet will be briefly interrupted.</p>
+  </div>
+
   <!-- THEME PICKER -->
   <div class="overlay" id="overlay" onclick="overlayClick(event)">
     <div class="theme-sheet" id="themeSheet">
@@ -1331,7 +1375,7 @@
   </div>
 
   <!-- BOTTOM TAB BAR -->
-  <nav class="tab-bar">
+  <nav class="tab-bar five-tabs">
     <button class="tab-btn active" data-tab="power" onclick="switchTab('power')">
       <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
       <span class="tab-label">Power</span>
@@ -1347,6 +1391,10 @@
     <button class="tab-btn" data-tab="controls" onclick="switchTab('controls')">
       <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="6" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="1" x2="7" y1="14" y2="14"/><line x1="9" x2="15" y1="8" y2="8"/><line x1="17" x2="23" y1="16" y2="16"/></svg></span>
       <span class="tab-label">Controls</span>
+    </button>
+    <button class="tab-btn" data-tab="internet" onclick="switchTab('internet')">
+      <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg></span>
+      <span class="tab-label">Internet</span>
     </button>
   </nav>
 
@@ -2085,6 +2133,47 @@ function refreshModeChip() {
   }
 }
 
+// ── Internet / Network switching ──────────────────
+let currentUpstream = null;
+
+function updateNetworkUI(upstream) {
+  currentUpstream = upstream;
+  const label = document.getElementById('netStatusLabel');
+  const sub   = document.getElementById('netStatusSub');
+  const icon  = document.getElementById('netStatusIcon');
+  const btnT  = document.getElementById('netBtnTmobile');
+  const btnS  = document.getElementById('netBtnStarlink');
+  btnT.classList.remove('active', 'switching');
+  btnS.classList.remove('active', 'switching');
+  if (upstream === 'tmobile') {
+    label.textContent = 'T-Mobile';
+    sub.textContent   = 'Primary upstream active';
+    icon.textContent  = '📶';
+    btnT.classList.add('active');
+  } else if (upstream === 'starlink') {
+    label.textContent = 'Starlink';
+    sub.textContent   = 'Fallback upstream active';
+    icon.textContent  = '🛰';
+    btnS.classList.add('active');
+  } else {
+    label.textContent = 'Unknown';
+    sub.textContent   = 'Detecting upstream…';
+    icon.textContent  = '❓';
+  }
+}
+
+function switchNetwork(target) {
+  if (target === currentUpstream) return;
+  if (!mqttClient?.connected) return;
+  const btnT = document.getElementById('netBtnTmobile');
+  const btnS = document.getElementById('netBtnStarlink');
+  btnT.classList.add('switching');
+  btnS.classList.add('switching');
+  document.getElementById('netStatusLabel').textContent = 'Switching…';
+  document.getElementById('netStatusSub').textContent   = 'Please wait ~10 seconds';
+  mqttClient.publish('van/network/upstream', target);
+}
+
 // ── MQTT ──────────────────────────────────────────
 const PORTAL_ID = 'c0619ab5dcfb';
 const CERBO_IP  = localStorage.getItem('cerboIp') || '192.168.12.140';
@@ -2235,6 +2324,7 @@ function connectMQTT() {
     client.subscribe(`N/${PORTAL_ID}/#`);
     client.subscribe('van/status/light/+');
     client.subscribe('van/status/ac/+');
+    client.subscribe('van/status/network/+');
     client.publish(`R/${PORTAL_ID}/keepalive`, '');
     client.publish(`R/${PORTAL_ID}/system/0/Serial`, '');
     client.publish(`R/${PORTAL_ID}/vebus/276/Mode`, '');
@@ -2300,6 +2390,14 @@ function connectMQTT() {
         if (!isNaN(t)) {
           document.getElementById('climateActual').textContent = t + '°';
         }
+      }
+      return;
+    }
+
+    if (topic.startsWith('van/status/network/')) {
+      const key = topic.split('/')[3];
+      if (key === 'upstream') {
+        updateNetworkUI(msg.toString().trim());
       }
       return;
     }

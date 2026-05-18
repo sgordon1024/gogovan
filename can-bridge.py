@@ -3,6 +3,7 @@ import socket
 import struct
 import subprocess
 import threading
+import time
 import paho.mqtt.client as mqtt
 
 MQTT_HOST = "localhost"
@@ -38,6 +39,9 @@ MOTORS = {
 # AC control: PGN 0x1FEF9 (proprietary Firefly thermostat command), SA=0x44
 # Discovered from candump of LCD (SA=0x9F) controlling G12 thermostat.
 AC_CAN_ID = "19FEF944"
+
+# Module-level MQTT client reference (set in on_connect)
+mqtt_client_ref = None
 
 def cansend(data):
     frame = f"19FEDB{SA}#{data}"
@@ -101,6 +105,47 @@ def handle_ac(key, payload):
             send_ac("00FFFFFFFFFAFFFF")
         elif payload == "down":
             send_ac("00FFFFFFFFF9FFFF")  # Confirmed step -1°F
+
+def get_current_upstream():
+    """Detect which upstream Wi-Fi connection wlan0 is using via nmcli."""
+    try:
+        result = subprocess.run(
+            ["nmcli", "-g", "DEVICE,CONNECTION", "device", "status"],
+            capture_output=True, text=True, timeout=5
+        )
+        for line in result.stdout.splitlines():
+            parts = line.split(":")
+            if len(parts) >= 2 and parts[0].strip() == "wlan0":
+                conn = parts[1].strip()
+                if conn == "preconfigured":
+                    return "tmobile"
+                elif conn == "wifi-blaster":
+                    return "starlink"
+                else:
+                    return "unknown"
+    except Exception as e:
+        print(f"get_current_upstream error: {e}")
+    return "unknown"
+
+def handle_network(key, payload):
+    """Switch upstream Wi-Fi connection based on MQTT command."""
+    global mqtt_client_ref
+    if key != "upstream":
+        return
+    if payload == "tmobile":
+        conn_name = "preconfigured"
+    elif payload == "starlink":
+        conn_name = "wifi-blaster"
+    else:
+        print(f"Unknown network target: {payload}")
+        return
+    print(f"Switching upstream to {payload} ({conn_name})")
+    subprocess.run(["sudo", "nmcli", "connection", "up", conn_name])
+    time.sleep(5)
+    upstream = get_current_upstream()
+    if mqtt_client_ref is not None:
+        mqtt_client_ref.publish("van/status/network/upstream", upstream, retain=True)
+        print(f"Network upstream → {upstream}")
 
 def can_listener(mqtt_client):
     """
@@ -208,12 +253,20 @@ def can_listener(mqtt_client):
             print(f"CAN listener error: {e}")
 
 def on_connect(client, userdata, flags, rc):
+    global mqtt_client_ref
+    mqtt_client_ref = client
     print(f"Connected to MQTT (rc={rc})")
     client.subscribe("van/light/+")
     client.subscribe("van/motor/+")
     client.subscribe("van/ac/+")
-    print("Subscribed to van/light/+, van/motor/+, van/ac/+")
+    client.subscribe("van/network/+")
+    print("Subscribed to van/light/+, van/motor/+, van/ac/+, van/network/+")
     subprocess.run(["cansend", CAN_IFACE, f"18EEFF{SA}#0000000000008000"])
+
+    # Publish initial upstream status
+    upstream = get_current_upstream()
+    client.publish("van/status/network/upstream", upstream, retain=True)
+    print(f"Initial network upstream → {upstream}")
 
     t = threading.Thread(target=can_listener, args=(client,), daemon=True)
     t.start()
@@ -243,6 +296,9 @@ def on_message(client, userdata, msg):
     elif category == "ac":
         print(f"ac/{name} -> {payload}")
         handle_ac(name, payload)
+    elif category == "network":
+        print(f"network/{name} -> {payload}")
+        handle_network(name, payload)
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
 client.on_connect = on_connect
