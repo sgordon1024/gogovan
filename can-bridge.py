@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import json
+import os
 import socket
 import struct
 import subprocess
@@ -10,6 +12,7 @@ MQTT_HOST = "localhost"
 MQTT_PORT = 1883
 CAN_IFACE = "can1"
 SA = "44"
+HISTORY_FILE = "/home/sgordon1024/speed-history.ndjson"
 
 LIGHTS = {
     "kitchen":  "16",
@@ -150,6 +153,49 @@ def handle_network(key, payload):
         t = threading.Thread(target=run_speedtest, daemon=True)
         t.start()
 
+def _prune_speed_history(cutoff_ts):
+    try:
+        with open(HISTORY_FILE, 'r') as f:
+            lines = f.readlines()
+        kept = []
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                if json.loads(line).get('ts', 0) >= cutoff_ts:
+                    kept.append(line)
+            except Exception:
+                pass
+        with open(HISTORY_FILE, 'w') as f:
+            f.write('\n'.join(kept) + ('\n' if kept else ''))
+    except Exception as e:
+        print(f"Speed history prune failed: {e}")
+
+def append_speed_history(result):
+    if result.get('download') is None:
+        return
+    entry = {
+        'ts':       int(time.time() * 1000),
+        'isoTs':    result.get('timestamp', ''),
+        'upstream': result.get('upstream', 'unknown'),
+        'down':     result.get('download'),
+        'up':       result.get('upload'),
+        'ping':     result.get('ping'),
+        'server':   result.get('server', ''),
+    }
+    try:
+        with open(HISTORY_FILE, 'a') as f:
+            f.write(json.dumps(entry) + '\n')
+        # Prune when the oldest entry has aged past 1 year
+        one_year_ago = int(time.time() * 1000) - 365 * 24 * 60 * 60 * 1000
+        with open(HISTORY_FILE, 'r') as f:
+            first = f.readline().strip()
+        if first and json.loads(first).get('ts', 0) < one_year_ago:
+            _prune_speed_history(one_year_ago)
+    except Exception as e:
+        print(f"Speed history write failed: {e}")
+
 def run_speedtest():
     """Run speedtest-cli and publish results to MQTT."""
     global mqtt_client_ref
@@ -163,8 +209,7 @@ def run_speedtest():
             ["speedtest-cli", "--json", "--secure"],
             capture_output=True, text=True, timeout=120
         )
-        import json as _json
-        data = _json.loads(r.stdout)
+        data = json.loads(r.stdout)
         result = {
             "download": round(data["download"] / 1e6, 1),
             "upload":   round(data["upload"]   / 1e6, 1),
@@ -182,9 +227,9 @@ def run_speedtest():
             "timestamp": "", "error": str(e)
         }
         print(f"Speed test failed: {e}")
-    import json as _json
-    mqtt_client_ref.publish("van/status/network/speedtest", _json.dumps(result), retain=True)
+    mqtt_client_ref.publish("van/status/network/speedtest", json.dumps(result), retain=True)
     mqtt_client_ref.publish("van/status/network/speedtest/running", "false", retain=True)
+    append_speed_history(result)
 
 def can_listener(mqtt_client):
     """

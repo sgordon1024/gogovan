@@ -144,7 +144,7 @@
     }
     .offline-banner {
       position: fixed;
-      top: 20px;
+      top: calc(env(safe-area-inset-top, 20px) + 8px);
       left: 50%;
       width: calc(100vw - 32px);
       max-width: 398px;
@@ -1196,6 +1196,9 @@
     .stats-entry-meta { font-size:12px; color:var(--txt2); margin-top:4px; }
     .stats-gps-link { color:var(--blue); text-decoration:none; }
     .stats-empty { text-align:center; padding:48px 24px; color:var(--txt2); font-size:14px; }
+    .stats-load-more { display:block; width:100%; margin:8px 0 24px; padding:12px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:10px; color:var(--txt2); font-size:13px; font-weight:600; cursor:pointer; text-align:center; }
+    .stats-load-more:active { background:rgba(255,255,255,0.1); }
+    .stats-load-more-count { font-weight:400; opacity:0.6; }
     .stats-no-chart { display:flex; align-items:center; justify-content:center; height:120px; color:var(--txt2); font-size:13px; }
 
     /* ── Starlink power card ──────────────────────────── */
@@ -2439,8 +2442,8 @@ function saveSpeedEntry(d, lat, lng) {
   // Deduplicate by timestamp
   if (d.timestamp && history.length && history[history.length-1].isoTs === d.timestamp) return;
   history.push({ ts: Date.now(), isoTs: d.timestamp||'', upstream: d.upstream||'unknown', down: d.download, up: d.upload, ping: d.ping, server: d.server||'', lat: lat||null, lng: lng||null });
-  while (history.length > 500) history.shift();
-  localStorage.setItem('gogovan-speed-history', JSON.stringify(history));
+  const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
+  localStorage.setItem('gogovan-speed-history', JSON.stringify(history.filter(e => e.ts >= oneYearAgo)));
 }
 async function captureGPS() {
   return new Promise(resolve => {
@@ -2451,8 +2454,30 @@ async function captureGPS() {
 
 // ── Stats overlay ──────────────────────────────────
 let statsFilter = 'all';
-function openStats() {
+let statsListPage = 0;
+let statsAllHistory = [];
+async function loadSpeedHistory() {
+  let serverHistory = [];
+  try {
+    const resp = await fetch('/speed-history.ndjson');
+    if (resp.ok) {
+      const text = await resp.text();
+      serverHistory = text.trim().split('\n').filter(Boolean).map(l => JSON.parse(l));
+    }
+  } catch (e) {}
+  const local = getSpeedHistory();
+  const seen = new Set();
+  return [...serverHistory, ...local].filter(e => {
+    if (seen.has(e.ts)) return false;
+    seen.add(e.ts);
+    return true;
+  });
+}
+async function openStats() {
+  statsListPage = 0;
   document.getElementById('statsOverlay').removeAttribute('hidden');
+  document.getElementById('statsList').innerHTML = '<div class="stats-empty">Loading…</div>';
+  statsAllHistory = await loadSpeedHistory();
   renderStats();
 }
 function closeStats() {
@@ -2460,25 +2485,49 @@ function closeStats() {
 }
 function setStatsFilter(f) {
   statsFilter = f;
+  statsListPage = 0;
   document.querySelectorAll('.stats-filter').forEach(b => b.classList.toggle('active', b.dataset.f === f));
   renderStats();
 }
 function renderStats() {
-  const all = getSpeedHistory();
-  const data = statsFilter === 'all' ? all : all.filter(d => d.upstream === statsFilter);
+  const data = statsFilter === 'all' ? statsAllHistory : statsAllHistory.filter(d => d.upstream === statsFilter);
   renderStatsChart(data);
   renderStatsList(data);
+}
+function aggregateDailyStats(data) {
+  const buckets = {};
+  data.forEach(d => {
+    if (d.down == null) return;
+    const day = new Date(d.ts).toLocaleDateString('en-CA'); // YYYY-MM-DD
+    const key = day + '|' + d.upstream;
+    if (!buckets[key]) buckets[key] = { day, upstream: d.upstream, downs: [], ups: [], pings: [] };
+    buckets[key].downs.push(d.down);
+    buckets[key].ups.push(d.up || 0);
+    if (d.ping) buckets[key].pings.push(d.ping);
+  });
+  return Object.values(buckets).map(b => {
+    const avg = arr => arr.reduce((a, v) => a + v, 0) / arr.length;
+    return {
+      ts: new Date(b.day).getTime() + 12 * 3600 * 1000,
+      upstream: b.upstream,
+      down: Math.round(avg(b.downs) * 10) / 10,
+      up: Math.round(avg(b.ups) * 10) / 10,
+      ping: b.pings.length ? Math.round(avg(b.pings)) : null,
+    };
+  }).sort((a, b) => a.ts - b.ts);
 }
 function renderStatsChart(data) {
   const svg = document.getElementById('statsChart');
   svg.innerHTML = '';
-  const sorted = [...data].sort((a,b) => a.ts - b.ts).filter(d => d.down != null);
+  const raw = [...data].filter(d => d.down != null);
+  // Aggregate to daily averages so the chart stays fast with a year of auto-tests
+  const sorted = aggregateDailyStats(raw);
   if (sorted.length < 2) {
     svg.setAttribute('height', '80');
     const el = document.createElementNS('http://www.w3.org/2000/svg','text');
     el.setAttribute('x','50%'); el.setAttribute('y','50%'); el.setAttribute('text-anchor','middle');
     el.setAttribute('dominant-baseline','middle'); el.setAttribute('fill','var(--txt2)'); el.setAttribute('font-size','13');
-    el.textContent = sorted.length < 1 ? 'No tests recorded yet' : 'Run at least 2 tests to see chart';
+    el.textContent = raw.length < 1 ? 'No tests recorded yet' : 'Run at least 2 tests to see chart';
     svg.appendChild(el); return;
   }
   const W = Math.max(200, svg.parentElement.clientWidth - 16);
@@ -2488,7 +2537,7 @@ function renderStatsChart(data) {
   svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('height', H);
   const maxY = Math.max(1, ...sorted.map(d => Math.max(d.down||0, d.up||0))) * 1.2;
   const minT = sorted[0].ts, maxT = sorted[sorted.length-1].ts;
-  const xp = t => P.l + (sorted.length < 2 ? cW/2 : (t-minT)/(maxT-minT)*cW);
+  const xp = t => P.l + (maxT === minT ? cW/2 : (t-minT)/(maxT-minT)*cW);
   const yp = v => P.t + cH - Math.min(cH, Math.max(0, (v/maxY)*cH));
   const ns = 'http://www.w3.org/2000/svg';
   const mk = (tag, a) => { const e = document.createElementNS(ns,tag); Object.entries(a).forEach(([k,v])=>e.setAttribute(k,v)); return e; };
@@ -2498,12 +2547,12 @@ function renderStatsChart(data) {
     svg.appendChild(mk('line',{x1:P.l,y1:gy,x2:P.l+cW,y2:gy,stroke:'rgba(255,255,255,0.07)','stroke-width':1}));
     const t = mk('text',{x:P.l-4,y:gy+4,'text-anchor':'end',fill:'var(--txt2)','font-size':9}); t.textContent=val; svg.appendChild(t);
   });
-  // X labels
+  // X labels — date only (no time) since points are daily averages
   const lblCount = Math.min(4, sorted.length);
   for (let i=0;i<lblCount;i++) {
     const d = sorted[Math.round(i*(sorted.length-1)/(lblCount-1))];
     const dt = new Date(d.ts);
-    const lbl = `${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
+    const lbl = `${dt.getMonth()+1}/${dt.getDate()}`;
     const t = mk('text',{x:xp(d.ts),y:H-4,'text-anchor':'middle',fill:'var(--txt2)','font-size':8}); t.textContent=lbl; svg.appendChild(t);
   }
   // Draw per-carrier lines
@@ -2513,41 +2562,48 @@ function renderStatsChart(data) {
     const pts = sorted.filter(d=>d.upstream===carrier);
     if (!pts.length) return;
     const col = colors[carrier]||'var(--txt2)';
-    // Download solid line
     if (pts.length > 1) {
       svg.appendChild(mk('polyline',{points:pts.map(d=>`${xp(d.ts)},${yp(d.down||0)}`).join(' '),fill:'none',stroke:col,'stroke-width':2,'stroke-linejoin':'round','stroke-linecap':'round'}));
-      // Upload dashed
       svg.appendChild(mk('polyline',{points:pts.map(d=>`${xp(d.ts)},${yp(d.up||0)}`).join(' '),fill:'none',stroke:col,'stroke-width':1.5,'stroke-linejoin':'round','stroke-dasharray':'4 3',opacity:.65}));
     }
-    // Dots
     pts.forEach(d => { svg.appendChild(mk('circle',{cx:xp(d.ts),cy:yp(d.down||0),r:3.5,fill:col,stroke:'var(--bg)','stroke-width':1.5})); });
   });
 }
+function statsEntryHtml(d) {
+  const dt = new Date(d.ts);
+  const dateStr = dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' · ' + dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  const carrierLabel = d.upstream==='tmobile'?'T-Mobile':d.upstream==='starlink'?'Starlink':d.upstream||'Unknown';
+  const carrierClass = d.upstream==='tmobile'?'tmobile':d.upstream==='starlink'?'starlink':'unknown';
+  const gpsHtml = d.lat ? `<a class="stats-gps-link" href="https://maps.apple.com/?ll=${d.lat.toFixed(5)},${d.lng.toFixed(5)}" target="_blank"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> ${d.lat.toFixed(4)}, ${d.lng.toFixed(4)}</a>` : '';
+  return `<div class="stats-entry">
+    <div class="stats-entry-header">
+      <span class="stats-carrier-badge stats-carrier-${carrierClass}">${carrierLabel}</span>
+      <span class="stats-entry-date">${dateStr}</span>
+    </div>
+    <div class="stats-entry-vals">
+      <span class="stats-entry-down">${d.down??'—'}</span><span class="stats-entry-unit"> ↓</span>
+      <span class="stats-entry-sep">/</span>
+      <span class="stats-entry-up">${d.up??'—'}</span><span class="stats-entry-unit"> ↑ Mbps</span>
+      <span class="stats-entry-sep">·</span>
+      <span class="stats-entry-ping">${d.ping??'—'} ms</span>
+    </div>
+    <div class="stats-entry-meta">${d.server||''}${d.server&&gpsHtml?' · ':''}${gpsHtml}</div>
+  </div>`;
+}
+const STATS_PAGE_SIZE = 50;
 function renderStatsList(data) {
   const el = document.getElementById('statsList');
   const sorted = [...data].sort((a,b) => b.ts - a.ts);
   if (!sorted.length) { el.innerHTML = '<div class="stats-empty">No tests recorded yet.<br>Run a speed test to start tracking.</div>'; return; }
-  el.innerHTML = sorted.map(d => {
-    const dt = new Date(d.ts);
-    const dateStr = dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' · ' + dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-    const carrierLabel = d.upstream==='tmobile'?'T-Mobile':d.upstream==='starlink'?'Starlink':d.upstream||'Unknown';
-    const carrierClass = d.upstream==='tmobile'?'tmobile':d.upstream==='starlink'?'starlink':'unknown';
-    const gpsHtml = d.lat ? `<a class="stats-gps-link" href="https://maps.apple.com/?ll=${d.lat.toFixed(5)},${d.lng.toFixed(5)}" target="_blank"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> ${d.lat.toFixed(4)}, ${d.lng.toFixed(4)}</a>` : '';
-    return `<div class="stats-entry">
-      <div class="stats-entry-header">
-        <span class="stats-carrier-badge stats-carrier-${carrierClass}">${carrierLabel}</span>
-        <span class="stats-entry-date">${dateStr}</span>
-      </div>
-      <div class="stats-entry-vals">
-        <span class="stats-entry-down">${d.down??'—'}</span><span class="stats-entry-unit"> ↓</span>
-        <span class="stats-entry-sep">/</span>
-        <span class="stats-entry-up">${d.up??'—'}</span><span class="stats-entry-unit"> ↑ Mbps</span>
-        <span class="stats-entry-sep">·</span>
-        <span class="stats-entry-ping">${d.ping??'—'} ms</span>
-      </div>
-      <div class="stats-entry-meta">${d.server||''}${d.server&&gpsHtml?' · ':''}${gpsHtml}</div>
-    </div>`;
-  }).join('');
+  const visible = sorted.slice(0, (statsListPage + 1) * STATS_PAGE_SIZE);
+  const remaining = sorted.length - visible.length;
+  el.innerHTML = visible.map(statsEntryHtml).join('') +
+    (remaining > 0 ? `<button class="stats-load-more" onclick="loadMoreStats()">Load ${Math.min(STATS_PAGE_SIZE, remaining)} more <span class="stats-load-more-count">(${remaining} remaining)</span></button>` : '');
+}
+function loadMoreStats() {
+  statsListPage++;
+  const data = statsFilter === 'all' ? statsAllHistory : statsAllHistory.filter(d => d.upstream === statsFilter);
+  renderStatsList(data);
 }
 
 // ── Starlink power control ────────────────────────

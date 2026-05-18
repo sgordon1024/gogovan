@@ -29,11 +29,12 @@ UNIT
 echo "=== Writing run-speedtest.py ==="
 cat > /home/sgordon1024/run-speedtest.py << 'PY'
 #!/usr/bin/env python3
-import json, subprocess
+import json, os, subprocess, time
 import paho.mqtt.client as mqtt
 
-MQTT_HOST = 'localhost'
-MQTT_PORT = 1883
+MQTT_HOST    = 'localhost'
+MQTT_PORT    = 1883
+HISTORY_FILE = '/home/sgordon1024/speed-history.ndjson'
 
 def get_upstream():
     try:
@@ -47,6 +48,41 @@ def get_upstream():
                 if conn == 'wifi-blaster':  return 'starlink'
         return 'unknown'
     except: return 'unknown'
+
+def append_history(result):
+    if result.get('download') is None:
+        return
+    entry = {
+        'ts':       int(time.time() * 1000),
+        'isoTs':    result.get('timestamp', ''),
+        'upstream': result.get('upstream', 'unknown'),
+        'down':     result.get('download'),
+        'up':       result.get('upload'),
+        'ping':     result.get('ping'),
+        'server':   result.get('server', ''),
+    }
+    try:
+        with open(HISTORY_FILE, 'a') as f:
+            f.write(json.dumps(entry) + '\n')
+        one_year_ago = int(time.time() * 1000) - 365 * 24 * 60 * 60 * 1000
+        with open(HISTORY_FILE, 'r') as f:
+            first = f.readline().strip()
+        if first and json.loads(first).get('ts', 0) < one_year_ago:
+            with open(HISTORY_FILE, 'r') as f:
+                lines = f.readlines()
+            kept = []
+            for line in lines:
+                line = line.strip()
+                if not line: continue
+                try:
+                    if json.loads(line).get('ts', 0) >= one_year_ago:
+                        kept.append(line)
+                except Exception:
+                    pass
+            with open(HISTORY_FILE, 'w') as f:
+                f.write('\n'.join(kept) + ('\n' if kept else ''))
+    except Exception as e:
+        print(f'History write failed: {e}')
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
 client.connect(MQTT_HOST, MQTT_PORT, 60)
@@ -70,6 +106,8 @@ try:
 except Exception as e:
     result = {'download':None,'upload':None,'ping':None,
               'server':None,'upstream':upstream,'timestamp':'','error':str(e)}
+
+append_history(result)
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
 client.connect(MQTT_HOST, MQTT_PORT, 60)

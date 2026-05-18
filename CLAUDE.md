@@ -54,6 +54,8 @@ Pi CAN HAT (Waveshare 2-CH CAN HAT+)
 |---|---|---|
 | `index.html` | Pi: `/home/YOUR_PI_USER/index.html` | Dashboard UI, served at :8080 |
 | `can-bridge.py` | Pi: `/home/YOUR_PI_USER/can-bridge.py` | MQTT subscriber → CAN sender + CAN listener → MQTT publisher |
+| `pi-setup/setup-speedtest.sh` | Dev only | Deploys `run-speedtest.py` + systemd timer to Pi; run once |
+| `run-speedtest.py` | Pi: `/home/sgordon1024/run-speedtest.py` | Created by setup script; runs `speedtest-cli --json --secure`, publishes result to MQTT |
 
 **Deploy command:**
 ```bash
@@ -179,6 +181,18 @@ When AC mode is **off**, the Firefly LCD always displays fan as "Auto" regardles
 
 All status topics use `retain=True` so the dashboard gets current state immediately on page load (no waiting for the G12 to broadcast again).
 
+### Internet / Speed Test topics
+
+| Topic | Direction | Payload |
+|---|---|---|
+| `van/network/speedtest` | Dashboard → Bridge | `run` (triggers manual test) |
+| `van/status/network/speedtest` | Bridge → Dashboard | JSON: `{download, upload, ping, server, upstream, timestamp, error}` |
+| `van/status/network/speedtest/running` | Bridge → Dashboard | `true` / `false` |
+
+`upstream` values: `tmobile` (NetworkManager connection `preconfigured`), `starlink` (connection `wifi-blaster`), `unknown`.
+
+Speed test results are stored in **`localStorage` key `gogovan-speed-history`** as a JSON array. Each entry: `{ts, isoTs, upstream, down, up, ping, server, lat, lng}`. Entries older than 1 year are pruned on every save. At 48 auto-tests/day (systemd timer every 30 min) this retains ~17,500 entries/year.
+
 ---
 
 ## Key Decisions & Why
@@ -200,3 +214,12 @@ Instances 0x05–0x08 all activate simultaneously when the tank heater is switch
 
 **Fan byte value for auto (0xCF in command, 0x00 in status):**  
 The command byte for auto (`00CFFFFFFFFFFFFF`) was discovered by sniffing the Mira app via candump while pressing the auto button. Three other guesses failed first (0xDF, 0xDF+0x00, 0xD5). Status frame byte[2]=0x00 maps to auto.
+
+**Why the speed test list paginates to 50 entries at a time:**  
+Automatic tests run every 30 min, so a year of history is ~17,500 entries. Rendering all of them as DOM nodes at once would freeze the UI. The stats overlay loads 50 entries initially with a "Load more" button to append the next batch.
+
+**Why the speed test chart shows daily averages instead of individual points:**  
+Same scale problem — 17,500 SVG nodes in a polyline would make the chart unusably slow and visually unreadable. `aggregateDailyStats()` groups raw entries by day + carrier and plots the daily average, capping the chart at ~365 points regardless of how many tests were run.
+
+**Why the offline banner uses `env(safe-area-inset-top)` instead of `top: 20px`:**  
+The Dynamic Island on iPhone 14 Pro and later sits ~59px from the top, so a fixed `20px` offset placed the banner behind it. `env(safe-area-inset-top)` is a CSS variable the browser sets to the exact inset height for the current device (Dynamic Island, notch, or 0 on older models), so it works correctly on all iPhones.
