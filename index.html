@@ -44,7 +44,7 @@
     body {
       max-width: 430px;
       margin: 0 auto;
-      padding: 0 0 calc(49px + env(safe-area-inset-bottom));
+      padding: 0 0 calc(49px + env(safe-area-inset-bottom) + 24px);
       min-width: 320px;
     }
 
@@ -71,7 +71,7 @@
     }
 
     .app-name:hover .edit-icon { opacity: 0.5; }
-    .edit-icon { opacity: 0; font-size: 13px; transition: opacity 0.2s; flex-shrink: 0; }
+    .edit-icon { opacity: 0; display: flex; align-items: center; transition: opacity 0.2s; flex-shrink: 0; }
 
     .name-input {
       font-size: clamp(18px, 5vw, 22px);
@@ -120,16 +120,56 @@
     }
 
     /* ── Offline banner ───────────────────────────── */
+    @keyframes banner-in {
+      0%   { transform: translateY(-110%); }
+      55%  { transform: translateY(6px); }
+      72%  { transform: translateY(-4px); }
+      85%  { transform: translateY(3px); }
+      93%  { transform: translateY(-2px); }
+      100% { transform: translateY(0); }
+    }
+    @keyframes banner-out {
+      0%   { transform: translateY(0); opacity: 1; }
+      100% { transform: translateY(-110%); opacity: 0; }
+    }
     .offline-banner {
-      background: rgba(255,160,64,0.1);
-      border-bottom: 1px solid rgba(255,160,64,0.25);
+      background: rgba(255,160,64,0.12);
+      border-bottom: 1px solid rgba(255,160,64,0.3);
       color: var(--amber);
-      text-align: center;
       font-size: 13px;
       font-weight: 600;
       padding: 8px 16px;
       letter-spacing: 0.2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      position: relative;
+      transform: translateY(-110%);
+      overflow: hidden;
     }
+    .offline-banner.visible {
+      animation: banner-in 0.6s cubic-bezier(0.22,1,0.36,1) forwards;
+    }
+    .offline-banner.hiding {
+      animation: banner-out 0.25s ease-in forwards;
+    }
+    .offline-banner-close {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--amber);
+      opacity: 0.7;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      padding: 4px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .offline-banner-close:active { opacity: 1; }
 
     /* ── Skeleton shimmer ─────────────────────────── */
     @keyframes shimmer {
@@ -212,7 +252,7 @@
     }
 
     .tab-btn.active { color: var(--amber); }
-    .tab-icon { font-size: 20px; line-height: 1; }
+    .tab-icon { font-size: 20px; line-height: 1; display: flex; align-items: center; justify-content: center; }
     .tab-label { font-size: 10px; font-weight: 600; letter-spacing: 0.3px; }
 
     .tab-panel { padding: 16px 0 0; }
@@ -321,6 +361,25 @@
     }
 
     .scene-chip:active { transform: scale(0.95); }
+    .scene-move-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      color: inherit;
+      padding: 0;
+      width: 32px;
+      align-self: stretch;
+      cursor: pointer;
+      opacity: 0.55;
+      flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.15s;
+    }
+    .scene-move-btn:active { opacity: 1; transform: scale(0.85); }
+    .scene-move-btn:disabled { opacity: 0.15; pointer-events: none; }
+
 
     .scene-add-btn {
       width: 44px;
@@ -680,7 +739,7 @@
     .ctrl-btn:active { transform: scale(0.97); }
     .ctrl-btn.active { background: rgba(79,195,247,0.1); border-color: rgba(79,195,247,0.3); }
 
-    .ctrl-btn-icon  { font-size: 22px; }
+    .ctrl-btn-icon  { font-size: 22px; display: flex; }
     .ctrl-btn-label { font-size: 14px; font-weight: 600; color: var(--txt); }
     .ctrl-btn-sub   { font-size: 12px; color: var(--txt2); }
 
@@ -883,6 +942,32 @@
 
     .theme-swatch.active .swatch-name { color: var(--amber); }
 
+    /* ── Driving / High-Idle mode chip ───────────── */
+    .mode-chip {
+      display: none;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 11px;
+      border-radius: 20px;
+      border: 1px solid transparent;
+      font-size: 12px;
+      font-weight: 600;
+      flex-shrink: 0;
+      transition: opacity 0.2s;
+    }
+
+    .mode-chip.driving {
+      background: rgba(255,160,64,0.15);
+      border-color: rgba(255,160,64,0.35);
+      color: var(--amber);
+    }
+
+    .mode-chip.idle {
+      background: rgba(79,195,247,0.1);
+      border-color: rgba(79,195,247,0.3);
+      color: var(--blue);
+    }
+
     /* ── Pull to refresh ─────────────────────────── */
     #ptr-backdrop {
       position: fixed;
@@ -963,7 +1048,7 @@
 <body>
   <div id="ptr-backdrop"></div>
   <div id="ptr-indicator">
-    <span id="ptr-arrow">↓</span>
+    <span id="ptr-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></span>
     <svg id="ptr-spinner" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg>
   </div>
 
@@ -971,13 +1056,23 @@
     <div class="app-name" id="nameDisplay">
       <img src="icons/LogoMark.png" alt="GoGoVan" style="width:260px;height:auto;max-width:65vw;">
     </div>
+    <div id="modeChip" class="mode-chip">
+      <span id="modeChipIcon">🚗</span>
+      <span id="modeChipLabel">Driving</span>
+    </div>
     <div class="status-pill">
       <div class="status-dot connecting" id="statusDot"></div>
       <span id="statusText">Connecting…</span>
     </div>
   </header>
 
-  <div id="offline-banner" class="offline-banner" hidden>⚠️ Reconnecting…</div>
+  <div id="offline-banner" class="offline-banner">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+    Reconnecting…
+    <button class="offline-banner-close" onclick="dismissBanner()" aria-label="Dismiss">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </button>
+  </div>
 
   <!-- TAB: POWER -->
   <div id="tab-power" class="tab-panel">
@@ -1026,9 +1121,9 @@
         </div>
         <div class="inv-limit">
           <div class="inv-limit-row">
-            <button class="climate-btn" onclick="adjustInputAmps(-1)">▼</button>
+            <button class="climate-btn" onclick="adjustInputAmps(-1)"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
             <div class="inv-amp"><span id="inputAmps">—</span><span class="inv-amp-unit">A</span></div>
-            <button class="climate-btn" onclick="adjustInputAmps(1)">▲</button>
+            <button class="climate-btn" onclick="adjustInputAmps(1)"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg></button>
           </div>
           <span class="inv-limit-label">Grid Current Limit</span>
         </div>
@@ -1064,23 +1159,23 @@
       <div class="climate-card">
         <div class="climate-left">
           <div class="climate-mode off" id="climateModeLine">
-            <span id="climateIcon">🌡️</span>
+            <span id="climateIcon" style="display:flex;align-items:center"></span>
             <span id="climateMode">Off</span>
           </div>
           <div class="climate-temp-actual" id="climateActual">—°</div>
           <div class="climate-sub">Current temp</div>
         </div>
         <div class="climate-controls">
-          <button class="climate-btn" onclick="acTempUp()">▲</button>
+          <button class="climate-btn" onclick="acTempUp()"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg></button>
           <div class="climate-set"><span id="climateSet">—</span>°</div>
-          <button class="climate-btn" onclick="acTempDown()">▼</button>
+          <button class="climate-btn" onclick="acTempDown()"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
         </div>
       </div>
       <div class="climate-buttons">
         <div class="clim-group">
           <span class="clim-group-label">Mode</span>
           <div class="clim-seg">
-            <button class="clim-seg-btn" id="acModeCool" onclick="setAcMode('cool')">❄️ Cool</button>
+            <button class="clim-seg-btn" id="acModeCool" onclick="setAcMode('cool')"><span style="display:inline-flex;align-items:center;gap:4px"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="22"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></svg>Cool</span></button>
             <button class="clim-seg-btn active" id="acModeOff"  onclick="setAcMode('off')">Off</button>
           </div>
         </div>
@@ -1101,22 +1196,22 @@
     <span class="section-label section-label-solo">Controls</span>
     <div class="controls-grid">
       <button class="ctrl-btn" onclick="awningExtend()">
-        <div class="ctrl-btn-icon">↗️</div>
+        <div class="ctrl-btn-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></div>
         <div class="ctrl-btn-label">Awning Extend</div>
         <div class="ctrl-btn-sub">Tap to extend</div>
       </button>
       <button class="ctrl-btn" onclick="awningRetract()">
-        <div class="ctrl-btn-icon">↙️</div>
+        <div class="ctrl-btn-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 17H7V7"/><path d="m17 7-10 10"/></svg></div>
         <div class="ctrl-btn-label">Awning Retract</div>
         <div class="ctrl-btn-sub">Tap to retract</div>
       </button>
       <button class="ctrl-btn" id="pumpBtn" onclick="togglePump()">
-        <div class="ctrl-btn-icon">💧</div>
+        <div class="ctrl-btn-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg></div>
         <div class="ctrl-btn-label">Water Pump</div>
         <div class="ctrl-btn-sub" id="pumpState">Off</div>
       </button>
       <button class="ctrl-btn" id="tankHeatBtn" onclick="toggleTankHeater()">
-        <div class="ctrl-btn-icon">🔥</div>
+        <div class="ctrl-btn-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg></div>
         <div class="ctrl-btn-label">Tank Heater</div>
         <div class="ctrl-btn-sub" id="tankHeatState">Off</div>
       </button>
@@ -1138,19 +1233,19 @@
   <!-- BOTTOM TAB BAR -->
   <nav class="tab-bar">
     <button class="tab-btn active" data-tab="power" onclick="switchTab('power')">
-      <span class="tab-icon">⚡</span>
+      <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
       <span class="tab-label">Power</span>
     </button>
     <button class="tab-btn" data-tab="lights" onclick="switchTab('lights')">
-      <span class="tab-icon">💡</span>
+      <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg></span>
       <span class="tab-label">Lights</span>
     </button>
     <button class="tab-btn" data-tab="climate" onclick="switchTab('climate')">
-      <span class="tab-icon">❄️</span>
+      <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="22"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></svg></span>
       <span class="tab-label">Climate</span>
     </button>
     <button class="tab-btn" data-tab="controls" onclick="switchTab('controls')">
-      <span class="tab-icon">🎛️</span>
+      <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="6" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="1" x2="7" y1="14" y2="14"/><line x1="9" x2="15" y1="8" y2="8"/><line x1="17" x2="23" y1="16" y2="16"/></svg></span>
       <span class="tab-label">Controls</span>
     </button>
   </nav>
@@ -1250,7 +1345,7 @@ function saveName() {
   localStorage.setItem('vanName', val);
   document.getElementById('nameDisplay').innerHTML = `
     <span id="nameText">${val}</span>
-    <span class="edit-icon">✎</span>`;
+    <span class="edit-icon">${lucideIcon('pencil', 12, 2)}</span>`;
   document.getElementById('nameDisplay').onclick = startEditName;
 }
 
@@ -1416,7 +1511,19 @@ const LUCIDE_PATHS = {
   'chevron-down': `<path d="m6 9 6 6 6-6"/>`,
   'chevron-left':  `<path d="m15 18-6-6 6-6"/>`,
   'chevron-right': `<path d="m9 18 6-6-6-6"/>`,
-  check:    `<path d="M20 6 9 17l-5-5"/>`,
+  check:            `<path d="M20 6 9 17l-5-5"/>`,
+  zap:              `<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>`,
+  lightbulb:        `<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>`,
+  snowflake:        `<line x1="2" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="22"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/>`,
+  sliders:          `<line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="6" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="1" x2="7" y1="14" y2="14"/><line x1="9" x2="15" y1="8" y2="8"/><line x1="17" x2="23" y1="16" y2="16"/>`,
+  thermometer:      `<path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>`,
+  droplet:          `<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>`,
+  flame:            `<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>`,
+  'arrow-down':     `<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>`,
+  'arrow-up-right': `<path d="M7 7h10v10"/><path d="M7 17 17 7"/>`,
+  'arrow-down-left':`<path d="M17 17H7V7"/><path d="m17 7-10 10"/>`,
+  'alert-triangle': `<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>`,
+  pencil:           `<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>`,
 };
 function lucideIcon(name, size = 16, sw = 2) {
   const p = LUCIDE_PATHS[name] || LUCIDE_PATHS.star;
@@ -1489,8 +1596,16 @@ function renderScenes() {
     const showSave = isActive && sceneIsDirty;
     chip.className = 'scene-chip' + (isActive ? ' active' : '');
 
+    // ← move left
+    const leftBtn = document.createElement('button');
+    leftBtn.className = 'scene-move-btn';
+    leftBtn.innerHTML = lucideIcon('chevron-left', 17);
+    leftBtn.disabled = si === 0;
+    leftBtn.addEventListener('click', e => { e.stopPropagation(); moveSceneLeft(scene.id); });
+    chip.appendChild(leftBtn);
+
     const iconEl = document.createElement('span');
-    iconEl.style.cssText = 'display:flex;align-items:center;margin-right:6px;';
+    iconEl.style.cssText = 'display:flex;align-items:center;margin-right:6px;margin-left:4px;';
     iconEl.innerHTML = lucideIcon(scene.icon || 'star', 14);
     const inner = document.createElement('span');
     inner.style.cssText = 'display:inline-grid;';
@@ -1504,6 +1619,14 @@ function renderScenes() {
     inner.appendChild(saveSpan);
     chip.appendChild(iconEl);
     chip.appendChild(inner);
+
+    // → move right
+    const rightBtn = document.createElement('button');
+    rightBtn.className = 'scene-move-btn';
+    rightBtn.innerHTML = lucideIcon('chevron-right', 17);
+    rightBtn.disabled = si === scenes.length - 1;
+    rightBtn.addEventListener('click', e => { e.stopPropagation(); moveSceneRight(scene.id); });
+    chip.appendChild(rightBtn);
 
     // Long-press to delete with confirmation
     let pressTimer;
@@ -1651,7 +1774,7 @@ function updateAcModeUI() {
   const on = acMode === 'cool';
   const modeEl = document.getElementById('climateModeLine');
   modeEl.classList.toggle('off', !on);
-  document.getElementById('climateIcon').textContent = on ? '❄️' : '🌡️';
+  document.getElementById('climateIcon').innerHTML = on ? lucideIcon('snowflake', 14) : lucideIcon('thermometer', 14);
   document.getElementById('climateMode').textContent = on ? 'Cooling' : 'Off';
   document.getElementById('acModeCool').classList.toggle('active',  on);
   document.getElementById('acModeOff').classList.toggle('active',  !on);
@@ -1730,25 +1853,148 @@ function adjustInputAmps(delta) {
     mqttClient.publish(`W/${PORTAL_ID}/vebus/276/Ac/In/1/CurrentLimit`, JSON.stringify({value: inputAmps}));
 }
 
+// ── Driving Mode ─────────────────────────────────
+let drivingMode     = false;
+let highIdleMode    = false;
+let drivingTimer    = null;
+let currentSpeedMph = null;
+let currentSolarW   = 0;
+
+const DRIVE_SPEED_MPH  = 5;    // mph to consider driving
+const DRIVE_CONFIRM_MS = 4000; // must hold above threshold before activating
+const STOP_SPEED_MPH   = 2;    // below this = stopped
+const HIGH_IDLE_EXCESS = 150;  // excess charge watts over solar → alternator likely
+
+function watchGPS() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.watchPosition(onGPSUpdate, onGPSError, {
+    enableHighAccuracy: false,
+    maximumAge: 4000,
+    timeout: 15000
+  });
+}
+
+function onGPSUpdate(pos) {
+  const raw = pos.coords.speed; // m/s, null if unavailable
+  currentSpeedMph = (raw != null && raw >= 0) ? raw * 2.237 : 0;
+
+  if (currentSpeedMph >= DRIVE_SPEED_MPH) {
+    if (!drivingMode && !drivingTimer)
+      drivingTimer = setTimeout(enterDrivingMode, DRIVE_CONFIRM_MS);
+  } else {
+    if (drivingTimer) { clearTimeout(drivingTimer); drivingTimer = null; }
+    if (drivingMode && currentSpeedMph < STOP_SPEED_MPH) exitDrivingMode();
+  }
+  refreshModeChip();
+}
+
+function onGPSError() {
+  currentSpeedMph = null;
+  refreshModeChip();
+}
+
+function enterDrivingMode() {
+  drivingMode  = true;
+  drivingTimer = null;
+
+  // 1. Turn off all lights
+  LIGHT_GROUPS.forEach(g => g.lights.forEach(l => {
+    if (l.on) { l.on = false; l.level = 0; publishLight(l.id, 'off'); }
+  }));
+
+  // 2. Turn off water pump
+  if (pumpOn) {
+    pumpOn = false;
+    if (mqttClient?.connected) mqttClient.publish('van/light/pump', 'off');
+    const pumpBtn   = document.getElementById('pumpBtn');
+    const pumpState = document.getElementById('pumpState');
+    if (pumpBtn)   pumpBtn.classList.remove('active');
+    if (pumpState) pumpState.textContent = 'Off';
+  }
+
+  // 3. Retract awning (G12 stops at limit switch if already retracted)
+  if (mqttClient?.connected) mqttClient.publish('van/motor/awning-retract', 'on');
+
+  renderLights();
+  refreshModeChip();
+}
+
+function exitDrivingMode() {
+  drivingMode = false;
+  refreshModeChip();
+}
+
+function checkHighIdle() {
+  // Heuristic: battery charging significantly more than solar can explain → alternator running
+  const excess      = battPower - currentSolarW;
+  const wasHighIdle = highIdleMode;
+  highIdleMode = !drivingMode && battPower > 50 && excess > HIGH_IDLE_EXCESS;
+  if (highIdleMode !== wasHighIdle) refreshModeChip();
+}
+
+function refreshModeChip() {
+  const chip  = document.getElementById('modeChip');
+  const icon  = document.getElementById('modeChipIcon');
+  const label = document.getElementById('modeChipLabel');
+  if (!chip) return;
+
+  if (drivingMode) {
+    chip.style.display = 'flex';
+    chip.className = 'mode-chip driving';
+    icon.textContent  = '🚗';
+    label.textContent = (currentSpeedMph != null)
+      ? Math.round(currentSpeedMph) + ' mph'
+      : 'Driving';
+  } else if (highIdleMode) {
+    chip.style.display = 'flex';
+    chip.className = 'mode-chip idle';
+    icon.textContent  = '⚙️';
+    label.textContent = 'High Idle';
+  } else {
+    chip.style.display = 'none';
+    chip.className = 'mode-chip';
+  }
+}
+
 // ── MQTT ──────────────────────────────────────────
 const PORTAL_ID = 'c0619ab5dcfb';
 const CERBO_IP  = localStorage.getItem('cerboIp') || '192.168.12.140';
 
+let bannerDismissed = false;
+
+function showBanner() {
+  const b = document.getElementById('offline-banner');
+  b.classList.remove('hiding');
+  b.classList.add('visible');
+}
+
+function hideBanner() {
+  const b = document.getElementById('offline-banner');
+  b.classList.remove('visible');
+  b.classList.add('hiding');
+  b.addEventListener('animationend', () => b.classList.remove('hiding'), { once: true });
+}
+
+function dismissBanner() {
+  bannerDismissed = true;
+  hideBanner();
+}
+
 function setLiveStatus(live) {
-  const dot    = document.getElementById('statusDot');
-  const text   = document.getElementById('statusText');
-  const banner = document.getElementById('offline-banner');
+  const dot  = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
   dot.classList.remove('connecting');
   if (live) {
     dot.style.background = 'var(--green)';
     dot.style.boxShadow  = '0 0 6px var(--green)';
     text.textContent = 'Live';
-    banner.hidden = true;
+    bannerDismissed = false;
+    hideBanner();
   } else {
     dot.style.background = 'var(--red)';
     dot.style.boxShadow  = '0 0 6px var(--red)';
     text.textContent = 'Offline';
-    banner.hidden = false;
+    if (!bannerDismissed) showBanner();
   }
 }
 
@@ -1778,6 +2024,7 @@ function updatePower(val) {
   document.getElementById('battALabel').textContent =
     battPower > 10 ? 'Charging' : battPower < -10 ? 'Discharging' : 'Idle';
   recalcTTE();
+  checkHighIdle();
 }
 
 function updateTTE(ttgSeconds) {
@@ -1836,13 +2083,15 @@ function formatTTE(secs) {
 }
 
 function updateSolar(val) {
+  currentSolarW = val;
   const el = document.getElementById('solarW');
   clearSkel(el);
   el.textContent = Math.round(val) + ' W';
+  checkHighIdle();
 }
 
 function connectMQTT() {
-  const client = mqttClient = mqtt.connect(`ws://${window.location.hostname}:9001`, {
+  const client = mqttClient = mqtt.connect(`ws://${CERBO_IP}:9001`, {
     clientId: 'gogovan_' + Math.random().toString(36).substr(2, 9),
     clean: true,
     reconnectPeriod: 10000,
@@ -2070,9 +2319,11 @@ const _nameEl = document.getElementById('nameText');
 if (_nameEl) _nameEl.textContent = savedName;
 document.title = savedName;
 applyTheme(activeTheme);
+updateAcModeUI();
 loadScenes();
 renderLights();
 renderScenes();
+watchGPS();
 </script>
 </body>
 </html>
