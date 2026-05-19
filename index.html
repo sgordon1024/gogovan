@@ -718,6 +718,38 @@
 
     .light-row.on .dim-pct { color: var(--amber); }
 
+    /* ── Rope lights ──────────────────────────────── */
+    .rope-palette { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px 14px 14px; }
+    .rope-color-btn {
+      width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent;
+      cursor: pointer; transition: transform 0.15s, border-color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .rope-color-btn:active { transform: scale(0.85); }
+    .rope-color-btn.active { border-color: var(--amber); }
+    .rope-effects { padding: 0 14px 14px; }
+    .rope-effect-btn {
+      width: 100%; height: 36px; border-radius: 18px; border: none;
+      cursor: pointer; font-size: 13px; font-weight: 600; letter-spacing: 0.3px;
+      color: #fff;
+      background: linear-gradient(90deg, #ff2222, #ff7700, #ffee00, #22cc44, #00eeff, #2244ff, #8822ff);
+      transition: opacity 0.15s, transform 0.15s;
+      -webkit-tap-highlight-color: transparent;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    }
+    .rope-effect-btn:active { transform: scale(0.97); opacity: 0.85; }
+    .rope-effect-btn.active { box-shadow: 0 0 0 2px var(--amber), 0 0 14px rgba(255,160,64,0.3); }
+
+    .rope-slider-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 4px 14px;
+    }
+    .rope-slider-row svg { flex-shrink: 0; opacity: 0.6; }
+    .rope-slider-row .dim-slider { flex: 1; }
+    .rope-slider-row .dim-pct { font-size: 13px; font-weight: 600; color: var(--txt2); width: 34px; text-align: right; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+    .rope-slider-row.speed-row { opacity: 0.4; transition: opacity 0.2s; }
+    .rope-slider-row.speed-row.active { opacity: 1; }
+
     /* ── Climate ──────────────────────────────────── */
     .climate-card {
       padding: 18px 16px;
@@ -1681,6 +1713,59 @@ safe-buffer/index.js:
     <div class="card">
       <div id="lightsList"></div>
     </div>
+    <span class="section-label section-label-solo" style="margin-top:16px">Rope Lights</span>
+    <div class="card">
+      <div class="light-row" id="ropeRow">
+        <button class="light-toggle" id="ropeToggle" onclick="toggleRopeLight()" aria-label="Rope lights">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--txt2)" stroke-width="2.5" stroke-linecap="round" id="ropeIcon">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+        </button>
+        <span class="light-name">Rope Lights</span>
+      </div>
+      <div class="rope-palette">
+        <button class="rope-color-btn" id="ropeRed"    onclick="setRopeColor('red')"    style="background:#ff2222" title="Red"></button>
+        <button class="rope-color-btn" id="ropeOrange" onclick="setRopeColor('orange')" style="background:#ff7700" title="Orange"></button>
+        <button class="rope-color-btn" id="ropeAmber"  onclick="setRopeColor('amber')"  style="background:#ffaa00" title="Amber"></button>
+        <button class="rope-color-btn" id="ropeYellow" onclick="setRopeColor('yellow')" style="background:#ffee00" title="Yellow"></button>
+        <button class="rope-color-btn" id="ropeLime"   onclick="setRopeColor('lime')"   style="background:#88ff22" title="Lime"></button>
+        <button class="rope-color-btn" id="ropeGreen"  onclick="setRopeColor('green')"  style="background:#22cc44" title="Green"></button>
+        <button class="rope-color-btn" id="ropeTeal"   onclick="setRopeColor('teal')"   style="background:#00bbaa" title="Teal"></button>
+        <button class="rope-color-btn" id="ropeCyan"   onclick="setRopeColor('cyan')"   style="background:#00eeff" title="Cyan"></button>
+        <button class="rope-color-btn" id="ropeSky"    onclick="setRopeColor('sky')"    style="background:#44aaff" title="Sky Blue"></button>
+        <button class="rope-color-btn" id="ropeBlue"   onclick="setRopeColor('blue')"   style="background:#2244ff" title="Blue"></button>
+        <button class="rope-color-btn" id="ropeNavy"   onclick="setRopeColor('navy')"   style="background:#112288" title="Navy"></button>
+        <button class="rope-color-btn" id="ropePurple" onclick="setRopeColor('purple')" style="background:#8822ff" title="Purple"></button>
+        <button class="rope-color-btn" id="ropePink"   onclick="setRopeColor('pink')"   style="background:#ff44aa" title="Pink"></button>
+        <button class="rope-color-btn" id="ropeWhite"  onclick="setRopeColor('white')"  style="background:#ffffff" title="White"></button>
+      </div>
+      <div class="rope-slider-row" style="padding-top:8px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--txt2)" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/>
+          <line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/>
+          <line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.78" y2="4.22"/>
+        </svg>
+        <input type="range" class="dim-slider" id="ropeBrightness" min="1" max="100" value="100"
+          oninput="setRopeBrightness(this.value)" style="--pct:100%">
+        <span class="dim-pct" id="ropeBrightPct">100%</span>
+      </div>
+      <div class="rope-slider-row speed-row" id="ropeSpeedRow">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--txt2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+        <input type="range" class="dim-slider" id="ropeSpeed" min="1" max="10" value="5"
+          oninput="setRopeSpeed(this.value)" style="--pct:44%">
+        <span class="dim-pct" id="ropeSpeedPct">5</span>
+      </div>
+      <div class="rope-effects">
+        <button class="rope-effect-btn" id="ropeEffectCycle" onclick="setRopeEffect('cycle')">✦ Color Cycle</button>
+      </div>
+    </div>
   </div>
 
   <!-- TAB: CLIMATE -->
@@ -2506,6 +2591,68 @@ function toggleTankHeater() {
   document.getElementById('tankHeatState').textContent = tankHeatOn ? 'On' : 'Off';
   if (mqttClient?.connected) mqttClient.publish('van/light/tank-heater', tankHeatOn ? 'on' : 'off');
   console.log(`MQTT → van/light/tank-heater: ${tankHeatOn ? 'on' : 'off'}`);
+}
+
+// ── Rope lights ───────────────────────────────────
+let ropeOn = false;
+let ropeActiveColor = null;
+let ropeActiveEffect = null;
+
+function toggleRopeLight() {
+  ropeOn = !ropeOn;
+  document.getElementById('ropeRow').classList.toggle('on', ropeOn);
+  document.getElementById('ropeIcon').setAttribute('stroke', ropeOn ? 'var(--amber)' : 'var(--txt2)');
+  if (!ropeOn) {
+    document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.rope-effect-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('ropeSpeedRow').classList.remove('active');
+    ropeActiveColor = null;
+    ropeActiveEffect = null;
+  }
+  if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', ropeOn ? 'on' : 'off');
+}
+
+function updateRopeIcon() {
+  document.getElementById('ropeIcon').setAttribute('stroke', ropeOn ? 'var(--amber)' : 'var(--txt2)');
+}
+
+function setRopeColor(color) {
+  ropeOn = true;
+  document.getElementById('ropeRow').classList.add('on');
+  document.getElementById('ropeIcon').setAttribute('stroke', 'var(--amber)');
+  document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.rope-effect-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('rope' + color.charAt(0).toUpperCase() + color.slice(1)).classList.add('active');
+  ropeActiveColor = color;
+  ropeActiveEffect = null;
+  if (mqttClient?.connected) mqttClient.publish('van/rope-light/color', color);
+}
+
+function setRopeEffect(effect) {
+  ropeOn = true;
+  document.getElementById('ropeRow').classList.add('on');
+  document.getElementById('ropeIcon').setAttribute('stroke', 'var(--amber)');
+  document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.rope-effect-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('ropeEffect' + effect.charAt(0).toUpperCase() + effect.slice(1)).classList.add('active');
+  document.getElementById('ropeSpeedRow').classList.add('active');
+  ropeActiveColor = null;
+  ropeActiveEffect = effect;
+  if (mqttClient?.connected) mqttClient.publish('van/rope-light/effect', effect);
+}
+
+function setRopeBrightness(val) {
+  const pct = Math.round(val);
+  document.getElementById('ropeBrightPct').textContent = pct + '%';
+  document.getElementById('ropeBrightness').style.setProperty('--pct', pct + '%');
+  if (mqttClient?.connected) mqttClient.publish('van/rope-light/brightness', String(pct));
+}
+
+function setRopeSpeed(val) {
+  document.getElementById('ropeSpeedPct').textContent = val;
+  const pct = ((val - 1) / 9 * 100).toFixed(0) + '%';
+  document.getElementById('ropeSpeed').style.setProperty('--pct', pct);
+  if (mqttClient?.connected) mqttClient.publish('van/rope-light/speed', String(val));
 }
 
 // ── Inverter ──────────────────────────────────────

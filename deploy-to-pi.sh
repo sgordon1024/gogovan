@@ -35,6 +35,12 @@ sshpass -p "$PASS" ssh "$PI" 'echo windows | sudo -S systemctl restart can-bridg
 echo "=== Copying index.html ==="
 sshpass -p "$PASS" scp "$DIR/index.html" "$PI:~/index.html" || { echo "FAILED: index.html copy"; exit 1; }
 
+echo "=== Copying rope-light.py ==="
+sshpass -p "$PASS" scp "$DIR/rope-light.py" "$PI:~/rope-light.py" || { echo "FAILED: rope-light.py copy"; exit 1; }
+
+echo "=== Restarting rope-light service ==="
+sshpass -p "$PASS" ssh "$PI" 'echo windows | sudo -S systemctl restart rope-light && echo "rope-light restarted"' || echo "WARNING: rope-light restart failed"
+
 echo "=== Verifying can-bridge is running ==="
 sleep 3
 sshpass -p "$PASS" ssh "$PI" 'sudo systemctl status can-bridge --no-pager -l | head -20'
