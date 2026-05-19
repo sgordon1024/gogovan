@@ -50,6 +50,27 @@
       min-width: 320px;
     }
 
+    /* ── Splash screen ───────────────────────────── */
+    #splash {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.45s ease;
+    }
+    #splash.hiding {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .splash-logo {
+      width: 260px;
+      max-width: 70vw;
+      height: auto;
+    }
+
     /* ── Header ───────────────────────────────────── */
     header {
       display: flex;
@@ -1447,6 +1468,10 @@ safe-buffer/index.js:
   </script>
 </head>
 <body>
+  <div id="splash">
+    <img src="icons/LogoMark.png" alt="GoGoVan" class="splash-logo">
+  </div>
+
   <div id="ptr-backdrop"></div>
   <div id="ptr-indicator">
     <span id="ptr-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></span>
@@ -1454,9 +1479,6 @@ safe-buffer/index.js:
   </div>
 
   <header>
-    <div class="app-name" id="nameDisplay">
-      <img src="icons/LogoMark.png" alt="GoGoVan" style="width:260px;height:auto;max-width:65vw;">
-    </div>
     <div id="modeChip" class="mode-chip">
       <span id="modeChipIcon">🚗</span>
       <span id="modeChipLabel">Driving</span>
@@ -2990,12 +3012,14 @@ function updateSoc(val) {
   clearSkel(el);
   el.textContent = pct + '%';
   el.style.color = pct > 50 ? 'var(--green)' : pct > 20 ? 'var(--amber)' : 'var(--red)';
+  recalcTTE();
 }
 
-let battPower  = 0;
-let battSoc    = null;
-let battCapWh  = null;
-let lastTTG    = null;
+let battPower   = 0;
+let battSoc     = null;
+let battVoltage = 48;      // updated from MQTT; default to nominal
+let battCapWh   = 165 * 48; // 7,920 Wh — used for discharge estimate
+let lastTTG     = null;
 let chargeStartSoc  = null;
 let chargeStartTime = null;
 
@@ -3022,35 +3046,47 @@ function updatePower(val) {
 }
 
 function estimateTTF() {
-  if (battSoc == null || battSoc >= 100 || battPower <= 10) return null;
-  const remaining = 100 - battSoc;
-  let rawSecs = null;
+  if (battSoc == null || battSoc >= 95 || battPower <= 10) return null;
 
-  // Method 1: known capacity from a prior discharge cycle
-  if (battCapWh != null && battCapWh > 200) {
-    rawSecs = (remaining / 100 * battCapWh / battPower) * 3600;
+  // Lithionics 165Ah / 48V NMC+ charging model
+  // Back-calculated from BMS app (15% SOC, +72.6A → 1h 43m):
+  //   165Ah × (90% − 15%) / 72.6A = 1h 42m  ← BMS targets 90% as effective full
+  //
+  // Uses actual voltage (not nominal 48V) for current calculation since
+  // pack voltage varies 47–58V across SOC range and affects Ah/W accuracy.
+  //
+  // LiFePO4 CC phase holds to ~87% SOC; brief CV taper 87–90%.
+  const BATT_AH  = 165;
+  const FULL_SOC = 90;   // Lithionics effective full-charge target
+  const CV_START = 87;   // CC→CV transition
+  const CV_TAPER = 1.25; // mild taper in final CV window
+
+  const V = (battVoltage != null && battVoltage > 10) ? battVoltage : 48;
+  const A = battPower / V;
+  if (A < 0.5) return null;
+
+  const soc = battSoc;
+
+  if (soc < CV_START) {
+    // CC phase: charge straight to CV_START, then model brief CV tail to FULL_SOC
+    const ccSecs = (BATT_AH * (CV_START - soc) / 100 / A) * 3600;
+    const cvSecs = (BATT_AH * (FULL_SOC - CV_START) / 100 / A) * 3600 * CV_TAPER;
+    return ccSecs + cvSecs;
+  } else if (soc < FULL_SOC) {
+    // In CV phase — current is already tapering
+    return (BATT_AH * (FULL_SOC - soc) / 100 / A) * 3600 * CV_TAPER;
+  } else {
+    // Above FULL_SOC (90–95%): deep CV absorption, heavier taper
+    return (BATT_AH * (95 - soc) / 100 / A) * 3600 * CV_TAPER * 1.8;
   }
-
-  // Method 2: SOC rate of change (needs 2+ min of charge data)
-  if (rawSecs == null && chargeStartTime != null && chargeStartSoc != null && battSoc > chargeStartSoc) {
-    const elapsedH = (Date.now() - chargeStartTime) / 3600000;
-    if (elapsedH > 0.033) {
-      const ratePerH = (battSoc - chargeStartSoc) / elapsedH;
-      if (ratePerH > 0.05) rawSecs = (remaining / ratePerH) * 3600;
-    }
-  }
-
-  if (rawSecs == null) return null;
-
-  // LiFePO4 CV-phase taper: current drops above ~90% SOC
-  const taper = battSoc >= 97 ? 2.0 : battSoc >= 90 ? 1.4 : 1.1;
-  return rawSecs * taper;
 }
 
 function updateTTE(ttgSeconds) {
   lastTTG = ttgSeconds;
   if (ttgSeconds != null && ttgSeconds > 3600 && battSoc != null && battSoc > 15 && battPower < -5) {
-    battCapWh = (Math.abs(battPower) * (ttgSeconds / 3600)) / (battSoc / 100);
+    const learned = (Math.abs(battPower) * (ttgSeconds / 3600)) / (battSoc / 100);
+    // Sanity-check: accept only if within ±30% of the 7,920 Wh nameplate (5,544–10,296 Wh)
+    if (learned > 5544 && learned < 10296) battCapWh = learned;
   }
   recalcTTE();
 }
@@ -3129,6 +3165,7 @@ function connectMQTT() {
   });
 
   client.on('connect', () => {
+    dismissSplash();
     setLiveStatus(true);
     client.subscribe(`N/${PORTAL_ID}/#`);
     client.subscribe('van/status/light/+');
@@ -3234,9 +3271,11 @@ function connectMQTT() {
         const b = Array.isArray(arr) ? arr[0] : null;
         if (b?.soc != null) { battSoc = b.soc; updateSoc(b.soc); }
         if (b?.voltage != null) {
+          battVoltage = b.voltage;
           const sub = document.getElementById('battSub');
           clearSkel(sub);
           sub.textContent = b.voltage.toFixed(1) + 'V';
+          recalcTTE();
         }
       } catch {}
       return;
@@ -3274,6 +3313,15 @@ function connectMQTT() {
 }
 
 connectMQTT();
+setTimeout(dismissSplash, 5000); // fallback: dismiss splash if MQTT never connects
+
+// ── Splash ────────────────────────────────────────
+function dismissSplash() {
+  const splash = document.getElementById('splash');
+  if (!splash) return;
+  splash.classList.add('hiding');
+  splash.addEventListener('transitionend', () => splash.remove(), { once: true });
+}
 
 // ── Pull to refresh ───────────────────────────────
 function playPop() {
