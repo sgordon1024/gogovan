@@ -58,7 +58,25 @@
       justify-content: center;
       padding: calc(6px + env(safe-area-inset-top)) 20px 8px;
       gap: 6px;
+      position: relative;
     }
+    .settings-btn {
+      position: absolute;
+      top: calc(env(safe-area-inset-top) + 10px);
+      right: 16px;
+      background: none;
+      border: none;
+      color: var(--txt2);
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+      transition: color 0.2s, background 0.2s;
+    }
+    .settings-btn:active { background: var(--surface); color: var(--txt); }
 
     .app-name {
       font-size: clamp(18px, 5vw, 22px);
@@ -187,6 +205,61 @@
       -webkit-tap-highlight-color: transparent;
     }
     .offline-banner-close:active { opacity: 1; }
+
+    /* ── Arrived toast ────────────────────────────── */
+    .arrived-toast {
+      position: fixed;
+      bottom: calc(env(safe-area-inset-bottom) + 76px);
+      left: 50%;
+      transform: translateX(-50%) translateY(16px);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 10px 12px 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.45);
+      opacity: 0;
+      transition: opacity 0.25s, transform 0.25s;
+      pointer-events: none;
+      z-index: 90;
+      max-width: calc(100vw - 32px);
+    }
+    .arrived-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      pointer-events: auto;
+    }
+    .arrived-toast-msg {
+      font-size: 13px;
+      color: var(--txt);
+      flex: 1;
+      white-space: nowrap;
+    }
+    .arrived-toast-restore {
+      background: var(--amber);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .arrived-toast-dismiss {
+      background: none;
+      border: none;
+      color: var(--txt2);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      padding: 4px;
+      flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
 
     /* ── Skeleton shimmer ─────────────────────────── */
     @keyframes shimmer {
@@ -1051,7 +1124,7 @@
       border-radius: 0;
       border-left: none;
       border-right: none;
-      margin-bottom: 1px;
+      border-top: none;
     }
 
     body.driving #tab-power {
@@ -1114,12 +1187,12 @@
       font-family: 'Courier New', 'Lucida Console', monospace;
       letter-spacing: 6px;
       line-height: 1;
-      color: var(--amber);
+      color: #fff;
       font-variant-numeric: tabular-nums;
       text-shadow:
-        0 0 8px var(--amber),
-        0 0 24px rgba(255,160,0,0.5),
-        0 0 48px rgba(255,160,0,0.2);
+        0 0 8px rgba(255,255,255,0.8),
+        0 0 24px rgba(255,255,255,0.4),
+        0 0 48px rgba(255,255,255,0.15);
     }
 
     #drive-speed-unit {
@@ -1176,6 +1249,7 @@
       box-shadow: 0 1px 3px rgba(0,0,0,.4);
     }
     .drive-mode-toggle.on .drive-mode-knob { transform: translateX(22px); }
+    #drive-mode-card { margin-top: 12px; }
     body.driving .drive-mode-row { padding: 20px 16px; }
     body.driving #drive-mode-card { margin-top: 0; }
 
@@ -1391,7 +1465,19 @@ safe-buffer/index.js:
       <div class="status-dot connecting" id="statusDot"></div>
       <span id="statusText">Connecting…</span>
     </div>
+    <button class="settings-btn" onclick="openThemePicker()" aria-label="Settings">
+      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+    </button>
   </header>
+
+  <!-- ARRIVED TOAST -->
+  <div id="arrived-toast" class="arrived-toast">
+    <span class="arrived-toast-msg">Restore lights from before driving?</span>
+    <button class="arrived-toast-restore" onclick="restorePreDriveLights()">Restore</button>
+    <button class="arrived-toast-dismiss" onclick="dismissArrivedToast()" aria-label="Dismiss">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </button>
+  </div>
 
   <div id="offline-indicator"></div>
   <div id="offline-banner" class="offline-banner">
@@ -1437,7 +1523,7 @@ safe-buffer/index.js:
       </div>
     </div>
 
-    <div class="card" id="drive-mode-card" style="margin-top:12px">
+    <div class="card" id="drive-mode-card">
       <div class="drive-mode-row">
         <div>
           <div class="drive-mode-label">Drive Mode</div>
@@ -1480,12 +1566,6 @@ safe-buffer/index.js:
     </div>
     </div><!-- /#inverter-section -->
 
-    <div class="theme-btn-wrap">
-      <button class="theme-btn" onclick="openThemePicker()">
-        <span style="display:flex;align-items:center"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg></span>
-        <span>Appearance</span>
-      </button>
-    </div>
   </div>
 
   <!-- TAB: LIGHTS -->
@@ -1703,7 +1783,8 @@ safe-buffer/index.js:
   <div class="overlay" id="overlay" onclick="overlayClick(event)">
     <div class="theme-sheet" id="themeSheet">
       <div class="sheet-handle"></div>
-      <div class="sheet-title">Appearance</div>
+      <div class="sheet-title">Settings</div>
+      <div class="theme-group-label" style="margin-bottom:14px;font-size:11px;letter-spacing:0.8px;">Appearance</div>
       <div class="theme-group-label">Dark</div>
       <div class="theme-row" id="darkRow"></div>
       <div class="theme-group-label">Light</div>
@@ -2357,6 +2438,9 @@ let drivingTimer    = null;
 let currentSpeedMph = null;
 let currentSolarW   = 0;
 let preDriveTab     = 'power';
+let preDriveLights  = [];   // [{id, level}] lights that were on before driving
+let pumpWasOn       = false; // was pump on before driving
+let arrivedToastTimer = null;
 
 const DRIVE_SPEED_MPH  = 5;    // mph to consider driving
 const DRIVE_CONFIRM_MS = 4000; // must hold above threshold before activating
@@ -2413,6 +2497,13 @@ function enterDrivingMode() {
   drivingMode  = true;
   drivingTimer = null;
 
+  // Save pre-drive state for restore on exit
+  preDriveLights = [];
+  LIGHT_GROUPS.forEach(g => g.lights.forEach(l => {
+    if (l.on) preDriveLights.push({ id: l.id, level: l.level });
+  }));
+  pumpWasOn = pumpOn;
+
   // 1. Turn off all lights
   LIGHT_GROUPS.forEach(g => g.lights.forEach(l => {
     if (l.on) { l.on = false; l.level = 0; publishLight(l.id, 'off'); }
@@ -2448,6 +2539,46 @@ function exitDrivingMode() {
   switchTab(preDriveTab);
   refreshModeChip();
   updateDriveModeToggle();
+
+  // Auto-restore water pump if it was on before driving
+  if (pumpWasOn) {
+    pumpOn = true;
+    if (mqttClient?.connected) mqttClient.publish('van/light/pump', 'on');
+    const pumpBtn   = document.getElementById('pumpBtn');
+    const pumpState = document.getElementById('pumpState');
+    if (pumpBtn)   pumpBtn.classList.add('active');
+    if (pumpState) pumpState.textContent = 'On';
+  }
+
+  // Show "Arrived?" toast if any lights were on before driving
+  if (preDriveLights.length > 0) showArrivedToast();
+}
+
+function showArrivedToast() {
+  if (arrivedToastTimer) clearTimeout(arrivedToastTimer);
+  const toast = document.getElementById('arrived-toast');
+  if (!toast) return;
+  toast.classList.add('show');
+  arrivedToastTimer = setTimeout(dismissArrivedToast, 8000);
+}
+
+function dismissArrivedToast() {
+  if (arrivedToastTimer) { clearTimeout(arrivedToastTimer); arrivedToastTimer = null; }
+  const toast = document.getElementById('arrived-toast');
+  if (toast) toast.classList.remove('show');
+}
+
+function restorePreDriveLights() {
+  preDriveLights.forEach(({ id, level }) => {
+    const light = LIGHT_GROUPS.flatMap(g => g.lights).find(l => l.id === id);
+    if (!light) return;
+    light.on    = true;
+    light.level = level;
+    publishLight(id, String(level));
+  });
+  preDriveLights = [];
+  renderLights();
+  dismissArrivedToast();
 }
 
 function switchDriveTab(name) {
@@ -2497,9 +2628,19 @@ function refreshModeChip() {
 
   // Update large speed panel when driving
   if (speedEl) {
-    speedEl.textContent = (drivingMode && currentSpeedMph != null)
-      ? Math.round(currentSpeedMph)
-      : '—';
+    const speedVal = (drivingMode && currentSpeedMph != null) ? Math.round(currentSpeedMph) : null;
+    speedEl.textContent = speedVal != null ? speedVal : '—';
+    // Interpolate color white → red from 0 → 90 mph
+    if (speedVal != null && speedVal > 0) {
+      const ratio = Math.min(speedVal / 90, 1);
+      const gb = Math.round(255 * (1 - ratio));
+      const col = `rgb(255,${gb},${gb})`;
+      speedEl.style.color = col;
+      speedEl.style.textShadow = `0 0 8px ${col}, 0 0 24px rgba(255,${gb},${gb},0.5), 0 0 48px rgba(255,${gb},${gb},0.2)`;
+    } else {
+      speedEl.style.color = '';
+      speedEl.style.textShadow = '';
+    }
   }
 
   if (!chip) return;

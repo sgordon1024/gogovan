@@ -2,9 +2,26 @@
 # Deploy updated can-bridge.py and index.html to GoGoVan Pi
 # Dashboard URLs: http://vanpi.local  (on GoGoVan) | http://100.98.52.107 (via Tailscale)
 
-PI="sgordon1024@100.98.52.107"
 PASS="windows"
 DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Auto-detect Pi — try Tailscale first, fall back to local network
+echo "=== Detecting Pi connection ==="
+if sshpass -p "$PASS" ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "sgordon1024@100.98.52.107" "echo ok" &>/dev/null; then
+  PI="sgordon1024@100.98.52.107"
+  echo "→ Using Tailscale (100.98.52.107)"
+elif sshpass -p "$PASS" ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "sgordon1024@vanpi.local" "echo ok" &>/dev/null; then
+  PI="sgordon1024@vanpi.local"
+  echo "→ Using local network (vanpi.local)"
+elif sshpass -p "$PASS" ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "sgordon1024@192.168.4.1" "echo ok" &>/dev/null; then
+  PI="sgordon1024@192.168.4.1"
+  echo "→ Using local IP (192.168.4.1)"
+else
+  echo "ERROR: Cannot reach Pi via Tailscale or local network."
+  echo "  - Via Tailscale: make sure Tailscale is running on this machine"
+  echo "  - Via GoGoVan Wi-Fi: connect to GoGoVan network first"
+  exit 1
+fi
 
 echo "=== Copying can-bridge.py ==="
 sshpass -p "$PASS" scp "$DIR/can-bridge.py" "$PI:~/can-bridge.py" || { echo "FAILED: can-bridge.py copy"; exit 1; }
