@@ -1110,37 +1110,74 @@
 
     #drive-speed-number {
       font-size: clamp(96px, 28vw, 148px);
-      font-weight: 800;
-      letter-spacing: -4px;
+      font-weight: 200;
+      font-family: 'Courier New', 'Lucida Console', monospace;
+      letter-spacing: 6px;
       line-height: 1;
       color: var(--amber);
       font-variant-numeric: tabular-nums;
+      text-shadow:
+        0 0 8px var(--amber),
+        0 0 24px rgba(255,160,0,0.5),
+        0 0 48px rgba(255,160,0,0.2);
     }
 
     #drive-speed-unit {
-      font-size: 18px;
-      font-weight: 600;
-      letter-spacing: 3px;
+      font-size: 14px;
+      font-weight: 400;
+      font-family: 'Courier New', 'Lucida Console', monospace;
+      letter-spacing: 8px;
       text-transform: uppercase;
+      color: var(--amber);
+      opacity: 0.5;
+      margin-top: 6px;
+      text-shadow: 0 0 6px var(--amber);
+    }
+
+    /* ── Drive mode toggle card ──────────────────── */
+    .drive-mode-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+    }
+    .drive-mode-label {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--txt);
+    }
+    .drive-mode-sub {
+      font-size: 13px;
       color: var(--txt2);
       margin-top: 2px;
     }
-
-    /* ── Drive test button (dev only) ────────────── */
-    .drive-test-btn {
-      position: absolute;
-      top: max(env(safe-area-inset-top), 14px);
-      right: 14px;
-      background: none;
+    .drive-mode-toggle {
+      width: 54px;
+      height: 32px;
+      border-radius: 16px;
+      background: var(--tog-off);
       border: none;
-      font-size: 10px;
-      font-weight: 500;
-      color: var(--border);
       cursor: pointer;
-      padding: 4px 6px;
+      position: relative;
+      transition: background .2s;
+      flex-shrink: 0;
       -webkit-tap-highlight-color: transparent;
-      letter-spacing: 0.5px;
     }
+    .drive-mode-toggle.on { background: var(--amber); }
+    .drive-mode-knob {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #fff;
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      transition: transform .2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,.4);
+    }
+    .drive-mode-toggle.on .drive-mode-knob { transform: translateX(22px); }
+    body.driving .drive-mode-row { padding: 20px 16px; }
+    body.driving #drive-mode-card { margin-top: 0; }
 
     /* ── Pull to refresh ─────────────────────────── */
     #ptr-backdrop {
@@ -1354,7 +1391,6 @@ safe-buffer/index.js:
       <div class="status-dot connecting" id="statusDot"></div>
       <span id="statusText">Connecting…</span>
     </div>
-    <button id="driveTestBtn" class="drive-test-btn" onclick="toggleDriveTest()">drive</button>
   </header>
 
   <div id="offline-indicator"></div>
@@ -1398,6 +1434,18 @@ safe-buffer/index.js:
           <div class="power-value" id="battTTE" style="font-size:clamp(14px,4vw,18px)"><span class="skel">&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
           <div class="power-sub" id="battTTESub">to 10% SOC</div>
         </div>
+      </div>
+    </div>
+
+    <div class="card" id="drive-mode-card" style="margin-top:12px">
+      <div class="drive-mode-row">
+        <div>
+          <div class="drive-mode-label">Drive Mode</div>
+          <div class="drive-mode-sub" id="driveModeSub">Auto · GPS watching</div>
+        </div>
+        <button class="drive-mode-toggle" id="driveModeToggle" onclick="toggleDriveMode()">
+          <div class="drive-mode-knob"></div>
+        </button>
       </div>
     </div>
 
@@ -2342,6 +2390,7 @@ function onGPSUpdate(pos) {
     currentSpeedMph = raw * 2.237;
     setGPSStatus('');
   }
+  updateDriveModeToggle();
 
   if (currentSpeedMph >= DRIVE_SPEED_MPH) {
     if (!drivingMode && !drivingTimer)
@@ -2390,6 +2439,7 @@ function enterDrivingMode() {
 
   renderLights();
   refreshModeChip();
+  updateDriveModeToggle();
 }
 
 function exitDrivingMode() {
@@ -2397,6 +2447,7 @@ function exitDrivingMode() {
   document.body.classList.remove('driving');
   switchTab(preDriveTab);
   refreshModeChip();
+  updateDriveModeToggle();
 }
 
 function switchDriveTab(name) {
@@ -2405,14 +2456,28 @@ function switchDriveTab(name) {
   document.getElementById('driveNavInternet').classList.toggle('active', name === 'internet');
 }
 
-function toggleDriveTest() {
+function toggleDriveMode() {
   if (drivingMode) {
-    currentSpeedMph = 0;
+    currentSpeedMph = currentSpeedMph ?? 0;
     exitDrivingMode();
   } else {
     if (drivingTimer) { clearTimeout(drivingTimer); drivingTimer = null; }
     if (currentSpeedMph == null) currentSpeedMph = 0;
     enterDrivingMode();
+  }
+}
+
+function updateDriveModeToggle() {
+  const btn = document.getElementById('driveModeToggle');
+  const sub = document.getElementById('driveModeSub');
+  if (!btn || !sub) return;
+  btn.classList.toggle('on', drivingMode);
+  if (drivingMode) {
+    sub.textContent = 'On · controls locked';
+  } else if (currentSpeedMph != null) {
+    sub.textContent = 'Auto · GPS active';
+  } else {
+    sub.textContent = 'Auto · GPS watching';
   }
 }
 
