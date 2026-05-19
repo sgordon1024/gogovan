@@ -77,27 +77,9 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: calc(6px + env(safe-area-inset-top)) 20px 8px;
+      padding: calc(env(safe-area-inset-top) + 6px) 20px 6px;
       gap: 6px;
-      position: relative;
     }
-    .settings-btn {
-      position: absolute;
-      top: calc(env(safe-area-inset-top) + 10px);
-      right: 16px;
-      background: none;
-      border: none;
-      color: var(--txt2);
-      cursor: pointer;
-      padding: 8px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      -webkit-tap-highlight-color: transparent;
-      transition: color 0.2s, background 0.2s;
-    }
-    .settings-btn:active { background: var(--surface); color: var(--txt); }
 
     .app-name {
       font-size: clamp(18px, 5vw, 22px);
@@ -128,48 +110,42 @@
       padding-bottom: 1px;
     }
 
-    .status-pill {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 5px 10px;
-      font-size: 12px;
-      color: var(--txt2);
-    }
-
-    .status-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 6px var(--green);
-      transition: background 0.3s, box-shadow 0.3s;
-    }
-
-    .status-dot.connecting {
-      background: var(--amber);
-      box-shadow: 0 0 6px var(--amber);
-      animation: dot-pulse 1.2s ease-in-out infinite;
-    }
-
-    @keyframes dot-pulse {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.35; }
-    }
-
-    /* ── Offline indicator (2px top bar) ─────────── */
-    #offline-indicator {
+    /* ── Status bar (top of screen) ──────────────── */
+    #status-bar {
       position: fixed;
       top: 0; left: 0; right: 0;
-      height: 2px;
-      background: var(--amber);
-      z-index: 1001;
-      display: none;
+      height: 4px;
+      z-index: 9998;
+      overflow: hidden;
+      transition: background 0.4s;
     }
-    #offline-indicator.show { display: block; }
+    #status-bar.live        { background: var(--green); }
+    #status-bar.live-dim    { background: rgba(52,199,89,0.18); }
+    #status-bar.offline     { background: var(--red); }
+    #status-bar.connecting  { background: var(--amber); }
+    #status-bar.connecting::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      height: 100%;
+      width: 35%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.7), transparent);
+      animation: bar-sweep 1.4s ease-in-out infinite;
+    }
+    #status-bar.high-idle   { background: rgba(79,195,247,0.22); }
+    #status-bar.high-idle::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      height: 100%;
+      width: 45%;
+      background: linear-gradient(90deg, transparent, rgba(79,195,247,0.9), transparent);
+      animation: bar-sweep 2.2s ease-in-out infinite;
+    }
+    @keyframes bar-sweep {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(400%); }
+    }
 
     /* ── Offline banner ───────────────────────────── */
     @keyframes banner-in {
@@ -336,7 +312,7 @@
       left: 50%;
       transform: translateX(-50%);
       width: 100%;
-      max-width: 430px;
+      max-width: 100%;
       height: calc(49px + env(safe-area-inset-bottom));
       padding-bottom: env(safe-area-inset-bottom);
       background: var(--surface);
@@ -380,7 +356,7 @@
 
     /* ── Battery hero ─────────────────────────────── */
     .batt-hero-area {
-      padding: 20px 20px 16px;
+      padding: 20px 20px 14px;
     }
 
     .batt-hero-label {
@@ -398,6 +374,7 @@
       letter-spacing: -2px;
       line-height: 1;
       margin-bottom: 4px;
+      color: var(--blue);
     }
 
     .batt-hero-voltage {
@@ -406,13 +383,26 @@
       font-weight: 500;
     }
 
-    .power-strip-3 {
+    /* ── Battery fill bar ─────────────────────────── */
+    .batt-bar-track {
+      height: 5px;
+      background: rgba(79,195,247,0.12);
+      overflow: hidden;
+    }
+    .batt-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, rgba(79,195,247,0.55) 0%, #4FC3F7 100%);
+      transition: width 1.5s ease;
+      min-width: 3px;
+    }
+
+    .power-strip-3, .power-strip-4 {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 1px;
-      background: var(--border);
       border-top: 1px solid var(--border);
     }
+    .power-strip-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .power-strip-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
 
     .power-cell {
       background: var(--surface);
@@ -421,11 +411,29 @@
       flex-direction: column;
       gap: 3px;
       transition: background 0.3s;
+      position: relative;
+    }
+    /* Full-height dividers via pseudo-element — border-right stops at content,
+       but top:0/bottom:0 on an absolutely-positioned element spans padding too */
+    .power-cell:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: var(--border);
+      pointer-events: none;
     }
 
     .power-label { font-size: 12px; color: var(--txt2); font-weight: 500; white-space: nowrap; overflow: hidden; }
     .power-value { font-size: clamp(15px,4vw,20px); font-weight: 700; letter-spacing: -0.5px; line-height: 1; white-space: nowrap; overflow: hidden; }
     .power-sub   { font-size: 12px; color: var(--txt2); white-space: nowrap; overflow: hidden; }
+
+    /* Tighter text when 4 columns are showing */
+    .power-strip-4 .power-value { font-size: clamp(13px,3.5vw,18px) !important; }
+    .power-strip-4 .power-label,
+    .power-strip-4 .power-sub   { font-size: 11px; }
 
     /* ── Scenes ───────────────────────────────────── */
     .scenes-wrap {
@@ -1074,12 +1082,6 @@
       color: var(--amber);
     }
 
-    .mode-chip.idle {
-      background: rgba(79,195,247,0.1);
-      border-color: rgba(79,195,247,0.3);
-      color: var(--blue);
-    }
-
     /* ── Driving mode full-screen layout ────────── */
     body.driving .tab-bar      { display: none; }
     body.driving #inverter-section { display: none; }
@@ -1088,18 +1090,12 @@
     body.driving #modeChip         { display: none !important; }
     body.driving                   { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
 
-    body.driving header {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      padding: max(env(safe-area-inset-top), 12px) 16px 12px;
-      background: var(--bg);
-      border-bottom: 1px solid var(--border);
-      z-index: 50;
-    }
+    /* Header is empty in drive mode — hide it so content reaches the top */
+    body.driving header { display: none; }
 
-    body.driving #tab-power,
+    /* Internet tab just needs safe-area padding at top */
     body.driving #tab-internet {
-      padding-top: calc(max(env(safe-area-inset-top), 12px) + 44px);
+      padding-top: max(env(safe-area-inset-top), 16px);
     }
 
     /* Drive-mode two-tab nav */
@@ -1110,7 +1106,7 @@
       left: 50%;
       transform: translateX(-50%);
       width: 100%;
-      max-width: 430px;
+      max-width: 100%;
       height: calc(88px + env(safe-area-inset-bottom));
       padding-bottom: env(safe-area-inset-bottom);
       background: var(--surface);
@@ -1148,9 +1144,83 @@
       border-top: none;
     }
 
+    /* Power tab fills from top of screen to just above drive nav */
     body.driving #tab-power {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: calc(88px + env(safe-area-inset-bottom));
+      padding-top: env(safe-area-inset-top);
       display: flex;
       flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Speed panel = top 1/3 of available space */
+    body.driving #drive-speed-panel {
+      flex: 1 0 0;
+      min-height: 0;
+    }
+
+    /* Detail panel (battery card + drive mode toggle) = bottom 2/3 */
+    #drive-power-detail {
+      display: contents; /* neutral outside drive mode */
+    }
+    body.driving #drive-power-detail {
+      display: flex;
+      flex-direction: column;
+      flex: 2 0 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    body.driving .batt-hero-area {
+      text-align: center;
+    }
+
+    /* Battery card stretches to fill most of the detail area */
+    body.driving #drive-power-detail > .card:not(#drive-mode-card) {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Power strip expands to fill all remaining card space so
+       divider lines reach the very bottom of the card */
+    body.driving #powerStrip {
+      flex: 1;
+      min-height: 0;
+      grid-template-rows: 1fr;
+      align-items: stretch;
+    }
+
+    /* Center content within taller cells, scale text to fill space */
+    body.driving .power-cell {
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 0 clamp(8px,2vw,16px);
+      gap: 6px;
+    }
+    body.driving .power-label {
+      font-size: clamp(13px,2.8vw,20px);
+      white-space: nowrap;
+    }
+    body.driving .power-value {
+      font-size: clamp(22px,5.5vw,40px) !important;
+      letter-spacing: -1px;
+      white-space: nowrap;
+    }
+    body.driving .power-sub {
+      font-size: clamp(12px,2vw,16px);
+      white-space: nowrap;
+    }
+
+    /* Drive mode card stays compact at bottom */
+    body.driving #drive-mode-card {
+      flex: 0 0 auto;
     }
 
     body.driving #tab-internet {
@@ -1218,14 +1288,14 @@
 
     #drive-speed-unit {
       font-size: 14px;
-      font-weight: 400;
+      font-weight: 700;
       font-family: 'Courier New', 'Lucida Console', monospace;
       letter-spacing: 8px;
       text-transform: uppercase;
-      color: var(--amber);
-      opacity: 0.5;
+      color: var(--txt2);
+      opacity: 0.7;
       margin-top: 6px;
-      text-shadow: 0 0 6px var(--amber);
+      text-shadow: none;
     }
 
     /* ── Drive mode toggle card ──────────────────── */
@@ -1234,6 +1304,12 @@
       align-items: center;
       justify-content: space-between;
       padding: 16px;
+      width: 100%;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      text-align: left;
+      -webkit-tap-highlight-color: transparent;
     }
     .drive-mode-label {
       font-size: 17px;
@@ -1483,13 +1559,6 @@ safe-buffer/index.js:
       <span id="modeChipIcon">🚗</span>
       <span id="modeChipLabel">Driving</span>
     </div>
-    <div class="status-pill">
-      <div class="status-dot connecting" id="statusDot"></div>
-      <span id="statusText">Connecting…</span>
-    </div>
-    <button class="settings-btn" onclick="openThemePicker()" aria-label="Settings">
-      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-    </button>
   </header>
 
   <!-- ARRIVED TOAST -->
@@ -1501,7 +1570,7 @@ safe-buffer/index.js:
     </button>
   </div>
 
-  <div id="offline-indicator"></div>
+  <div id="status-bar" class="connecting"></div>
   <div id="offline-banner" class="offline-banner">
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
     Reconnecting…
@@ -1520,17 +1589,26 @@ safe-buffer/index.js:
       <div id="drive-gps-status" style="font-size:13px;color:var(--txt2);margin-top:8px;letter-spacing:0.3px;"></div>
     </div>
 
+    <div id="drive-power-detail">
     <div class="card">
       <div class="batt-hero-area">
         <div class="batt-hero-label">Battery</div>
         <div class="batt-hero-soc" id="battPct"><span class="skel">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
         <div class="batt-hero-voltage" id="battSub"><span class="skel">&nbsp;&nbsp;&nbsp;</span></div>
       </div>
-      <div class="power-strip-3">
+      <div class="batt-bar-track">
+        <div class="batt-bar-fill" id="battBar"></div>
+      </div>
+      <div class="power-strip-3" id="powerStrip">
         <div class="power-cell">
           <div class="power-label">Solar</div>
           <div class="power-value" id="solarW"><span class="skel">&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
           <div class="power-sub">PV Charger</div>
+        </div>
+        <div class="power-cell" id="altCell" style="display:none">
+          <div class="power-label">Alternator</div>
+          <div class="power-value" id="altW">— W</div>
+          <div class="power-sub">Engine</div>
         </div>
         <div class="power-cell">
           <div class="power-label">Net Power</div>
@@ -1546,16 +1624,17 @@ safe-buffer/index.js:
     </div>
 
     <div class="card" id="drive-mode-card">
-      <div class="drive-mode-row">
+      <button class="drive-mode-row" onclick="toggleDriveMode()" aria-label="Toggle Drive Mode">
         <div>
           <div class="drive-mode-label">Drive Mode</div>
           <div class="drive-mode-sub" id="driveModeSub">Auto · GPS watching</div>
         </div>
-        <button class="drive-mode-toggle" id="driveModeToggle" onclick="toggleDriveMode()">
+        <div class="drive-mode-toggle" id="driveModeToggle">
           <div class="drive-mode-knob"></div>
-        </button>
-      </div>
+        </div>
+      </button>
     </div>
+    </div><!-- /#drive-power-detail -->
 
     <div id="inverter-section">
     <div class="section-label-row mt">
@@ -1835,6 +1914,10 @@ safe-buffer/index.js:
     <button class="tab-btn" data-tab="internet" onclick="switchTab('internet')">
       <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg></span>
       <span class="tab-label">Internet</span>
+    </button>
+    <button class="tab-btn" onclick="openThemePicker()" aria-label="Settings">
+      <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></span>
+      <span class="tab-label">Settings</span>
     </button>
   </nav>
 
@@ -2553,6 +2636,7 @@ function enterDrivingMode() {
   renderLights();
   refreshModeChip();
   updateDriveModeToggle();
+  updateAltColumn();
 }
 
 function exitDrivingMode() {
@@ -2561,16 +2645,15 @@ function exitDrivingMode() {
   switchTab(preDriveTab);
   refreshModeChip();
   updateDriveModeToggle();
+  updateAltColumn();
 
-  // Auto-restore water pump if it was on before driving
-  if (pumpWasOn) {
-    pumpOn = true;
-    if (mqttClient?.connected) mqttClient.publish('van/light/pump', 'on');
-    const pumpBtn   = document.getElementById('pumpBtn');
-    const pumpState = document.getElementById('pumpState');
-    if (pumpBtn)   pumpBtn.classList.add('active');
-    if (pumpState) pumpState.textContent = 'On';
-  }
+  // Always restore water pump when drive mode ends
+  pumpOn = true;
+  if (mqttClient?.connected) mqttClient.publish('van/light/pump', 'on');
+  const pumpBtn   = document.getElementById('pumpBtn');
+  const pumpState = document.getElementById('pumpState');
+  if (pumpBtn)   pumpBtn.classList.add('active');
+  if (pumpState) pumpState.textContent = 'On';
 
   // Show "Arrived?" toast if any lights were on before driving
   if (preDriveLights.length > 0) showArrivedToast();
@@ -2640,6 +2723,26 @@ function checkHighIdle() {
   const wasHighIdle = highIdleMode;
   highIdleMode = !drivingMode && battPower > 50 && excess > HIGH_IDLE_EXCESS;
   if (highIdleMode !== wasHighIdle) refreshModeChip();
+  updateAltColumn();
+}
+
+function updateAltColumn() {
+  const active = highIdleMode || drivingMode;
+  const strip  = document.getElementById('powerStrip');
+  const cell   = document.getElementById('altCell');
+  const el     = document.getElementById('altW');
+  if (!strip || !cell || !el) return;
+
+  if (active) {
+    const altW = Math.max(0, Math.round(battPower - currentSolarW));
+    el.textContent = altW + ' W';
+    el.style.color = altW > 50 ? 'var(--green)' : 'var(--txt2)';
+    cell.style.display = '';
+    strip.className = 'power-strip-4';
+  } else {
+    cell.style.display = 'none';
+    strip.className = 'power-strip-3';
+  }
 }
 
 function refreshModeChip() {
@@ -2676,14 +2779,13 @@ function refreshModeChip() {
       ? Math.round(currentSpeedMph) + ' mph'
       : 'Driving';
   } else if (highIdleMode) {
-    chip.style.display = 'flex';
-    chip.className = 'mode-chip idle';
-    icon.textContent  = '⚙️';
-    label.textContent = 'High Idle';
+    chip.style.display = 'none'; // bar handles high-idle state now
+    chip.className = 'mode-chip';
   } else {
     chip.style.display = 'none';
     chip.className = 'mode-chip';
   }
+  applyStatusBar();
 }
 
 // ── Internet / Network switching ──────────────────
@@ -2981,25 +3083,41 @@ function dismissBanner() {
   hideBanner();
 }
 
+let liveDimTimer = null;
+let isConnected  = false;
+let isBarDimmed  = false;
+
+function applyStatusBar() {
+  const bar = document.getElementById('status-bar');
+  if (!bar) return;
+  if (!isConnected) { bar.className = 'offline'; return; }
+  if (highIdleMode) { bar.className = 'high-idle'; return; }
+  bar.className = isBarDimmed ? 'live-dim' : 'live';
+}
+
 function setLiveStatus(live) {
-  const dot  = document.getElementById('statusDot');
-  const text = document.getElementById('statusText');
-  const ind  = document.getElementById('offline-indicator');
-  dot.classList.remove('connecting');
+  clearTimeout(liveDimTimer);
+  isConnected = live;
+  isBarDimmed = false;
   if (live) {
-    dot.style.background = 'var(--green)';
-    dot.style.boxShadow  = '0 0 6px var(--green)';
-    text.textContent = 'Live';
     bannerDismissed = false;
     hideBanner();
-    ind.classList.remove('show');
+    liveDimTimer = setTimeout(() => {
+      isBarDimmed = true;
+      applyStatusBar();
+    }, 4000);
   } else {
-    dot.style.background = 'var(--red)';
-    dot.style.boxShadow  = '0 0 6px var(--red)';
-    text.textContent = 'Offline';
-    ind.classList.add('show');
     if (!bannerDismissed) showBanner();
   }
+  applyStatusBar();
+}
+
+function setConnecting() {
+  clearTimeout(liveDimTimer);
+  isBarDimmed = false;
+  const bar = document.getElementById('status-bar');
+  if (bar) bar.className = 'connecting';
+  hideBanner();
 }
 
 function clearSkel(el) {
@@ -3011,7 +3129,9 @@ function updateSoc(val) {
   const el  = document.getElementById('battPct');
   clearSkel(el);
   el.textContent = pct + '%';
-  el.style.color = pct > 50 ? 'var(--green)' : pct > 20 ? 'var(--amber)' : 'var(--red)';
+  el.style.color = 'var(--blue)';
+  const bar = document.getElementById('battBar');
+  if (bar) bar.style.width = pct + '%';
   recalcTTE();
 }
 
@@ -3306,8 +3426,9 @@ function connectMQTT() {
     }
   });
 
-  client.on('error',   e  => { console.warn('MQTT:', e); setLiveStatus(false); });
-  client.on('offline', () => setLiveStatus(false));
+  client.on('error',     e  => { console.warn('MQTT:', e); setLiveStatus(false); });
+  client.on('offline',   () => setLiveStatus(false));
+  client.on('reconnect', () => setConnecting());
 
   setInterval(() => { if (client.connected) client.publish(`R/${PORTAL_ID}/keepalive`, ''); }, 30000);
 }
