@@ -401,6 +401,34 @@
     /* ── Battery lightning animation ─────────────────── */
     #battCard { position: relative; }
 
+    .batt-hero-label-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .batt-hero-label-row .batt-hero-label { margin-bottom: 0; }
+
+    #chargingTestBtn {
+      background: none;
+      border: 1px solid transparent;
+      font-size: 13px;
+      line-height: 1;
+      padding: 2px 5px;
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--txt2);
+      opacity: 0.35;
+      transition: opacity 0.15s, border-color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #chargingTestBtn:hover  { opacity: 0.65; }
+    #chargingTestBtn.active {
+      opacity: 1;
+      color: #4FC3F7;
+      border-color: rgba(79,195,247,0.4);
+    }
+
     #batt-bolt {
       position: absolute;
       top: 50%;
@@ -1284,7 +1312,8 @@
     body.driving #powerStrip {
       flex: 1;
       min-height: 0;
-      grid-template-rows: 1fr;
+      grid-template-columns: 1fr 1fr !important;
+      grid-template-rows: 1fr 1fr;
       align-items: stretch;
     }
 
@@ -1684,7 +1713,10 @@ safe-buffer/index.js:
     <div id="drive-power-detail">
     <div class="card" id="battCard">
       <div class="batt-hero-area">
-        <div class="batt-hero-label">Battery</div>
+        <div class="batt-hero-label-row">
+          <div class="batt-hero-label">Battery</div>
+          <button id="chargingTestBtn" onclick="toggleChargingTest()" title="Test charging animation">⚡</button>
+        </div>
         <div class="batt-hero-soc" id="battPct"><span class="skel">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
         <div class="batt-hero-voltage" id="battSub"><span class="skel">&nbsp;&nbsp;&nbsp;</span></div>
         <!-- charging lightning bolt — visible only when animating -->
@@ -2753,6 +2785,7 @@ function adjustInputAmps(delta) {
 let drivingMode     = false;
 let highIdleMode    = false;
 let lightningTimer  = null;
+let testCharging    = false;
 let drivingTimer    = null;
 let currentSpeedMph = null;
 let currentSolarW   = 0;
@@ -3004,8 +3037,15 @@ function refreshModeChip() {
 }
 
 // ── Charging lightning bolt ────────────────────────
+function toggleChargingTest() {
+  testCharging = !testCharging;
+  document.getElementById('chargingTestBtn').classList.toggle('active', testCharging);
+  if (testCharging) strikeLightning();   // immediate preview on enable
+  scheduleLightning();
+}
+
 function scheduleLightning() {
-  if (!(drivingMode || highIdleMode)) {
+  if (!(drivingMode || highIdleMode || testCharging)) {
     clearTimeout(lightningTimer);
     lightningTimer = null;
     return;
