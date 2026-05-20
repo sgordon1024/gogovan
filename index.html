@@ -2881,6 +2881,14 @@ function renderScenes() {
         tile.appendChild(dot);
       }
 
+      // Long-press → enter edit mode (like iOS)
+      let longPressTimer;
+      tile.addEventListener('touchstart', () => {
+        longPressTimer = setTimeout(() => toggleSceneEdit(), 500);
+      }, { passive: true });
+      tile.addEventListener('touchend',   () => clearTimeout(longPressTimer));
+      tile.addEventListener('touchmove',  () => clearTimeout(longPressTimer));
+
       tile.addEventListener('click', () => {
         if (isActive && sceneIsDirty) saveToScene(scene.id);
         else applyScene(scene.id);
