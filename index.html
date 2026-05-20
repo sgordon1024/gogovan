@@ -683,7 +683,6 @@
       justify-content: center;
       color: var(--txt2);
       flex-shrink: 0;
-      margin-left: auto;
       touch-action: none;
       cursor: grab;
       padding: 4px;
@@ -692,15 +691,13 @@
 
     /* ── Jiggle animation ────────────────────────── */
     @keyframes scene-jiggle {
-      0%   { transform: rotate(0deg)    translateY(0); }
-      20%  { transform: rotate(1.5deg)  translateY(-1px); }
-      40%  { transform: rotate(-1.5deg) translateY(1px); }
-      60%  { transform: rotate(1.2deg)  translateY(-0.5px); }
-      80%  { transform: rotate(-1.2deg) translateY(0.5px); }
-      100% { transform: rotate(0deg)    translateY(0); }
+      0%   { transform: rotate(0deg); }
+      30%  { transform: rotate(0.35deg); }
+      70%  { transform: rotate(-0.35deg); }
+      100% { transform: rotate(0deg); }
     }
     .scene-tile.jiggle {
-      animation: scene-jiggle 0.45s ease-in-out infinite;
+      animation: scene-jiggle 0.55s ease-in-out infinite;
       transform-origin: center center;
     }
     .scene-tile.drag-source {
@@ -2828,26 +2825,27 @@ function renderScenes() {
       // Stagger jiggle so tiles don't all move in lockstep
       tile.style.animationDelay = `${(i * 47) % 200}ms`;
 
-      // Trash button
+      // Name (flex:1 pushes buttons to the right)
+      const nameEl = document.createElement('span');
+      nameEl.className = 'scene-tile-name';
+      nameEl.style.flex = '1';
+      nameEl.textContent = scene.name;
+      tile.appendChild(nameEl);
+
+      // Trash button (right side)
       const trashBtn = document.createElement('button');
       trashBtn.className = 'scene-tile-trash';
       trashBtn.innerHTML = lucideIcon('trash-2', 14, 2.5);
       trashBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         deleteScene(scene.id);
-        // deleteScene calls renderScenes internally
       });
       tile.appendChild(trashBtn);
 
-      // Name
-      const nameEl = document.createElement('span');
-      nameEl.className = 'scene-tile-name';
-      nameEl.textContent = scene.name;
-      tile.appendChild(nameEl);
-
-      // Grip handle
+      // Grip handle (right of trash)
       const gripEl = document.createElement('span');
       gripEl.className = 'scene-tile-grip';
+      gripEl.style.marginLeft = '0';
       gripEl.innerHTML = lucideIcon('grip-vertical', 18, 2);
       setupDragHandle(gripEl, scene.id);
       tile.appendChild(gripEl);

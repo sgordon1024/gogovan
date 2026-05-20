@@ -381,3 +381,96 @@ The Dynamic Island on iPhone 14 Pro and later sits ~59px from the top, so a fixe
 
 **Why Avahi is restricted to `uap0`:**  
 Without this restriction, Avahi advertises `vanpi.local` on all interfaces. When the Pi is connected to Starlink via wlan0, clients on GoGoVan (uap0) receive mDNS responses with the wlan0 IP (e.g. 192.168.1.43), which is on a different subnet and unreachable. Restricting to uap0 ensures the advertised IP is always 192.168.4.1.
+
+---
+
+## Smart Plug — Starlink Automation (IN PROGRESS)
+
+### Goal
+Automatically power Starlink on/off from the Pi based on T-Mobile signal quality. A Tuya smart plug controls Starlink's power outlet. The Pi monitors T-Mobile signal strength via MQTT and switches to Starlink when T-Mobile is poor.
+
+### The Device
+- **Model:** Tuya X5P smart plug
+- **FCC ID:** 2AKBP-X5
+- **MAC address:** `fc:67:1f:dd:67:b2`
+- **Supports:** Wi-Fi (2.4GHz only) and Bluetooth pairing
+- **Pairing modes:** Fast blink = EZ/Bluetooth pairing mode. Slow blink = AP mode (hold button ~5 sec). Solid = connected/pairing in progress.
+- **Smart Life app name:** "Starlink Router" (already named in the app but may not be fully registered)
+- **Virtual ID from Smart Life app:** `ebdff4bbc06d8f4e19cz2b`
+- **IP (as seen by Smart Life):** `174.218.232.*` (public IP, not local — device communicates via Tuya cloud)
+
+### Approach 1: tuya-convert (OTA flash to Tasmota) — ABANDONED
+
+Attempted to use tuya-convert to flash Tasmota firmware over the air, which would let us control the plug locally without Tuya cloud. **Abandoned** for two reasons:
+
+1. **Port conflicts:** tuya-convert requires ports 80, 443, 53, and 1883 — all occupied by the dashboard stack (gogovan-web, nginx, dnsmasq, mosquitto). Even after killing those services, the sequence of prompts was unreliable.
+
+2. **Pi goes offline:** tuya-convert hijacks `wlan0` entirely (creates a hostapd AP on it called `vtrust-flash`). Since `wlan0` carries the Pi's upstream internet — and Tailscale rides on that — the Pi loses Tailscale connectivity the moment tuya-convert runs. There is no way to SSH back in remotely while it's running. Recovering required physically accessing the Pi (removing seats and unscrewing the power cable to power-cycle it).
+
+**tuya-convert has been permanently deleted from the Pi:** `rm -rf ~/tuya-convert`. Do not attempt this approach again.
+
+### Approach 2: tinytuya (local control via Tuya cloud API) — CURRENT PLAN
+
+`tinytuya` is a Python library that communicates with Tuya devices on the local network using an encrypted protocol. It requires a one-time cloud credential fetch (device local key) via the Tuya IoT Platform, after which it works fully locally.
+
+**Tuya IoT Platform credentials (already set up):**
+- Project name: GoGoVan
+- Client ID and Secret: stored in Tuya IoT Platform at platform.tuya.com (log in with sgordon1024@gmail.com)
+- Smart Life account linked: `sgo****1024@gmail.com`, region Canada/United States
+
+**tinytuya is installed on the Pi:**
+```bash
+pip3 install tinytuya
+```
+
+**To get the device local key (run after plug is successfully added to Smart Life):**
+```bash
+cd ~
+python3 -m tinytuya wizard
+# Enter Client ID and Secret from platform.tuya.com
+# It will scan the network and return device IDs and local keys
+```
+
+**To test local control once key is obtained:**
+```python
+import tinytuya
+d = tinytuya.OutletDevice(
+    dev_id='<device_id>',
+    address='<local_ip>',
+    local_key='<local_key>',
+    version=3.3
+)
+d.set_status(True)   # power on
+d.set_status(False)  # power off
+```
+
+### Why the plug isn't added to Smart Life yet
+
+The Smart Life app repeatedly returned "Failed to add the device" throughout May 18–19, 2026. The Tuya cloud infrastructure was experiencing an outage during this period. This is a Tuya server-side problem, not a local Wi-Fi or device issue — confirmed by:
+- The plug correctly enters pairing mode (fast blink)
+- The plug connects to the GoGoVan Wi-Fi during pairing (goes solid briefly)
+- GoGoVan is 2.4GHz (hw_mode=g, channel 6) — meets device requirement
+- The plug resets/blinks again at the end of the add attempt, indicating the cloud registration step failed
+- tinytuya network scan found 0 devices (no local key = cloud never provisioned it)
+- Both Smart Life and Tuya Smart apps failed identically
+
+**Next step:** Try adding the plug to Smart Life again on a different day when Tuya cloud has recovered. The app auto-defaults to Bluetooth pairing — that's fine. Once the device shows up in Smart Life and the `tinytuya wizard` returns a local key, the automation can be built.
+
+### Planned Automation Script (not yet built)
+
+Once tinytuya is working, a Python script on the Pi will:
+1. Subscribe to `van/status/network/upstream` (or T-Mobile signal MQTT topic)
+2. If T-Mobile signal drops below threshold for N seconds → `d.set_status(True)` (Starlink on)
+3. If T-Mobile recovers → `d.set_status(False)` (Starlink off)
+4. Run as a systemd service: something like `starlink-auto.service`
+
+The `starlink-bridge.py` and `starlink-bridge.service` files already exist in the project root and may serve as a starting point.
+
+### Network Watchdog (to prevent Pi going unreachable)
+
+The tuya-convert incident revealed the Pi can go offline if anything takes over `wlan0`. A watchdog script should be added to:
+1. Monitor that Tailscale is up (`tailscale status`)
+2. If Tailscale has been down for >2 minutes, restart it (`sudo systemctl restart tailscaled`)
+3. Run as a systemd timer every 60 seconds
+
+This has **not been implemented yet**.
