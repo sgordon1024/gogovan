@@ -59,10 +59,12 @@ The Pi acts as a Wi-Fi hotspot and travel router:
 | `wlan0` | DHCP (upstream) | WAN: T-Mobile / Starlink / campground Wi-Fi |
 
 - **hostapd** creates the `GoGoVan` SSID on `uap0`
-- **dnsmasq** provides DHCP (192.168.4.100–200) to clients on `uap0`
+- **dnsmasq** provides DHCP (192.168.4.2–50) to clients on `uap0`; Cerbo GX has a static lease: `dhcp-host=26:d7:db:55:a4:3f,192.168.4.25`
 - **iptables NAT** (MASQUERADE on wlan0) routes client traffic through wlan0
 - **IP forwarding** enabled persistently: `/etc/sysctl.d/99-ipforward.conf` → `net.ipv4.ip_forward=1`
 - **Avahi mDNS** restricted to `allow-interfaces=uap0` in `/etc/avahi/avahi-daemon.conf` — prevents `vanpi.local` from resolving to the wlan0 IP (192.168.1.x) instead of 192.168.4.1
+
+**Cerbo GX MQTT access — important:** The Cerbo GX does **not** expose port 1883 on its GoGoVan client interface (`192.168.4.25`). It only exposes MQTT on the T-Mobile subnet where both the Pi and Cerbo connect as clients of the T-Mobile MiFi. On T-Mobile: Pi is `192.168.12.122` (wlan0), Cerbo is `192.168.12.140`. The mosquitto bridge must use `192.168.12.140:1883`. If upstream switches to Starlink or campground Wi-Fi, the Cerbo may get a different IP and the bridge will drop — check `mosquitto_sub -h localhost -t 'N/c0619ab5dcfb/#' -C 1 -W 5` to confirm data is flowing.
 
 **GoGoVan Wi-Fi password:** `1234567890`
 

@@ -3,7 +3,16 @@
 # Dashboard URLs: http://vanpi.local  (on GoGoVan) | http://100.98.52.107 (via Tailscale)
 
 PASS="windows"
-DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Prefer CWD when it has an index.html (e.g. running from a worktree).
+# Fall back to the script's own directory.
+if [ -f "$(pwd)/index.html" ]; then
+  DIR="$(pwd)"
+else
+  DIR="$SCRIPT_DIR"
+fi
+echo "→ Source directory: $DIR"
 
 # Auto-detect Pi — try Tailscale first, fall back to local network
 echo "=== Detecting Pi connection ==="

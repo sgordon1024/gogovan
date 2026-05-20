@@ -1403,7 +1403,12 @@
 
     /* Internet tab just needs safe-area padding at top */
     body.driving #tab-internet {
-      padding-top: max(env(safe-area-inset-top), 16px);
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      bottom: calc(88px + env(safe-area-inset-bottom));
+      padding-top: env(safe-area-inset-top);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
     /* Drive-mode two-tab nav */
@@ -1465,20 +1470,14 @@
       overflow: hidden;
     }
 
-    /* Speed panel = top 1/3 of available space */
-    body.driving #drive-speed-panel {
-      flex: 1 0 0;
-      min-height: 0;
-    }
-
-    /* Detail panel (battery card + drive mode toggle) = bottom 2/3 */
+    /* Detail panel fills all available space in drive mode (speed panel removed) */
     #drive-power-detail {
       display: contents; /* neutral outside drive mode */
     }
     body.driving #drive-power-detail {
       display: flex;
       flex-direction: column;
-      flex: 2 0 0;
+      flex: 1 0 0;
       min-height: 0;
       overflow: hidden;
     }
@@ -1579,18 +1578,32 @@
       padding: 10px 16px;
     }
 
-    /* ── Speed panel ─────────────────────────────── */
-    #drive-speed-panel {
-      display: none;
-      flex-direction: column;
-      align-items: stretch;
-      justify-content: flex-start;
-      flex: 1;
-      min-height: 200px;
-      padding: 0;
+    /* Full-width buttons and zero side margins in drive mode */
+    body.driving #tab-internet .speed-test-btn,
+    body.driving #tab-internet .view-history-btn {
+      width: 100%;
+      margin-left: 0;
+      margin-right: 0;
+      border-radius: 0;
     }
 
-    body.driving #drive-speed-panel { display: flex; }
+    body.driving #tab-internet .card {
+      margin-bottom: 0;
+    }
+
+    /* ── Explore panel ───────────────────────────── */
+    #drive-explore-panel {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      bottom: calc(88px + env(safe-area-inset-bottom));
+      padding-top: env(safe-area-inset-top);
+      flex-direction: column;
+      background: var(--surface);
+      z-index: 20;
+      overflow: hidden;
+    }
+    #drive-explore-panel.active { display: flex; }
 
     /* Top row: rest stop left, speedometer right */
     #drive-top-row {
@@ -1671,6 +1684,98 @@
       font-size: clamp(11px, 2.8vw, 14px);
       color: var(--txt2);
     }
+    /* ── Explore bottom row ──────────────────────── */
+    #explore-bottom-row {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    #explore-state-box {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 10px;
+      border-right: 1px solid var(--border);
+      gap: 4px;
+    }
+    #explore-state-abbr {
+      font-size: clamp(36px, 10vw, 56px);
+      font-weight: 800;
+      color: var(--amber);
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+    #explore-state-name {
+      font-size: clamp(11px, 2.5vw, 14px);
+      color: var(--txt2);
+      text-align: center;
+    }
+    #explore-weather-box {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 10px;
+      gap: 6px;
+    }
+    #explore-weather-icon { display: flex; align-items: center; }
+    #explore-weather-icon svg { width: clamp(28px, 7vw, 40px); height: clamp(28px, 7vw, 40px); }
+    #explore-weather-temp {
+      font-size: clamp(28px, 7.5vw, 44px);
+      font-weight: 700;
+      color: var(--txt);
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+    #explore-weather-cond {
+      font-size: clamp(11px, 2.8vw, 14px);
+      color: var(--txt2);
+      text-align: center;
+    }
+    /* ── Local facts box ─────────────────────────── */
+    #explore-facts-box {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 16px;
+      gap: 8px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      border-top: 1px solid var(--border);
+      min-height: 0;
+    }
+    #explore-facts-box:active { opacity: 0.75; }
+    #explore-facts-place {
+      font-size: clamp(10px, 2.5vw, 13px);
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--amber);
+    }
+    #explore-facts-text {
+      font-size: clamp(13px, 3.2vw, 17px);
+      color: var(--txt);
+      text-align: center;
+      line-height: 1.45;
+      flex: 1;
+      display: flex;
+      align-items: center;
+    }
+    #explore-facts-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      gap: 8px;
+    }
+    #explore-facts-hint { font-size: 11px; color: var(--txt2); }
+    #explore-facts-progress { font-size: 11px; color: var(--txt2); font-variant-numeric: tabular-nums; }
     #drive-rest-weather {
       display: flex;
       align-items: center;
@@ -2023,32 +2128,6 @@ safe-buffer/index.js:
   <div id="tab-power" class="tab-panel">
 
     <!-- Drive mode top row: rest stop (left) + speed (right) -->
-    <div id="drive-speed-panel">
-      <div id="drive-top-row">
-        <div id="drive-rest-box">
-          <div id="drive-rest-spinner" hidden></div>
-          <div id="drive-rest-state" style="display:none"></div>
-          <div id="drive-rest-icon"></div>
-          <div id="drive-rest-name">Finding rest stops…</div>
-          <div id="drive-rest-meta" style="display:none">
-            <span id="drive-rest-dist"></span>
-            <span id="drive-rest-time"></span>
-            <span id="drive-rest-exit"></span>
-          </div>
-          <div id="drive-rest-weather" style="display:none">
-            <span id="drive-rest-weather-icon"></span>
-            <span id="drive-rest-weather-temp"></span>
-            <span id="drive-rest-weather-cond"></span>
-          </div>
-        </div>
-        <div id="drive-speed-box">
-          <div id="drive-speed-number">—</div>
-          <div id="drive-speed-unit">mph</div>
-        </div>
-      </div>
-      <div id="drive-gps-status" style="font-size:13px;color:var(--txt2);margin-top:4px;letter-spacing:0.3px;text-align:center;padding:0 12px;"></div>
-    </div>
-
     <div id="drive-power-detail">
     <div class="card" id="battCard">
       <div class="batt-hero-area">
@@ -2450,15 +2529,62 @@ safe-buffer/index.js:
 
   <!-- Drive-mode nav — shown only while driving -->
   <nav id="drive-nav">
-    <button class="drive-nav-btn active" id="driveNavSpeed" onclick="switchDriveTab('speed')">
-      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
-      Speed
+    <button class="drive-nav-btn active" id="driveNavPower" onclick="switchDriveTab('power')">
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      Power
+    </button>
+    <button class="drive-nav-btn" id="driveNavExplore" onclick="switchDriveTab('explore')">
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+      Explore
     </button>
     <button class="drive-nav-btn" id="driveNavInternet" onclick="switchDriveTab('internet')">
       <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg>
       Internet
     </button>
   </nav>
+
+  <!-- Drive Explore panel — fixed overlay shown when Explore tab is active -->
+  <div id="drive-explore-panel">
+    <!-- Top row: rest stop + speedometer (same layout as before) -->
+    <div id="drive-top-row">
+      <div id="drive-rest-box">
+        <div id="drive-rest-spinner" hidden></div>
+        <div id="drive-rest-icon"></div>
+        <div id="drive-rest-name">Finding rest stops…</div>
+        <div id="drive-rest-meta" style="display:none">
+          <span id="drive-rest-dist"></span>
+          <span id="drive-rest-time"></span>
+          <span id="drive-rest-exit"></span>
+        </div>
+      </div>
+      <div id="drive-speed-box">
+        <div id="drive-speed-number">—</div>
+        <div id="drive-speed-unit">mph</div>
+      </div>
+    </div>
+    <!-- Bottom row: state + weather for current GPS location -->
+    <div id="explore-bottom-row">
+      <div id="explore-state-box">
+        <div id="explore-state-abbr">—</div>
+        <div id="explore-state-name"></div>
+      </div>
+      <div id="explore-weather-box">
+        <div id="explore-weather-icon"></div>
+        <div id="explore-weather-temp">—</div>
+        <div id="explore-weather-cond"></div>
+      </div>
+    </div>
+    <!-- Local facts strip -->
+    <div id="explore-facts-box" onclick="cycleLocalFact()">
+      <div id="explore-facts-place"></div>
+      <div id="explore-facts-text">Loading local facts…</div>
+      <div id="explore-facts-footer">
+        <span id="explore-facts-hint">tap to cycle</span>
+        <span id="explore-facts-progress"></span>
+      </div>
+    </div>
+    <div id="drive-gps-status" style="font-size:13px;color:var(--txt2);padding:4px 12px;text-align:center;flex-shrink:0;"></div>
+  </div>
 
 <script>
 // ── Tab navigation ────────────────────────────────
@@ -3470,6 +3596,7 @@ let highIdleMode    = false;
 let lightningLoopId = null;   // setInterval handle
 let nextStrikeAt    = 0;      // timestamp of next planned strike
 let drivingTimer    = null;
+let stopTimer       = null;
 let currentSpeedMph = null;
 let currentSolarW   = 0;
 let preDriveTab     = 'power';
@@ -3480,6 +3607,7 @@ let arrivedToastTimer = null;
 const DRIVE_SPEED_MPH  = 5;    // mph to consider driving
 const DRIVE_CONFIRM_MS = 4000; // must hold above threshold before activating
 const STOP_SPEED_MPH   = 2;    // below this = stopped
+const STOP_EXIT_MS     = 60000; // must stay stopped this long before auto-exiting drive mode
 const HIGH_IDLE_EXCESS = 150;  // excess charge watts over solar → alternator likely
 
 function watchGPS() {
@@ -3517,11 +3645,17 @@ function onGPSUpdate(pos) {
   updateDriveModeToggle();
 
   if (currentSpeedMph >= DRIVE_SPEED_MPH) {
+    // Moving — cancel any pending stop exit, start drive confirm if needed
+    if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
     if (!drivingMode && !drivingTimer)
       drivingTimer = setTimeout(enterDrivingMode, DRIVE_CONFIRM_MS);
   } else {
+    // Below driving threshold — cancel drive-entry timer
     if (drivingTimer) { clearTimeout(drivingTimer); drivingTimer = null; }
-    if (drivingMode && !manualDriveMode && currentSpeedMph < STOP_SPEED_MPH) exitDrivingMode();
+    // Only auto-exit after staying stopped for STOP_EXIT_MS (e.g. red light grace period)
+    if (drivingMode && !manualDriveMode && currentSpeedMph < STOP_SPEED_MPH && !stopTimer) {
+      stopTimer = setTimeout(() => { stopTimer = null; exitDrivingMode(); }, STOP_EXIT_MS);
+    }
   }
   refreshModeChip();
 }
@@ -3576,20 +3710,24 @@ function enterDrivingMode(manual = false) {
   preDriveTab = activeTab;
   switchTab('power');
   document.body.classList.add('driving');
-  switchDriveTab('speed');
+  switchDriveTab('power');
 
   renderLights();
   refreshModeChip();
   updateDriveModeToggle();
   updateAltColumn();
   startRestStopUpdates();
+  startExploreUpdates();
 }
 
 function exitDrivingMode() {
   drivingMode     = false;
   manualDriveMode = false;
+  if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
   document.body.classList.remove('driving');
+  document.getElementById('drive-explore-panel')?.classList.remove('active');
   stopRestStopUpdates();
+  stopExploreUpdates();
   switchTab(preDriveTab);
   refreshModeChip();
   updateDriveModeToggle();
@@ -3652,9 +3790,18 @@ function restorePreDriveLights() {
 }
 
 function switchDriveTab(name) {
-  switchTab(name === 'speed' ? 'power' : 'internet');
-  document.getElementById('driveNavSpeed').classList.toggle('active', name === 'speed');
+  const explorePanel = document.getElementById('drive-explore-panel');
+  if (name === 'explore') {
+    switchTab('power'); // keep power tab active beneath (battery card hidden by explore overlay)
+    explorePanel.classList.add('active');
+  } else {
+    explorePanel.classList.remove('active');
+    switchTab(name === 'power' ? 'power' : 'internet');
+  }
+  document.getElementById('driveNavPower').classList.toggle('active', name === 'power');
+  document.getElementById('driveNavExplore').classList.toggle('active', name === 'explore');
   document.getElementById('driveNavInternet').classList.toggle('active', name === 'internet');
+  if (name === 'explore') refreshExploreData();
 }
 
 function toggleDriveMode() {
@@ -4032,8 +4179,6 @@ function stopRestStopUpdates() {
   hideRestSpinner();
   restStopHasData = false;
   setRestStopUI('loading', 'Finding rest stops…', null, null, null);
-  clearRestStopWeather();
-  clearRestStopState();
 }
 
 function setRestStopUI(icon, name, distMi, timeMin, exitStr) {
@@ -4072,8 +4217,6 @@ async function updateRestStop() {
   // First load: show placeholder. Subsequent refreshes: just show spinner, keep existing content.
   if (!restStopHasData) {
     setRestStopUI('loading', 'Searching ahead…', null, null, null);
-    clearRestStopWeather();
-    clearRestStopState();
   }
   showRestSpinner();
   try {
@@ -4112,8 +4255,6 @@ out center;`;
 
     if (!candidates.length) {
       setRestStopUI('rest', 'No rest stops found ahead', null, null, null);
-      clearRestStopWeather();
-      clearRestStopState();
       restStopHasData = true;
       hideRestSpinner();
       return;
@@ -4126,16 +4267,11 @@ out center;`;
     const exitStr  = best.ref ? 'Exit ' + best.ref : '';
     const displayName = best.name || 'Rest Area';
     setRestStopUI('rest', displayName, distMi, timeMin, exitStr);
-    fetchRestStopWeather(best.lat, best.lng);
-    fetchRestStopState(best.lat, best.lng);
     restStopHasData = true;
     hideRestSpinner();
   } catch(e) {
-    // On error, only replace content if we have nothing to show yet
     if (!restStopHasData) {
       setRestStopUI('rest', 'Rest stops unavailable', null, null, null);
-      clearRestStopWeather();
-      clearRestStopState();
     }
     hideRestSpinner();
   }
@@ -4190,6 +4326,152 @@ async function fetchRestStopState(lat, lng) {
     el.textContent = display;
     el.style.display = '';
   } catch(e) { /* silently skip */ }
+}
+
+// ── Explore tab: current location state + weather + facts ─────────
+let exploreUpdateInterval = null;
+let lastExploreLat = null;
+let lastExploreLng = null;
+let localFacts     = [];
+let localFactIdx   = 0;
+let explorePlace   = '';
+
+function startExploreUpdates() {
+  stopExploreUpdates();
+  if (lastGPSLat && lastGPSLng) refreshExploreData();
+  exploreUpdateInterval = setInterval(() => {
+    if (lastGPSLat && lastGPSLng) {
+      const moved = lastExploreLat == null || haversineM(lastExploreLat, lastExploreLng, lastGPSLat, lastGPSLng) > 5000;
+      if (moved) refreshExploreData();
+    }
+  }, 30000);
+}
+
+function stopExploreUpdates() {
+  if (exploreUpdateInterval) { clearInterval(exploreUpdateInterval); exploreUpdateInterval = null; }
+}
+
+function refreshExploreData() {
+  if (!lastGPSLat || !lastGPSLng) return;
+  lastExploreLat = lastGPSLat;
+  lastExploreLng = lastGPSLng;
+  fetchExploreState(lastGPSLat, lastGPSLng);
+  fetchExploreWeather(lastGPSLat, lastGPSLng);
+  fetchLocalFacts(lastGPSLat, lastGPSLng);
+}
+
+async function fetchExploreState(lat, lng) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=5&addressdetails=1`;
+    const resp = await fetch(url, {
+      headers: { 'Accept-Language': 'en', 'User-Agent': 'GoGoVan/1.0' },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const iso  = data.address?.['ISO3166-2-lvl4'] || '';
+    const abbr = iso.includes('-') ? iso.split('-')[1] : '';
+    const full = data.address?.state || '';
+    const abbrEl = document.getElementById('explore-state-abbr');
+    const nameEl = document.getElementById('explore-state-name');
+    if (abbrEl) abbrEl.textContent = abbr || full.slice(0,2).toUpperCase() || '—';
+    if (nameEl) nameEl.textContent = full;
+  } catch(e) {}
+}
+
+async function fetchExploreWeather(lat, lng) {
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code&temperature_unit=fahrenheit&forecast_days=1&timezone=auto`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const temp = Math.round(data.current?.temperature_2m);
+    const code = data.current?.weather_code;
+    if (temp == null || code == null) return;
+    const { label, icon } = wmoCondition(code);
+    const iconEl  = document.getElementById('explore-weather-icon');
+    const tempEl  = document.getElementById('explore-weather-temp');
+    const condEl  = document.getElementById('explore-weather-cond');
+    if (iconEl) iconEl.innerHTML = lucideIcon(icon, 36, 1.5);
+    if (tempEl) tempEl.textContent = temp + '°F';
+    if (condEl) condEl.textContent = label;
+  } catch(e) {}
+}
+
+async function fetchLocalFacts(lat, lng) {
+  const placeEl   = document.getElementById('explore-facts-place');
+  const textEl    = document.getElementById('explore-facts-text');
+  const progEl    = document.getElementById('explore-facts-progress');
+  if (textEl) textEl.textContent = 'Loading local facts…';
+  if (placeEl) placeEl.textContent = '';
+  if (progEl) progEl.textContent = '';
+  try {
+    // Step 1: reverse geocode to get place name
+    const geoUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=10&addressdetails=1`;
+    const geoResp = await fetch(geoUrl, {
+      headers: { 'Accept-Language': 'en', 'User-Agent': 'GoGoVan/1.0' },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!geoResp.ok) throw new Error('geo fail');
+    const geo = await geoResp.json();
+    const city   = geo.address?.city || geo.address?.town || geo.address?.village || geo.address?.hamlet || '';
+    const county = geo.address?.county || '';
+    const state  = geo.address?.state || '';
+
+    // Try city first, then county, then state
+    const candidates = [city, county, state].filter(Boolean);
+    let extract = '';
+    let usedPlace = '';
+    for (const place of candidates) {
+      const wikiUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(place)}`;
+      try {
+        const wResp = await fetch(wikiUrl, { signal: AbortSignal.timeout(8000) });
+        if (!wResp.ok) continue;
+        const wData = await wResp.json();
+        if (wData.extract && wData.extract.length > 100) {
+          extract   = wData.extract;
+          usedPlace = wData.title || place;
+          break;
+        }
+      } catch(e) { continue; }
+    }
+
+    if (!extract) {
+      if (textEl) textEl.textContent = 'No local facts found for this area.';
+      return;
+    }
+
+    // Split into sentences, filter short ones, take up to 10
+    const sentences = extract
+      .replace(/\n/g, ' ')
+      .split(/(?<=[.!?])\s+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 60);
+    localFacts   = sentences.slice(0, 10);
+    localFactIdx = 0;
+    explorePlace = usedPlace;
+    showLocalFact();
+  } catch(e) {
+    if (textEl) textEl.textContent = 'Local facts unavailable.';
+  }
+}
+
+function showLocalFact() {
+  const placeEl = document.getElementById('explore-facts-place');
+  const textEl  = document.getElementById('explore-facts-text');
+  const progEl  = document.getElementById('explore-facts-progress');
+  const hintEl  = document.getElementById('explore-facts-hint');
+  if (!textEl || !localFacts.length) return;
+  if (placeEl) placeEl.textContent = explorePlace;
+  textEl.textContent = localFacts[localFactIdx];
+  if (progEl) progEl.textContent = `${localFactIdx + 1} / ${localFacts.length}`;
+  if (hintEl) hintEl.textContent = 'tap to cycle';
+}
+
+function cycleLocalFact() {
+  if (!localFacts.length) return;
+  localFactIdx = (localFactIdx + 1) % localFacts.length;
+  showLocalFact();
 }
 
 function wmoCondition(code) {
