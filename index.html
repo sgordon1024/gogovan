@@ -1784,7 +1784,7 @@ safe-buffer/index.js:
           <div class="batt-hero-label">Battery</div>
           <button id="chargingTestBtn" onclick="toggleChargingTest()" title="Test charging animation">⚡</button>
         </div>
-        <div class="batt-hero-soc" id="battPct"><span class="skel">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+        <div class="batt-hero-soc" id="battPct" onclick="startPuzzles()" style="cursor:pointer"><span class="skel">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
         <div class="batt-hero-voltage" id="battSub"><span class="skel">&nbsp;&nbsp;&nbsp;</span></div>
         <!-- charging lightning bolt — visible only when animating -->
         <svg id="batt-bolt" aria-hidden="true" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -1853,10 +1853,10 @@ safe-buffer/index.js:
         <div class="clim-group">
           <span class="clim-group-label">Mode</span>
           <div class="clim-seg">
-            <button class="clim-seg-btn active" id="invMode3" onclick="setInverterMode(3)">On</button>
-            <button class="clim-seg-btn"        id="invMode1" onclick="setInverterMode(1)">Charger</button>
-            <button class="clim-seg-btn"        id="invMode2" onclick="setInverterMode(2)">Inverter</button>
-            <button class="clim-seg-btn"        id="invMode4" onclick="setInverterMode(4)">Off</button>
+            <button class="clim-seg-btn" id="invMode3" onclick="setInverterMode(3)">On</button>
+            <button class="clim-seg-btn" id="invMode1" onclick="setInverterMode(1)">Charger</button>
+            <button class="clim-seg-btn" id="invMode2" onclick="setInverterMode(2)">Inverter</button>
+            <button class="clim-seg-btn" id="invMode4" onclick="setInverterMode(4)">Off</button>
           </div>
         </div>
         <div class="inv-limit">
@@ -2828,7 +2828,7 @@ function setRopeSpeed(val) {
 }
 
 // ── Inverter ──────────────────────────────────────
-let inverterMode = 3;
+let inverterMode = null;  // null = unknown until MQTT confirms
 let inputAmps    = null;
 const INPUT_AMPS_MIN = 2;
 const INPUT_AMPS_MAX = 50;
@@ -2843,7 +2843,8 @@ function setInverterMode(mode) {
 function updateInverterUI() {
   [1, 2, 3, 4].forEach(m => {
     const el = document.getElementById(`invMode${m}`);
-    if (el) el.classList.toggle('active', inverterMode === m);
+    // null means data not yet received — show no button active
+    if (el) el.classList.toggle('active', inverterMode !== null && inverterMode === m);
   });
 }
 
@@ -3735,6 +3736,15 @@ function updateSolar(val) {
   checkHighIdle();
 }
 
+function requestInverterData() {
+  if (!mqttClient?.connected) return;
+  mqttClient.publish(`R/${PORTAL_ID}/keepalive`, '');
+  mqttClient.publish(`R/${PORTAL_ID}/system/0/Serial`, '');
+  mqttClient.publish(`R/${PORTAL_ID}/vebus/276/Mode`, '');
+  mqttClient.publish(`R/${PORTAL_ID}/vebus/276/Ac/In/1/CurrentLimit`, '');
+  mqttClient.publish(`R/${PORTAL_ID}/vebus/276/Ac/In/1/L1/V`, '');
+}
+
 function connectMQTT() {
   const isHttps = window.location.protocol === 'https:';
   const mqttUrl = isHttps
@@ -3750,15 +3760,15 @@ function connectMQTT() {
   client.on('connect', () => {
     dismissSplash();
     setLiveStatus(true);
-    client.subscribe(`N/${PORTAL_ID}/#`);
-    client.subscribe('van/status/light/+');
-    client.subscribe('van/status/ac/+');
-    client.subscribe('van/status/network/+');
-    client.subscribe('van/status/starlink/+');
-    client.publish(`R/${PORTAL_ID}/keepalive`, '');
-    client.publish(`R/${PORTAL_ID}/system/0/Serial`, '');
-    client.publish(`R/${PORTAL_ID}/vebus/276/Mode`, '');
-    client.publish(`R/${PORTAL_ID}/vebus/276/Ac/In/1/CurrentLimit`, '');
+    // Subscribe first, then request data only after all subs are confirmed
+    // so we don't miss the responses (race condition on fast connections)
+    let subsDone = 0;
+    const onSubbed = () => { if (++subsDone === 5) requestInverterData(); };
+    client.subscribe(`N/${PORTAL_ID}/#`,          onSubbed);
+    client.subscribe('van/status/light/+',        onSubbed);
+    client.subscribe('van/status/ac/+',           onSubbed);
+    client.subscribe('van/status/network/+',      onSubbed);
+    client.subscribe('van/status/starlink/+',     onSubbed);
   });
 
   client.on('message', (topic, msg) => {
@@ -3893,7 +3903,8 @@ function connectMQTT() {
   client.on('offline',   () => setLiveStatus(false));
   client.on('reconnect', () => setConnecting());
 
-  setInterval(() => { if (client.connected) client.publish(`R/${PORTAL_ID}/keepalive`, ''); }, 30000);
+  // Every 30s: keepalive + re-request inverter values so the display stays in sync
+  setInterval(() => { requestInverterData(); }, 30000);
 }
 
 connectMQTT();
@@ -3931,10 +3942,7 @@ function refreshData() {
     connectMQTT();
     return;
   }
-  mqttClient.publish(`R/${PORTAL_ID}/keepalive`, '');
-  mqttClient.publish(`R/${PORTAL_ID}/system/0/Serial`, '');
-  mqttClient.publish(`R/${PORTAL_ID}/vebus/276/Mode`, '');
-  mqttClient.publish(`R/${PORTAL_ID}/vebus/276/Ac/In/1/CurrentLimit`, '');
+  requestInverterData();
 }
 
 (function setupPTR() {
