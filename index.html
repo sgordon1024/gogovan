@@ -1048,6 +1048,8 @@
       padding: 16px 20px calc(20px + env(safe-area-inset-bottom));
       width: 100%;
       max-width: 430px;
+      max-height: 82vh;
+      overflow-y: auto;
       animation: slideUp 0.28s cubic-bezier(0.32, 0.72, 0, 1);
     }
 
@@ -1083,41 +1085,40 @@
 
     .theme-row {
       display: flex;
-      gap: 8px;
+      gap: 10px;
       margin-bottom: 20px;
-      flex-wrap: nowrap;
-      justify-content: center;
+      flex-wrap: wrap;
+      justify-content: flex-start;
     }
 
     .theme-swatch {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       cursor: pointer;
-      flex: 1;
-      min-width: 0;
+      width: 56px;
+      flex-shrink: 0;
       -webkit-tap-highlight-color: transparent;
     }
 
     .swatch-circle {
-      width: 48px;
-      height: 48px;
-      border-radius: 14px;
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
       position: relative;
-      border: 2px solid transparent;
+      border: 2.5px solid transparent;
       transition: border-color 0.2s, transform 0.15s;
       overflow: hidden;
       flex-shrink: 0;
     }
 
-    .swatch-circle::after {
-      content: '';
+    .swatch-dot {
       position: absolute;
-      bottom: 6px;
-      right: 6px;
-      width: 14px;
-      height: 14px;
+      bottom: 7px;
+      right: 7px;
+      width: 13px;
+      height: 13px;
       border-radius: 50%;
     }
 
@@ -1127,16 +1128,14 @@
       display: none;
       align-items: center;
       justify-content: center;
-      font-size: 18px;
-      background: rgba(0,0,0,0.25);
     }
 
-    .theme-swatch.active .swatch-circle { border-color: var(--amber); }
+    .theme-swatch.active .swatch-circle { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber); }
     .theme-swatch.active .swatch-check { display: flex; }
-    .theme-swatch:active .swatch-circle { transform: scale(0.93); }
+    .theme-swatch:active .swatch-circle { transform: scale(0.91); }
 
     .swatch-name {
-      font-size: 10px;
+      font-size: 9.5px;
       font-weight: 600;
       color: var(--txt2);
       text-align: center;
@@ -2039,6 +2038,10 @@ safe-buffer/index.js:
       <div class="theme-row" id="darkRow"></div>
       <div class="theme-group-label">Light</div>
       <div class="theme-row" id="lightRow"></div>
+      <div class="theme-group-label">Vivid</div>
+      <div class="theme-row" id="vividRow"></div>
+      <div class="theme-group-label">Special</div>
+      <div class="theme-row" id="specialRow"></div>
     </div>
   </div>
 
@@ -2099,53 +2102,119 @@ function switchTab(tab) {
 
 // ── Themes ────────────────────────────────────────
 const THEMES = [
-  { id:'night',   name:'Night',   dark:true,  bg:'#07070F', accent:'#FF8C00',
+  // ── Dark ────────────────────────────────────────
+  { id:'night',     name:'Night',    group:'dark',    dark:true,  bg:'#07070F', accent:'#FF8C00',
     vars:{'--bg':'#07070F','--surface':'#11111E','--surface2':'#18182A','--border':'rgba(255,255,255,0.14)','--txt':'#F0F0FF','--txt2':'#B8B8D8','--blue':'#00D4FF','--amber':'#FF8C00','--amber-dim':'rgba(255,140,0,0.18)','--green':'#00E676','--red':'#FF1744','--tog-off':'#444458'}},
-  { id:'forest',  name:'Forest',  dark:true,  bg:'#060E07', accent:'#00E676',
+  { id:'forest',    name:'Forest',   group:'dark',    dark:true,  bg:'#060E07', accent:'#00E676',
     vars:{'--bg':'#060E07','--surface':'#0E1A10','--surface2':'#162018','--border':'rgba(255,255,255,0.14)','--txt':'#E0FFE8','--txt2':'#98C8A0','--blue':'#00E5FF','--amber':'#00E676','--amber-dim':'rgba(0,230,118,0.15)','--green':'#69F0AE','--red':'#FF5252','--tog-off':'#364A38'}},
-  { id:'carbon',  name:'Carbon',  dark:true,  bg:'#0A0A0A', accent:'#18FFFF',
+  { id:'carbon',    name:'Carbon',   group:'dark',    dark:true,  bg:'#0A0A0A', accent:'#18FFFF',
     vars:{'--bg':'#0A0A0A','--surface':'#161616','--surface2':'#202020','--border':'rgba(255,255,255,0.13)','--txt':'#F5F5F5','--txt2':'#B8B8B8','--blue':'#18FFFF','--amber':'#18FFFF','--amber-dim':'rgba(24,255,255,0.12)','--green':'#B2FF59','--red':'#FF5252','--tog-off':'#404040'}},
-  { id:'dusk',    name:'Dusk',    dark:true,  bg:'#0A080F', accent:'#EA80FC',
+  { id:'dusk',      name:'Dusk',     group:'dark',    dark:true,  bg:'#0A080F', accent:'#EA80FC',
     vars:{'--bg':'#0A080F','--surface':'#14111E','--surface2':'#1E1928','--border':'rgba(255,255,255,0.14)','--txt':'#F0EEFF','--txt2':'#B8A8D8','--blue':'#82B1FF','--amber':'#EA80FC','--amber-dim':'rgba(234,128,252,0.15)','--green':'#69F0AE','--red':'#FF5252','--tog-off':'#484060'}},
-  { id:'ember',   name:'Ember',   dark:true,  bg:'#0F0A07', accent:'#FF3D00',
+  { id:'ember',     name:'Ember',    group:'dark',    dark:true,  bg:'#0F0A07', accent:'#FF3D00',
     vars:{'--bg':'#0F0A07','--surface':'#1A1208','--surface2':'#231A0E','--border':'rgba(255,255,255,0.14)','--txt':'#FFF3EE','--txt2':'#C8A898','--blue':'#FFAB40','--amber':'#FF3D00','--amber-dim':'rgba(255,61,0,0.15)','--green':'#B2FF59','--red':'#FF5252','--tog-off':'#4A3828'}},
-  { id:'cloud',   name:'Cloud',   dark:false, bg:'#F0F2FF', accent:'#0055FF',
+  { id:'void',      name:'Void',     group:'dark',    dark:true,  bg:'#000000', accent:'#FF4081',
+    vars:{'--bg':'#000000','--surface':'#0F0F0F','--surface2':'#1A1A1A','--border':'rgba(255,255,255,0.12)','--txt':'#FFFFFF','--txt2':'#AAAAAA','--blue':'#E040FB','--amber':'#FF4081','--amber-dim':'rgba(255,64,129,0.18)','--green':'#00E676','--red':'#FF1744','--tog-off':'#2A2A2A'}},
+  { id:'deepsea',   name:'Deep Sea', group:'dark',    dark:true,  bg:'#020C10', accent:'#00FFC8',
+    vars:{'--bg':'#020C10','--surface':'#041820','--surface2':'#072030','--border':'rgba(0,255,200,0.15)','--txt':'#C8FFF4','--txt2':'#60A899','--blue':'#00E5FF','--amber':'#00FFC8','--amber-dim':'rgba(0,255,200,0.15)','--green':'#69F0AE','--red':'#FF5252','--tog-off':'#0E2A32'}},
+  { id:'galaxy',    name:'Galaxy',   group:'dark',    dark:true,  bg:'#06001A', accent:'#7C4DFF',
+    vars:{'--bg':'#06001A','--surface':'#0E0830','--surface2':'#16103E','--border':'rgba(124,77,255,0.2)','--txt':'#E8D8FF','--txt2':'#9070C8','--blue':'#B388FF','--amber':'#7C4DFF','--amber-dim':'rgba(124,77,255,0.18)','--green':'#69F0AE','--red':'#FF5252','--tog-off':'#221840'}},
+
+  // ── Light ───────────────────────────────────────
+  { id:'cloud',     name:'Cloud',    group:'light',   dark:false, bg:'#F0F2FF', accent:'#0055FF',
     vars:{'--bg':'#F0F2FF','--surface':'#FFFFFF','--surface2':'#E8ECFF','--border':'rgba(0,0,0,0.13)','--txt':'#0A0A1A','--txt2':'#2A3D99','--blue':'#0055FF','--amber':'#FF6200','--amber-dim':'rgba(255,98,0,0.12)','--green':'#00C853','--red':'#FF1744','--tog-off':'#B8BEDD'}},
-  { id:'sand',    name:'Sand',    dark:false, bg:'#FFF8F0', accent:'#FF6200',
+  { id:'sand',      name:'Sand',     group:'light',   dark:false, bg:'#FFF8F0', accent:'#FF6200',
     vars:{'--bg':'#FFF8F0','--surface':'#FFFFFF','--surface2':'#FFE8D0','--border':'rgba(0,0,0,0.12)','--txt':'#1A0A00','--txt2':'#5A3000','--blue':'#2979FF','--amber':'#FF6200','--amber-dim':'rgba(255,98,0,0.12)','--green':'#00C853','--red':'#DD2C00','--tog-off':'#EEBF99'}},
-  { id:'meadow',  name:'Meadow',  dark:false, bg:'#F0FFF4', accent:'#00C853',
+  { id:'meadow',    name:'Meadow',   group:'light',   dark:false, bg:'#F0FFF4', accent:'#00C853',
     vars:{'--bg':'#F0FFF4','--surface':'#FFFFFF','--surface2':'#CCFFDD','--border':'rgba(0,0,0,0.12)','--txt':'#001A08','--txt2':'#005A22','--blue':'#2979FF','--amber':'#00C853','--amber-dim':'rgba(0,200,83,0.12)','--green':'#00C853','--red':'#DD2C00','--tog-off':'#99DDB0'}},
-  { id:'frost',   name:'Frost',   dark:false, bg:'#F0F8FF', accent:'#0091EA',
+  { id:'frost',     name:'Frost',    group:'light',   dark:false, bg:'#F0F8FF', accent:'#0091EA',
     vars:{'--bg':'#F0F8FF','--surface':'#FFFFFF','--surface2':'#CCE8FF','--border':'rgba(0,0,0,0.12)','--txt':'#001428','--txt2':'#003D6E','--blue':'#0091EA','--amber':'#FF6D00','--amber-dim':'rgba(255,109,0,0.12)','--green':'#00C853','--red':'#DD2C00','--tog-off':'#99BBDD'}},
-  { id:'rose',    name:'Rose',    dark:false, bg:'#FFF0F5', accent:'#F50057',
+  { id:'rose',      name:'Rose',     group:'light',   dark:false, bg:'#FFF0F5', accent:'#F50057',
     vars:{'--bg':'#FFF0F5','--surface':'#FFFFFF','--surface2':'#FFCCDD','--border':'rgba(0,0,0,0.12)','--txt':'#1A0010','--txt2':'#6A0028','--blue':'#FF4081','--amber':'#F50057','--amber-dim':'rgba(245,0,87,0.12)','--green':'#00C853','--red':'#DD2C00','--tog-off':'#EE99BB'}},
+  { id:'paper',     name:'Paper',    group:'light',   dark:false, bg:'#F9F9F9', accent:'#222222',
+    vars:{'--bg':'#F9F9F9','--surface':'#FFFFFF','--surface2':'#EFEFEF','--border':'rgba(0,0,0,0.09)','--txt':'#111111','--txt2':'#666666','--blue':'#0070C9','--amber':'#333333','--amber-dim':'rgba(0,0,0,0.08)','--green':'#237D32','--red':'#C62828','--tog-off':'#CCCCCC'}},
+  { id:'sunset',    name:'Sunset',   group:'light',   dark:false, bg:'#FFF4E6', accent:'#E65100',
+    vars:{'--bg':'#FFF4E6','--surface':'#FFFFFF','--surface2':'#FFDDB3','--border':'rgba(0,0,0,0.11)','--txt':'#1A0800','--txt2':'#6D3000','--blue':'#FF8F00','--amber':'#E65100','--amber-dim':'rgba(230,81,0,0.12)','--green':'#558B2F','--red':'#C62828','--tog-off':'#FFCC80'}},
+  { id:'lilac',     name:'Lilac',    group:'light',   dark:false, bg:'#F6F0FF', accent:'#7C4DFF',
+    vars:{'--bg':'#F6F0FF','--surface':'#FFFFFF','--surface2':'#EAE0FF','--border':'rgba(0,0,0,0.1)','--txt':'#1A0050','--txt2':'#5B40A0','--blue':'#651FFF','--amber':'#7C4DFF','--amber-dim':'rgba(124,77,255,0.12)','--green':'#00C853','--red':'#DD2C00','--tog-off':'#CEB8F8'}},
+
+  // ── Vivid ───────────────────────────────────────
+  { id:'neon',      name:'Neon',     group:'vivid',   dark:true,  bg:'#080010', accent:'#FF00FF',
+    vars:{'--bg':'#080010','--surface':'#120020','--surface2':'#1C0030','--border':'rgba(255,0,255,0.3)','--txt':'#FFF0FF','--txt2':'#FF80FF','--blue':'#00FFFF','--amber':'#FF00FF','--amber-dim':'rgba(255,0,255,0.22)','--green':'#00FF88','--red':'#FF0040','--tog-off':'#3A006A'}},
+  { id:'vaporwave', name:'Wave',     group:'vivid',   dark:true,  bg:'#150028', accent:'#FF71CE',
+    vars:{'--bg':'#150028','--surface':'#200040','--surface2':'#2C0058','--border':'rgba(255,113,206,0.28)','--txt':'#FFD8F4','--txt2':'#C070D8','--blue':'#01CDFE','--amber':'#FF71CE','--amber-dim':'rgba(255,113,206,0.2)','--green':'#05FFA1','--red':'#FF486A','--tog-off':'#480080'}},
+  { id:'arcade',    name:'Arcade',   group:'vivid',   dark:true,  bg:'#000820', accent:'#FFD600',
+    vars:{'--bg':'#000820','--surface':'#001030','--surface2':'#001840','--border':'rgba(255,214,0,0.22)','--txt':'#FFF8CC','--txt2':'#C4A800','--blue':'#FF00FF','--amber':'#FFD600','--amber-dim':'rgba(255,214,0,0.2)','--green':'#00FF6A','--red':'#FF2800','--tog-off':'#002458'}},
+  { id:'acid',      name:'Acid',     group:'vivid',   dark:true,  bg:'#030800', accent:'#AAFF00',
+    vars:{'--bg':'#030800','--surface':'#071200','--surface2':'#0C1C00','--border':'rgba(170,255,0,0.22)','--txt':'#EEFFC0','--txt2':'#88CC00','--blue':'#00FFAA','--amber':'#AAFF00','--amber-dim':'rgba(170,255,0,0.18)','--green':'#AAFF00','--red':'#FF3300','--tog-off':'#1A3300'}},
+  { id:'miami',     name:'Miami',    group:'vivid',   dark:true,  bg:'#001E2A', accent:'#FF2D78',
+    vars:{'--bg':'#001E2A','--surface':'#002F3D','--surface2':'#004050','--border':'rgba(255,45,120,0.25)','--txt':'#DEFFFC','--txt2':'#FF80A0','--blue':'#00E5FF','--amber':'#FF2D78','--amber-dim':'rgba(255,45,120,0.2)','--green':'#00E676','--red':'#FF1744','--tog-off':'#004A60'}},
+  { id:'bloodmoon', name:'Blood',    group:'vivid',   dark:true,  bg:'#0F0000', accent:'#FF1744',
+    vars:{'--bg':'#0F0000','--surface':'#1C0000','--surface2':'#2A0000','--border':'rgba(255,23,68,0.22)','--txt':'#FFE0E0','--txt2':'#CC6666','--blue':'#FF6D00','--amber':'#FF1744','--amber-dim':'rgba(255,23,68,0.18)','--green':'#AEEA00','--red':'#FF1744','--tog-off':'#3D0000'}},
+  { id:'hypercolor', name:'Hyper',   group:'vivid',   dark:false, bg:'#FFFFFF', accent:'#FF0066',
+    vars:{'--bg':'#FFFFFF','--surface':'#F8F8F8','--surface2':'#EEEEEE','--border':'rgba(0,0,0,0.08)','--txt':'#000000','--txt2':'#333333','--blue':'#0000FF','--amber':'#FF0066','--amber-dim':'rgba(255,0,102,0.1)','--green':'#00CC00','--red':'#FF0000','--tog-off':'#BBBBBB'}},
+
+  // ── Special ─────────────────────────────────────
+  { id:'terminal',  name:'Terminal', group:'special', dark:true,  bg:'#000800', accent:'#33FF33',
+    vars:{'--bg':'#000800','--surface':'#001000','--surface2':'#001800','--border':'rgba(51,255,51,0.18)','--txt':'#33FF33','--txt2':'#228822','--blue':'#33FF33','--amber':'#33FF33','--amber-dim':'rgba(51,255,51,0.15)','--green':'#55FF55','--red':'#FF3333','--tog-off':'#0A2200'}},
+  { id:'blueprint', name:'Blueprint',group:'special', dark:true,  bg:'#001F5C', accent:'#FFD740',
+    vars:{'--bg':'#001F5C','--surface':'#002878','--surface2':'#003090','--border':'rgba(255,255,255,0.25)','--txt':'#FFFFFF','--txt2':'#80B0FF','--blue':'#FFFFFF','--amber':'#FFD740','--amber-dim':'rgba(255,215,64,0.2)','--green':'#69F0AE','--red':'#FF5252','--tog-off':'#003AAA'}},
+  { id:'rainbow',   name:'Rainbow',  group:'special', dark:true,  bg:'#0A0010', accent:'#FF0000',
+    vars:{'--bg':'#0A0010','--surface':'#120018','--surface2':'#1C0024','--border':'rgba(255,255,255,0.18)','--txt':'#FFFFFF','--txt2':'#CCCCCC','--blue':'#00AAFF','--amber':'#FF0000','--amber-dim':'rgba(255,0,0,0.18)','--green':'#00FF88','--red':'#FF1744','--tog-off':'#2A003A'}},
 ];
 
-let activeTheme = localStorage.getItem('theme') || 'night';
+let activeTheme   = localStorage.getItem('theme') || 'night';
+let rainbowTimerId = null;
 
 function applyTheme(id) {
+  // Stop any running rainbow animation
+  if (rainbowTimerId) { clearInterval(rainbowTimerId); rainbowTimerId = null; }
+
   const t = THEMES.find(t => t.id === id) || THEMES[0];
   const root = document.documentElement;
   Object.entries(t.vars).forEach(([k,v]) => root.style.setProperty(k, v));
   activeTheme = id;
   localStorage.setItem('theme', id);
+
+  // Rainbow: cycle --amber and --blue through the hue wheel
+  if (id === 'rainbow') {
+    let hue = 0;
+    rainbowTimerId = setInterval(() => {
+      hue = (hue + 1.2) % 360;
+      const h2 = (hue + 130) % 360;
+      root.style.setProperty('--amber',     `hsl(${hue},100%,62%)`);
+      root.style.setProperty('--amber-dim', `hsla(${hue},100%,62%,0.2)`);
+      root.style.setProperty('--blue',      `hsl(${h2},100%,65%)`);
+    }, 30);
+  }
+
   renderThemePicker();
   renderLights();
 }
 
 function renderThemePicker() {
-  ['darkRow','lightRow'].forEach(rowId => {
-    const isDark = rowId === 'darkRow';
-    const row = document.getElementById(rowId);
+  const groups = ['dark','light','vivid','special'];
+  const rowIds  = { dark:'darkRow', light:'lightRow', vivid:'vividRow', special:'specialRow' };
+  groups.forEach(group => {
+    const row = document.getElementById(rowIds[group]);
+    if (!row) return;
     row.innerHTML = '';
-    THEMES.filter(t => t.dark === isDark).forEach(t => {
+    THEMES.filter(t => t.group === group).forEach(t => {
+      const isLight     = !t.dark;
+      const checkStroke = isLight ? '#111111' : 'white';
+      const checkOverlay= isLight ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.3)';
+      const bgStyle = t.id === 'rainbow'
+        ? 'background: conic-gradient(#FF0000 0%, #FF8800 14%, #FFFF00 28%, #00CC00 42%, #0088FF 57%, #8800FF 71%, #FF00FF 85%, #FF0000 100%);'
+        : `background:${t.bg};`;
       const el = document.createElement('div');
       el.className = 'theme-swatch' + (t.id === activeTheme ? ' active' : '');
       el.onclick = () => { applyTheme(t.id); };
       el.innerHTML = `
-        <div class="swatch-circle" style="background:${t.bg};">
-          <div class="swatch-check"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
-          <div style="position:absolute;bottom:7px;right:7px;width:13px;height:13px;border-radius:50%;background:${t.accent};"></div>
+        <div class="swatch-circle" style="${bgStyle}">
+          <div class="swatch-check" style="background:${checkOverlay};">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${checkStroke}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
+          <div class="swatch-dot" style="background:${t.id === 'rainbow' ? 'white' : t.accent};"></div>
         </div>
         <span class="swatch-name">${t.name}</span>`;
       row.appendChild(el);
