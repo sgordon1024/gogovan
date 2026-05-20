@@ -958,12 +958,15 @@
     /* ── Rope lights ──────────────────────────────── */
     .rope-palette { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px 14px 14px; }
     .rope-color-btn {
-      width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent;
-      cursor: pointer; transition: transform 0.15s, border-color 0.15s;
+      width: 32px; height: 32px; min-width: 32px; min-height: 32px;
+      border-radius: 50%; border: none; padding: 0;
+      cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
       -webkit-tap-highlight-color: transparent;
+      -webkit-appearance: none; appearance: none;
+      flex-shrink: 0; display: block;
     }
     .rope-color-btn:active { transform: scale(0.85); }
-    .rope-color-btn.active { border-color: var(--amber); }
+    .rope-color-btn.active { box-shadow: 0 0 0 2.5px var(--amber); }
     .rope-effects { padding: 0 14px 14px; }
     .rope-effect-btn {
       width: 100%; height: 36px; border-radius: 18px; border: none;
@@ -2356,7 +2359,7 @@ safe-buffer/index.js:
         <button class="rope-color-btn" id="ropePurple" onclick="setRopeColor('purple')" style="background:#8822ff" title="Purple"></button>
         <button class="rope-color-btn" id="ropePink"   onclick="setRopeColor('pink')"   style="background:#ff44aa" title="Pink"></button>
         <button class="rope-color-btn" id="ropeWhite"  onclick="setRopeColor('white')"  style="background:#ffffff" title="White"></button>
-        <button class="rope-color-btn" id="ropeEffectCycle" onclick="setRopeEffect('cycle')" style="background:conic-gradient(#ff2222 0%,#ff7700 12%,#ffee00 25%,#22cc44 38%,#00eeff 50%,#2244ff 63%,#8822ff 75%,#ff44aa 87%,#ff2222 100%)" title="Color Cycle"></button>
+        <button class="rope-color-btn" id="ropeEffectCycle" onclick="setRopeEffect('cycle')" style="background:conic-gradient(from 0deg,hsl(0,100%,55%) 0deg,hsl(45,100%,55%) 45deg,hsl(90,100%,45%) 90deg,hsl(150,100%,45%) 135deg,hsl(180,100%,50%) 180deg,hsl(210,100%,55%) 225deg,hsl(270,100%,60%) 270deg,hsl(300,100%,55%) 315deg,hsl(360,100%,55%) 360deg)" title="Color Cycle"></button>
       </div>
       <div class="rope-slider-row" style="padding-top:8px">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--txt2)" stroke-width="2" stroke-linecap="round">
@@ -3139,16 +3142,16 @@ function lucideIcon(name, size = 16, sw = 2) {
 const DEFAULT_SCENES = [
   { id:'sleep',   name:'Sleep',   icon:'moon',
     lights:{ main:{on:false,level:0}, kitchen:{on:false,level:0}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:false,level:0}, awning:{on:false,level:0}, step:{on:false,level:0} },
-    rope:{ on:false, color:null, effect:null }},
+    rope:{ on:false, color:null, effect:null, brightness:100, speed:5 }},
   { id:'movie',   name:'Movie',   icon:'film',
     lights:{ main:{on:true,level:15}, kitchen:{on:false,level:0}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:true,level:20}, bench:{on:true,level:15}, awning:{on:false,level:0}, step:{on:false,level:0} },
-    rope:{ on:true, color:'amber', effect:null }},
+    rope:{ on:true, color:'amber', effect:null, brightness:60, speed:5 }},
   { id:'morning', name:'Morning', icon:'sun',
     lights:{ main:{on:true,level:60}, kitchen:{on:true,level:80}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:false,level:0}, awning:{on:false,level:0}, step:{on:false,level:0} },
-    rope:{ on:false, color:null, effect:null }},
+    rope:{ on:false, color:null, effect:null, brightness:100, speed:5 }},
   { id:'dinner',  name:'Dinner',  icon:'utensils',
     lights:{ main:{on:true,level:70}, kitchen:{on:true,level:100}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:true,level:50}, awning:{on:false,level:0}, step:{on:false,level:0} },
-    rope:{ on:true, color:'amber', effect:null }},
+    rope:{ on:true, color:'amber', effect:null, brightness:70, speed:5 }},
 ];
 
 let scenes = [];
@@ -3161,7 +3164,10 @@ function migrateScene(s) {
   const name = s.name.replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}]️?\s*/u, '').trim() || s.name;
   const icon = s.icon || SCENE_ID_ICONS[s.id] || 'star';
   // Add rope state for scenes saved before rope support was added
-  const rope = s.rope || { on: false, color: null, effect: null };
+  const rope = {
+    on: false, color: null, effect: null, brightness: 100, speed: 5,
+    ...(s.rope || {}),
+  };
   return { ...s, name, icon, rope };
 }
 
@@ -3466,10 +3472,34 @@ function applyScene(id) {
   });
   // Apply rope light state
   if (scene.rope) {
-    if (scene.rope.on) {
-      if (scene.rope.effect) setRopeEffect(scene.rope.effect);
-      else if (scene.rope.color) setRopeColor(scene.rope.color);
-      else if (!ropeOn) toggleRopeLight();
+    const r = scene.rope;
+    // Apply brightness first (so it's set before turning on)
+    const bright = r.brightness ?? 100;
+    const speed  = r.speed ?? 5;
+    ropeActiveBrightness = bright;
+    ropeActiveSpeed      = speed;
+    const brightEl = document.getElementById('ropeBrightness');
+    if (brightEl) {
+      brightEl.value = bright;
+      brightEl.style.setProperty('--pct', bright + '%');
+      document.getElementById('ropeBrightPct').textContent = bright + '%';
+    }
+    const speedEl = document.getElementById('ropeSpeed');
+    if (speedEl) {
+      speedEl.value = speed;
+      speedEl.style.setProperty('--pct', ((speed - 1) / 9 * 100).toFixed(0) + '%');
+      document.getElementById('ropeSpeedPct').textContent = speed;
+    }
+    if (mqttClient?.connected) mqttClient.publish('van/rope-light/brightness', String(bright));
+    if (r.on) {
+      if (r.effect) {
+        setRopeEffect(r.effect);
+        if (mqttClient?.connected) mqttClient.publish('van/rope-light/speed', String(speed));
+      } else if (r.color) {
+        setRopeColor(r.color);
+      } else if (!ropeOn) {
+        toggleRopeLight();
+      }
     } else if (ropeOn) {
       toggleRopeLight();
     }
@@ -3484,7 +3514,13 @@ function saveToScene(id) {
   const scene = scenes.find(s => s.id === id);
   if (!scene) return;
   allLights().forEach(l => { scene.lights[l.id] = { on: l.on, level: l.level }; });
-  scene.rope = { on: ropeOn, color: ropeActiveColor, effect: ropeActiveEffect };
+  scene.rope = {
+    on: ropeOn,
+    color: ropeActiveColor,
+    effect: ropeActiveEffect,
+    brightness: ropeActiveBrightness,
+    speed: ropeActiveSpeed,
+  };
   sceneIsDirty = false;
   saveScenes();
   renderScenes();
@@ -3494,10 +3530,17 @@ function markSceneDirty() {
   if (!lastAppliedSceneId) return;
   const scene = scenes.find(s => s.id === lastAppliedSceneId);
   if (!scene) return;
-  const dirty = allLights().some(l => {
+  const lightsDirty = allLights().some(l => {
     const s = scene.lights[l.id];
     return s && (s.on !== l.on || (l.on && s.level !== l.level));
   });
+  const r = scene.rope || {};
+  const ropeDirty = r.on !== ropeOn
+    || (ropeOn && r.color !== ropeActiveColor)
+    || (ropeOn && r.effect !== ropeActiveEffect)
+    || (ropeOn && (r.brightness ?? 100) !== ropeActiveBrightness)
+    || (ropeOn && r.effect && (r.speed ?? 5) !== ropeActiveSpeed);
+  const dirty = lightsDirty || ropeDirty;
   if (dirty !== sceneIsDirty) {
     sceneIsDirty = dirty;
     renderScenes();
@@ -3539,7 +3582,14 @@ function saveNewScene() {
   const id = 'scene_' + Date.now();
   const lights = {};
   allLights().forEach(l => { lights[l.id] = { on: l.on, level: l.level }; });
-  scenes.push({ id, name, icon: 'star', lights });
+  const rope = {
+    on: ropeOn,
+    color: ropeActiveColor,
+    effect: ropeActiveEffect,
+    brightness: ropeActiveBrightness,
+    speed: ropeActiveSpeed,
+  };
+  scenes.push({ id, name, icon: 'star', lights, rope });
   saveScenes();
   renderScenes();
 }
@@ -3639,11 +3689,15 @@ function toggleTankHeater() {
 
 // ── Rope lights ───────────────────────────────────
 let ropeOn = false;
-let preRopeOn     = false;  // rope light state before drive mode
-let preRopeColor  = null;
-let preRopeEffect = null;
-let ropeActiveColor = null;
-let ropeActiveEffect = null;
+let preRopeOn         = false;  // rope light state before drive mode
+let preRopeColor      = null;
+let preRopeEffect     = null;
+let preRopeBrightness = 100;
+let preRopeSpeed      = 5;
+let ropeActiveColor      = null;
+let ropeActiveEffect     = null;
+let ropeActiveBrightness = 100;
+let ropeActiveSpeed      = 5;
 
 function ropeOff() {
   if (!ropeOn) return;
@@ -3698,16 +3752,20 @@ function setRopeEffect(effect) {
 
 function setRopeBrightness(val) {
   const pct = Math.round(val);
+  ropeActiveBrightness = pct;
   document.getElementById('ropeBrightPct').textContent = pct + '%';
   document.getElementById('ropeBrightness').style.setProperty('--pct', pct + '%');
   if (mqttClient?.connected) mqttClient.publish('van/rope-light/brightness', String(pct));
+  markSceneDirty();
 }
 
 function setRopeSpeed(val) {
+  ropeActiveSpeed = parseInt(val);
   document.getElementById('ropeSpeedPct').textContent = val;
   const pct = ((val - 1) / 9 * 100).toFixed(0) + '%';
   document.getElementById('ropeSpeed').style.setProperty('--pct', pct);
   if (mqttClient?.connected) mqttClient.publish('van/rope-light/speed', String(val));
+  markSceneDirty();
 }
 
 // ── Inverter ──────────────────────────────────────
@@ -3845,9 +3903,11 @@ function enterDrivingMode(manual = false) {
   }
 
   // 3. Save rope light state and turn off (always send — JS state may lag physical state)
-  preRopeOn     = ropeOn;
-  preRopeColor  = ropeActiveColor;
-  preRopeEffect = ropeActiveEffect;
+  preRopeOn         = ropeOn;
+  preRopeColor      = ropeActiveColor;
+  preRopeEffect     = ropeActiveEffect;
+  preRopeBrightness = ropeActiveBrightness;
+  preRopeSpeed      = ropeActiveSpeed;
   ropeOn = false;
   document.getElementById('ropeRow').classList.remove('on');
   document.getElementById('ropeIcon').setAttribute('stroke', 'var(--txt2)');
@@ -3892,9 +3952,26 @@ function exitDrivingMode() {
   if (pumpState) pumpState.textContent = 'On';
 
   // Restore rope lights to pre-drive state (always direct — never use toggle)
+  // Restore brightness and speed first
+  ropeActiveBrightness = preRopeBrightness;
+  ropeActiveSpeed      = preRopeSpeed;
+  const _brightEl = document.getElementById('ropeBrightness');
+  if (_brightEl) {
+    _brightEl.value = preRopeBrightness;
+    _brightEl.style.setProperty('--pct', preRopeBrightness + '%');
+    document.getElementById('ropeBrightPct').textContent = preRopeBrightness + '%';
+  }
+  const _speedEl = document.getElementById('ropeSpeed');
+  if (_speedEl) {
+    _speedEl.value = preRopeSpeed;
+    _speedEl.style.setProperty('--pct', ((preRopeSpeed - 1) / 9 * 100).toFixed(0) + '%');
+    document.getElementById('ropeSpeedPct').textContent = preRopeSpeed;
+  }
+  if (mqttClient?.connected) mqttClient.publish('van/rope-light/brightness', String(preRopeBrightness));
   if (preRopeOn) {
     if (preRopeEffect === 'cycle') {
       setRopeEffect('cycle');
+      if (mqttClient?.connected) mqttClient.publish('van/rope-light/speed', String(preRopeSpeed));
     } else if (preRopeColor) {
       setRopeColor(preRopeColor);
     } else {
