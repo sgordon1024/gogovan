@@ -63,11 +63,26 @@ def dim(data):
     return data
 
 async def color_cycle(client):
+    """Cycle through colors with a smooth cross-fade between each pair."""
     i = 0
     while True:
-        await client.write_gatt_char(CHAR_UUID, dim(CYCLE_COLORS[i % len(CYCLE_COLORS)]))
+        a = dim(CYCLE_COLORS[i % len(CYCLE_COLORS)])
+        b = dim(CYCLE_COLORS[(i + 1) % len(CYCLE_COLORS)])
+        # Target ~15 Hz; don't go faster than 67ms per frame
+        step_delay = max(0.067, cycle_speed / 15)
+        steps = max(1, round(cycle_speed / step_delay))
+        for step in range(steps):
+            t = step / steps
+            blended = bytes([
+                0x56,
+                int(a[1] + (b[1] - a[1]) * t),
+                int(a[2] + (b[2] - a[2]) * t),
+                int(a[3] + (b[3] - a[3]) * t),
+                0x00, 0xf0, 0xaa
+            ])
+            await client.write_gatt_char(CHAR_UUID, blended)
+            await asyncio.sleep(step_delay)
         i += 1
-        await asyncio.sleep(cycle_speed)
 
 async def ble_loop():
     global last_color
