@@ -1,112 +1,151 @@
 #!/usr/bin/env python3
 """
-starlink-bridge.py — Starlink smart plug (Shelly Gen4) MQTT bridge.
+starlink-bridge.py — Starlink smart plug (Tuya X5P) MQTT bridge.
 
-Subscribes to van/starlink/+ commands and relays them to the Shelly plug
-via its local RPC MQTT interface.  Also monitors T-Mobile signal strength
-and auto-powers the plug when signal falls below threshold.
+Controls the Tuya smart plug via tinytuya local API.
+Monitors T-Mobile signal and auto-powers Starlink when signal is poor.
+Monitors connectivity quality when Starlink is active upstream.
 
-MQTT topics (in):
-  van/starlink/power   — "on" / "off"
-  van/starlink/auto    — "on" / "off"  (enable/disable auto-switch logic)
+MQTT topics (subscribe):
+  van/starlink/power     — "on" / "off"  (manual control from dashboard)
+  van/starlink/auto      — "on" / "off"  (enable/disable auto-switch)
+  van/starlink/threshold — "0"-"100"     (signal level below which Starlink turns on)
 
-MQTT topics (out):
-  van/status/starlink/power          — "on" / "off"  (retained)
-  van/status/starlink/tmobile-signal — "0"-"100" dBm-relative or "-1" if unknown (retained)
-  van/status/starlink/auto           — "on" / "off"  (retained)
-
-Shelly Gen4 RPC topics:
-  shellyplugus-{ID}/rpc              — publish JSON-RPC command
-  shellyplugus-{ID}/status/switch:0  — subscribe for switch state
+MQTT topics (publish, retained):
+  van/status/starlink/power          — "on" / "off" / "unknown"
+  van/status/starlink/tmobile-signal — "0"-"100" or "-1" if unknown
+  van/status/starlink/auto           — "on" / "off"
+  van/status/starlink/threshold      — "0"-"100"
+  van/status/starlink/quality        — "good" / "poor" / "unknown"
 """
 
-import json
+import os
 import subprocess
 import threading
 import time
 import paho.mqtt.client as mqtt
+import tinytuya
 
 # ── Configuration ──────────────────────────────────────────────────────────
 MQTT_HOST = "localhost"
 MQTT_PORT = 1883
 
-# Replace with actual device ID after Shelly is added to GoGoVan network.
-# Find it in the Shelly app under Device Info → Device ID, or check the
-# label on the plug itself.  Format: shellyplugus-XXXXXXXXXXXX
-SHELLY_ID = "shellyplugus-XXXXXXXXXXXX"
+PLUG_DEV_ID    = "eb21e6caef01e8582972u9"
+PLUG_ADDRESS   = "192.168.4.34"
+PLUG_LOCAL_KEY = "knGT9!<jN3jA~npU"
+PLUG_VERSION   = 3.3
 
-# T-Mobile signal thresholds (nmcli SIGNAL field, 0-100 scale)
-# Below ON_THRESH  → turn Starlink ON  (bad signal, need backup)
-# Above OFF_THRESH → turn Starlink OFF (good signal, save power)
-# Hysteresis gap prevents rapid toggling.
-SIGNAL_ON_THRESH  = 35   # signal drops below this → power Starlink on
-SIGNAL_OFF_THRESH = 55   # signal rises above this → power Starlink off
-
-# How often to poll T-Mobile signal strength (seconds)
-SIGNAL_POLL_INTERVAL = 30
-
-# ── State ──────────────────────────────────────────────────────────────────
-starlink_power = None   # "on" / "off" / None (unknown)
-auto_mode      = False  # whether auto-switch is enabled
-tmobile_signal = -1     # 0-100 or -1 if unknown
-rpc_request_id = 0      # incrementing RPC request counter
-
-mqtt_client_ref = None
-
+THRESH_FILE            = os.path.expanduser("~/.starlink_threshold")
+DEFAULT_ON_THRESH      = 35      # signal below this → Starlink ON
+HYSTERESIS             = 20      # off threshold = on_thresh + HYSTERESIS
+SIGNAL_POLL_INTERVAL   = 30      # seconds between T-Mobile signal polls
+QUALITY_CHECK_INTERVAL = 120     # seconds between ping quality checks (when on Starlink)
+QUALITY_PING_TIMEOUT   = 15      # total seconds for ping subprocess
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
-def next_rpc_id():
-    global rpc_request_id
-    rpc_request_id += 1
-    return rpc_request_id
+def load_threshold() -> int:
+    try:
+        return max(0, min(100, int(open(THRESH_FILE).read().strip())))
+    except Exception:
+        return DEFAULT_ON_THRESH
+
+def save_threshold(val: int):
+    try:
+        with open(THRESH_FILE, "w") as f:
+            f.write(str(val))
+    except Exception as e:
+        print(f"save_threshold error: {e}")
+
+# ── State ──────────────────────────────────────────────────────────────────
+starlink_power     = None    # "on" / "off" / None (unknown)
+auto_mode          = False
+tmobile_signal     = -1
+signal_on_thresh   = load_threshold()
+network_upstream   = "unknown"   # from van/status/network/upstream
+last_quality_check = 0.0         # timestamp of last connectivity check
+
+# ── Plug control ───────────────────────────────────────────────────────────
+
+def make_device():
+    d = tinytuya.OutletDevice(
+        dev_id=PLUG_DEV_ID,
+        address=PLUG_ADDRESS,
+        local_key=PLUG_LOCAL_KEY,
+        version=PLUG_VERSION
+    )
+    d.set_socketTimeout(5)
+    d.set_socketRetryLimit(2)
+    return d
 
 
-def shelly_set(client, on: bool):
-    """Send a Switch.Set RPC command to the Shelly plug."""
-    payload = json.dumps({
-        "id":     next_rpc_id(),
-        "method": "Switch.Set",
-        "params": {"id": 0, "on": on}
-    })
-    topic = f"{SHELLY_ID}/rpc"
-    print(f"Shelly RPC → {topic}: {payload}")
-    client.publish(topic, payload)
+def plug_set(on: bool) -> bool:
+    """Set plug state. Returns True on success."""
+    global starlink_power
+    try:
+        d = make_device()
+        result = d.set_value(1, on)
+        if "Error" not in str(result):
+            starlink_power = "on" if on else "off"
+            print(f"Plug → {'ON' if on else 'OFF'}: {result}")
+            return True
+        else:
+            print(f"Plug set error: {result}")
+            return False
+    except Exception as e:
+        print(f"plug_set exception: {e}")
+        return False
 
+
+def plug_get_state() -> str:
+    """Query current plug state. Returns 'on', 'off', or 'unknown'."""
+    try:
+        d = make_device()
+        status = d.status()
+        if "dps" in status:
+            return "on" if status["dps"].get("1", False) else "off"
+        return "unknown"
+    except Exception as e:
+        print(f"plug_get_state exception: {e}")
+        return "unknown"
+
+
+# ── T-Mobile signal ────────────────────────────────────────────────────────
 
 def get_tmobile_signal() -> int:
     """
-    Query nmcli for the T-Mobile hotspot signal level.
-    Returns 0-100 integer, or -1 on error / not visible.
-
-    Uses `nmcli dev wifi list` (NOT `dev wifi` which only shows active)
-    so we can see the T-Mobile SSID signal even when wlan0 is connected
-    to Starlink.  If multiple entries exist for the same SSID (multi-AP),
-    we return the highest signal seen.
-
-    nmcli -t -f SSID,SIGNAL dev wifi list
-    Example line: Gordie's T-Mobile Hotspot:72
+    Returns 0-100 signal level for T-Mobile, or -1 if not visible.
+    Checks both connected signal (nmcli dev show) and scan results.
     """
     try:
+        # First: check if wlan0 is currently on T-Mobile (fastest path)
+        result = subprocess.run(
+            ["nmcli", "-t", "-f", "GENERAL.CONNECTION,GENERAL.SIGNAL",
+             "dev", "show", "wlan0"],
+            capture_output=True, text=True, timeout=5
+        )
+        for line in result.stdout.splitlines():
+            if "SIGNAL" in line:
+                try:
+                    return int(line.split(":")[-1])
+                except ValueError:
+                    pass
+
+        # Fallback: scan for T-Mobile SSID
         result = subprocess.run(
             ["nmcli", "-t", "-f", "SSID,SIGNAL", "dev", "wifi", "list"],
             capture_output=True, text=True, timeout=10
         )
         best = -1
         for line in result.stdout.splitlines():
-            # Last colon-delimited field is the signal; everything before is SSID
-            # (SSID can itself contain colons, so split from right)
             idx = line.rfind(":")
             if idx < 0:
                 continue
-            ssid = line[:idx]
-            sig_str = line[idx + 1:]
-            ssid_lower = ssid.lower()
-            if "t-mobile" in ssid_lower or "tmobile" in ssid_lower:
+            ssid = line[:idx].lower()
+            if "t-mobile" in ssid or "tmobile" in ssid or ssid == "tmobile":
                 try:
-                    sig = int(sig_str)
-                    if sig > best:
-                        best = sig
+                    sig = int(line[idx + 1:])
+                    best = max(best, sig)
                 except ValueError:
                     pass
         return best
@@ -115,22 +154,40 @@ def get_tmobile_signal() -> int:
         return -1
 
 
-def publish_status(client):
-    """Publish all current status values (retained)."""
-    if starlink_power is not None:
-        client.publish("van/status/starlink/power", starlink_power, retain=True)
-    client.publish("van/status/starlink/tmobile-signal", str(tmobile_signal), retain=True)
-    client.publish("van/status/starlink/auto", "on" if auto_mode else "off", retain=True)
+# ── Connectivity quality check ─────────────────────────────────────────────
+
+def check_connectivity() -> str:
+    """
+    Ping 8.8.8.8 three times and assess quality.
+    Returns 'good', 'poor', or 'unknown'.
+    Typical healthy Starlink: 20-80 ms avg.
+    Obstructed / degraded: fails to respond or >2000 ms avg.
+    """
+    try:
+        result = subprocess.run(
+            ["ping", "-c", "3", "-W", "3", "-q", "8.8.8.8"],
+            capture_output=True, text=True, timeout=QUALITY_PING_TIMEOUT
+        )
+        if result.returncode != 0:
+            return "poor"
+        # Parse "rtt min/avg/max/mdev = X/X/X/X ms" line
+        for line in result.stdout.splitlines():
+            if "/" in line and ("rtt" in line or "round-trip" in line):
+                try:
+                    avg_ms = float(line.split("=")[1].strip().split("/")[1])
+                    return "poor" if avg_ms > 2000 else "good"
+                except Exception:
+                    pass
+        return "good"
+    except Exception as e:
+        print(f"check_connectivity error: {e}")
+        return "unknown"
 
 
 # ── Signal monitor loop ────────────────────────────────────────────────────
 
 def signal_monitor(client):
-    """
-    Runs in a background thread.  Polls T-Mobile signal every
-    SIGNAL_POLL_INTERVAL seconds and applies auto-power logic.
-    """
-    global tmobile_signal, starlink_power
+    global tmobile_signal, starlink_power, last_quality_check
 
     while True:
         time.sleep(SIGNAL_POLL_INTERVAL)
@@ -138,30 +195,33 @@ def signal_monitor(client):
             sig = get_tmobile_signal()
             if sig != tmobile_signal:
                 tmobile_signal = sig
-                client.publish(
-                    "van/status/starlink/tmobile-signal",
-                    str(tmobile_signal),
-                    retain=True
-                )
+                client.publish("van/status/starlink/tmobile-signal",
+                               str(tmobile_signal), retain=True)
                 print(f"T-Mobile signal → {tmobile_signal}")
 
-            if not auto_mode:
-                continue
+            if auto_mode:
+                off_thresh = min(signal_on_thresh + HYSTERESIS, 95)
+                if sig != -1 and sig < signal_on_thresh and starlink_power != "on":
+                    print(f"Auto: signal {sig} < {signal_on_thresh} → Starlink ON")
+                    if plug_set(True):
+                        client.publish("van/status/starlink/power", "on", retain=True)
 
-            # Auto-switch logic
-            if sig != -1 and sig < SIGNAL_ON_THRESH:
-                if starlink_power != "on":
-                    print(f"Auto: T-Mobile signal {sig} < {SIGNAL_ON_THRESH} → Starlink ON")
-                    shelly_set(client, True)
-                    # Optimistic state update; confirmed via Shelly status callback
-                    starlink_power = "on"
-                    client.publish("van/status/starlink/power", "on", retain=True)
-            elif sig != -1 and sig > SIGNAL_OFF_THRESH:
-                if starlink_power == "on":
-                    print(f"Auto: T-Mobile signal {sig} > {SIGNAL_OFF_THRESH} → Starlink OFF")
-                    shelly_set(client, False)
-                    starlink_power = "off"
-                    client.publish("van/status/starlink/power", "off", retain=True)
+                elif sig != -1 and sig > off_thresh and starlink_power == "on":
+                    print(f"Auto: signal {sig} > {off_thresh} → Starlink OFF")
+                    if plug_set(False):
+                        client.publish("van/status/starlink/power", "off", retain=True)
+                        client.publish("van/status/starlink/quality",
+                                       "unknown", retain=True)
+
+            # Quality check: only when Starlink plug is on AND Pi is routing through it
+            now = time.time()
+            if (starlink_power == "on"
+                    and network_upstream == "starlink"
+                    and now - last_quality_check >= QUALITY_CHECK_INTERVAL):
+                last_quality_check = now
+                quality = check_connectivity()
+                print(f"Starlink quality → {quality}")
+                client.publish("van/status/starlink/quality", quality, retain=True)
 
         except Exception as e:
             print(f"signal_monitor error: {e}")
@@ -170,64 +230,77 @@ def signal_monitor(client):
 # ── MQTT callbacks ─────────────────────────────────────────────────────────
 
 def on_connect(client, userdata, flags, rc):
-    global mqtt_client_ref
-    mqtt_client_ref = client
-    print(f"Connected to MQTT (rc={rc})")
+    global tmobile_signal, starlink_power
+    print(f"MQTT connected (rc={rc})")
 
-    # Dashboard command topics
     client.subscribe("van/starlink/power")
     client.subscribe("van/starlink/auto")
+    client.subscribe("van/starlink/threshold")
+    client.subscribe("van/status/network/upstream")  # track upstream for quality check
 
-    # Shelly status topic — confirmed relay state
-    client.subscribe(f"{SHELLY_ID}/status/switch:0")
+    state = plug_get_state()
+    starlink_power = state if state != "unknown" else None
+    client.publish("van/status/starlink/power",
+                   starlink_power or "unknown", retain=True)
 
-    # Seed initial signal reading
-    global tmobile_signal
     tmobile_signal = get_tmobile_signal()
-    publish_status(client)
-    print(f"Initial T-Mobile signal → {tmobile_signal}")
+    client.publish("van/status/starlink/tmobile-signal",
+                   str(tmobile_signal), retain=True)
+    client.publish("van/status/starlink/auto",
+                   "on" if auto_mode else "off", retain=True)
+    client.publish("van/status/starlink/threshold",
+                   str(signal_on_thresh), retain=True)
+    # Clear quality on (re)start so stale "poor" doesn't persist if plug is off
+    if starlink_power != "on":
+        client.publish("van/status/starlink/quality", "unknown", retain=True)
 
-    # Start background signal monitor
+    print(f"Initial: plug={starlink_power}, tmobile={tmobile_signal}, "
+          f"thresh={signal_on_thresh}, auto={auto_mode}")
+
     t = threading.Thread(target=signal_monitor, args=(client,), daemon=True)
     t.start()
 
 
 def on_message(client, userdata, msg):
-    global starlink_power, auto_mode
+    global starlink_power, auto_mode, signal_on_thresh, network_upstream
     topic   = msg.topic
     payload = msg.payload.decode().strip().lower()
 
-    # ── Dashboard → Shelly power command ──────────────────────────────
     if topic == "van/starlink/power":
-        print(f"van/starlink/power → {payload}")
-        if payload == "on":
-            shelly_set(client, True)
-        elif payload == "off":
-            shelly_set(client, False)
+        print(f"Manual: Starlink → {payload}")
+        on = (payload == "on")
+        if plug_set(on):
+            client.publish("van/status/starlink/power",
+                           "on" if on else "off", retain=True)
+            if not on:
+                client.publish("van/status/starlink/quality",
+                               "unknown", retain=True)
         return
 
-    # ── Dashboard → auto-mode toggle ─────────────────────────────────
     if topic == "van/starlink/auto":
         auto_mode = (payload == "on")
-        client.publish("van/status/starlink/auto", "on" if auto_mode else "off", retain=True)
-        print(f"Starlink auto-mode → {auto_mode}")
+        client.publish("van/status/starlink/auto",
+                       "on" if auto_mode else "off", retain=True)
+        print(f"Auto-mode → {auto_mode}")
         return
 
-    # ── Shelly status callback — source of truth for relay state ─────
-    if topic == f"{SHELLY_ID}/status/switch:0":
+    if topic == "van/starlink/threshold":
         try:
-            data = json.loads(msg.payload)
-            # Gen4 status payload: {"id":0,"output":true,"apower":...}
-            output = data.get("output")
-            if output is None:
-                return
-            new_state = "on" if output else "off"
-            if new_state != starlink_power:
-                starlink_power = new_state
-                client.publish("van/status/starlink/power", starlink_power, retain=True)
-                print(f"Shelly confirmed Starlink → {starlink_power}")
-        except Exception as e:
-            print(f"Shelly status parse error: {e} — raw: {msg.payload}")
+            val = max(0, min(100, int(payload)))
+            signal_on_thresh = val
+            save_threshold(val)
+            client.publish("van/status/starlink/threshold",
+                           str(val), retain=True)
+            print(f"Threshold → {val}")
+        except ValueError:
+            pass
+        return
+
+    if topic == "van/status/network/upstream":
+        network_upstream = payload
+        # Reset quality check timer when upstream changes so we check quickly
+        global last_quality_check
+        last_quality_check = 0.0
         return
 
 
