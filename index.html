@@ -780,20 +780,22 @@
       min-height: 44px;
     }
 
-    .light-row:not(.on) .slider-wrap { display: none; }
+    /* Slider always visible; dim + neutral when light is off */
+    .light-row:not(.on) .slider-wrap { opacity: 0.38; }
 
     .dim-slider {
       -webkit-appearance: none;
       appearance: none;
       flex: 1;
       min-width: 0;
-      height: 6px;
-      border-radius: 3px;
+      height: 14px;
+      border-radius: 7px;
       outline: none;
       cursor: pointer;
       background: var(--surface2);
     }
 
+    /* Amber fill tracks the thumb when the light is on */
     .light-row.on .dim-slider {
       background: linear-gradient(
         to right,
@@ -806,17 +808,17 @@
 
     .dim-slider::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 28px;
-      height: 28px;
+      width: 26px;
+      height: 26px;
       border-radius: 50%;
       background: #fff;
       box-shadow: 0 2px 6px rgba(0,0,0,0.4);
       cursor: pointer;
-      transition: transform 0.15s;
+      transition: transform 0.12s;
     }
 
-    .dim-slider:active::-webkit-slider-thumb { transform: scale(1.15); }
-    .light-row:not(.on) .dim-slider::-webkit-slider-thumb { background: #55557a; box-shadow: none; }
+    .dim-slider:active::-webkit-slider-thumb { transform: scale(1.18); }
+    .light-row:not(.on) .dim-slider::-webkit-slider-thumb { background: var(--txt2); box-shadow: none; }
 
     .dim-pct {
       font-size: 13px;
@@ -1154,8 +1156,46 @@
       cursor: pointer;
       flex: 1;
       min-width: 0;
+      position: relative;
       -webkit-tap-highlight-color: transparent;
     }
+
+    .swatch-delete {
+      position: absolute;
+      top: -5px;
+      right: -2px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(40,40,60,0.85);
+      border: 1.5px solid rgba(255,255,255,0.25);
+      color: #fff;
+      font-size: 11px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 3;
+      transition: background 0.15s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .swatch-delete:active { transform: scale(0.85); background: rgba(220,50,50,0.9); }
+
+    .theme-restore-btn {
+      background: none;
+      border: none;
+      color: var(--txt2);
+      font-size: 12px;
+      cursor: pointer;
+      padding: 0 0 16px;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      display: block;
+      margin: 0 auto;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .theme-restore-btn:active { opacity: 0.6; }
 
     .swatch-circle {
       width: 48px;
@@ -2196,7 +2236,8 @@ const THEMES = [
     vars:{'--bg':'#FFF0F5','--surface':'#FFFFFF','--surface2':'#FFCCDD','--border':'rgba(0,0,0,0.12)','--txt':'#1A0010','--txt2':'#6A0028','--blue':'#FF4081','--amber':'#F50057','--amber-dim':'rgba(245,0,87,0.12)','--green':'#00C853','--red':'#DD2C00','--tog-off':'#EE99BB'}},
 ];
 
-let activeTheme = localStorage.getItem('theme') || 'night';
+let activeTheme  = localStorage.getItem('theme') || 'night';
+let hiddenThemes = new Set(JSON.parse(localStorage.getItem('hiddenThemes') || '[]'));
 
 function applyTheme(id) {
   const t = THEMES.find(t => t.id === id) || THEMES[0];
@@ -2208,24 +2249,64 @@ function applyTheme(id) {
   renderLights();
 }
 
+function deleteTheme(id, e) {
+  e.stopPropagation();
+  hiddenThemes.add(id);
+  localStorage.setItem('hiddenThemes', JSON.stringify([...hiddenThemes]));
+  if (activeTheme === id) applyTheme('night');
+  else renderThemePicker();
+}
+
+function restoreThemes() {
+  hiddenThemes.clear();
+  localStorage.removeItem('hiddenThemes');
+  renderThemePicker();
+}
+
 function renderThemePicker() {
   ['darkRow','lightRow'].forEach(rowId => {
     const isDark = rowId === 'darkRow';
     const row = document.getElementById(rowId);
     row.innerHTML = '';
-    THEMES.filter(t => t.dark === isDark).forEach(t => {
-      const el = document.createElement('div');
-      el.className = 'theme-swatch' + (t.id === activeTheme ? ' active' : '');
-      el.onclick = () => { applyTheme(t.id); };
-      el.innerHTML = `
-        <div class="swatch-circle" style="background:${t.bg};">
-          <div class="swatch-check"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
-          <div style="position:absolute;bottom:7px;right:7px;width:13px;height:13px;border-radius:50%;background:${t.accent};"></div>
-        </div>
-        <span class="swatch-name">${t.name}</span>`;
-      row.appendChild(el);
-    });
+    THEMES
+      .filter(t => t.dark === isDark && !hiddenThemes.has(t.id))
+      .forEach(t => {
+        const el = document.createElement('div');
+        el.className = 'theme-swatch' + (t.id === activeTheme ? ' active' : '');
+        el.onclick = () => { applyTheme(t.id); };
+        const canDelete = !isDark && t.id !== activeTheme;
+        el.innerHTML = `
+          ${canDelete ? `<div class="swatch-delete" title="Remove">✕</div>` : ''}
+          <div class="swatch-circle" style="background:${t.bg};">
+            <div class="swatch-check"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+            <div style="position:absolute;bottom:7px;right:7px;width:13px;height:13px;border-radius:50%;background:${t.accent};"></div>
+          </div>
+          <span class="swatch-name">${t.name}</span>`;
+        if (canDelete) {
+          el.querySelector('.swatch-delete').onclick = (e) => deleteTheme(t.id, e);
+        }
+        row.appendChild(el);
+      });
   });
+  // Show restore link if any light themes are hidden
+  const sheet = document.getElementById('themeSheet');
+  let restoreBtn = document.getElementById('themeRestoreBtn');
+  const anyHidden = [...hiddenThemes].some(id => {
+    const t = THEMES.find(t => t.id === id);
+    return t && !t.dark;
+  });
+  if (anyHidden) {
+    if (!restoreBtn) {
+      restoreBtn = document.createElement('button');
+      restoreBtn.id = 'themeRestoreBtn';
+      restoreBtn.className = 'theme-restore-btn';
+      restoreBtn.onclick = restoreThemes;
+      sheet.appendChild(restoreBtn);
+    }
+    restoreBtn.textContent = `Restore hidden (${[...hiddenThemes].filter(id => { const t = THEMES.find(t=>t.id===id); return t&&!t.dark; }).length})`;
+  } else if (restoreBtn) {
+    restoreBtn.remove();
+  }
 }
 
 function openThemePicker() {
@@ -2302,7 +2383,8 @@ const findLight = id => allLights().find(l => l.id === id);
 
 function lightRowHTML(light) {
   const { on, level, id, name } = light;
-  const lvl = on ? level : 0;
+  // Show last known brightness even when off so tap-to-set feels natural
+  const lvl = on ? level : (level || 50);
   const stroke = on ? 'var(--amber)' : 'var(--txt2)';
   return `<div class="light-row${on?' on':''}" id="row-${id}">
     <button class="light-toggle" onclick="toggleLight('${id}')" aria-label="Toggle ${name}">
@@ -2316,8 +2398,10 @@ function lightRowHTML(light) {
     </button>
     <span class="light-name">${name}</span>
     <div class="slider-wrap">
-      <input type="range" class="dim-slider" min="0" max="100" value="${lvl}" style="--pct:${lvl}%"
-        oninput="dimLightUI('${id}',this.value)"
+      <input type="range" class="dim-slider" min="1" max="100" value="${lvl}" style="--pct:${lvl}%"
+        onpointerdown="dimSliderDown(this)"
+        oninput="dimSliderInput('${id}',this)"
+        onpointerup="dimSliderUp('${id}',this)"
         onchange="dimLightSend('${id}',this.value)"
         aria-label="${name} brightness">
       <span class="dim-pct">${on ? lvl+'%' : '—'}</span>
@@ -2352,35 +2436,99 @@ function toggleLight(id) {
   markSceneDirty();
 }
 
+// ── Tap-to-toggle dimmer logic ────────────────────
+// A single tap anywhere on the track turns the light on at that position,
+// or turns it off if it was already on. A drag adjusts brightness.
+// We count input events: 1 = tap (thumb jumped), >1 = drag.
+
+function dimSliderDown(el) {
+  el._inputCount = 0;
+}
+
+function dimSliderInput(id, el) {
+  el._inputCount = (el._inputCount || 0) + 1;
+  const val = parseInt(el.value);
+  el.style.setProperty('--pct', val + '%');
+
+  if (el._inputCount > 1) {
+    // Confirmed drag — turn light on and track position in real time
+    const l = findLight(id);
+    const row = document.getElementById('row-' + id);
+    if (l && !l.on) {
+      l.on = true;
+      row?.classList.add('on');
+      row?.querySelector('.light-toggle svg')?.setAttribute('stroke', 'var(--amber)');
+    }
+    if (l) l.level = val;
+    const pctEl = row?.querySelector('.dim-pct');
+    if (pctEl) pctEl.textContent = val + '%';
+    markSceneDirty();
+  }
+}
+
+function dimSliderUp(id, el) {
+  const isTap = (el._inputCount || 0) <= 1;
+  el._inputCount = 0;
+  const val = parseInt(el.value);
+  const l = findLight(id);
+  if (!l) return;
+
+  if (isTap) {
+    if (l.on) {
+      // Tap while on → turn off, restore slider to last brightness
+      l.on = false;
+      const restoreVal = l.level || 50;
+      el.value = restoreVal;
+      el.style.setProperty('--pct', restoreVal + '%');
+      publishLight(id, 'off');
+    } else {
+      // Tap while off → turn on at tapped position
+      l.on = true;
+      l.level = val;
+      publishLight(id, String(val));
+    }
+    renderLights();
+    markSceneDirty();
+  }
+  // Drag: onchange fires next and calls dimLightSend
+}
+
+// Called by onchange after drag ends — sends final value to MQTT
+function dimLightSend(id, value) {
+  const l = findLight(id);
+  if (!l?.on) return; // skip if tap-off already handled it
+  const v = parseInt(value);
+  if (v > 0) l.lastLevel = v;
+  publishLight(id, String(v));
+  markSceneDirty();
+}
+
+// Called from MQTT updates (Pi → dashboard)
 function dimLightUI(id, value) {
   const l = findLight(id); if (!l) return;
   const v = parseInt(value);
-  l.level = v; l.on = v > 0;
+  if (v > 0) l.level = v; // preserve last brightness when turning off
+  l.on = v > 0;
   const row = document.getElementById('row-' + id);
-  row.querySelector('.dim-slider').style.setProperty('--pct', v + '%');
+  if (!row) return;
+  const displayVal = v > 0 ? v : (l.level || 50);
+  const slider = row.querySelector('.dim-slider');
+  if (slider) { slider.value = displayVal; slider.style.setProperty('--pct', displayVal + '%'); }
   row.classList.toggle('on', v > 0);
-  row.querySelector('.dim-pct').textContent = v > 0 ? v + '%' : '—';
+  const pctEl = row.querySelector('.dim-pct');
+  if (pctEl) pctEl.textContent = v > 0 ? v + '%' : '—';
   const group = LIGHT_GROUPS.find(g => g.lights.some(x => x.id === id));
   if (group) {
     const anyOn = group.lights.some(l => l.on);
-    row.closest('.card').querySelectorAll('.group-header').forEach(h => {
-      if (h.querySelector('.group-label').textContent === group.label)
-        h.querySelector('.toggle-switch').classList.toggle('on', anyOn);
+    row.closest('.card')?.querySelectorAll('.group-header').forEach(h => {
+      if (h.querySelector('.group-label')?.textContent === group.label)
+        h.querySelector('.toggle-switch')?.classList.toggle('on', anyOn);
     });
   }
 }
 
-function dimLightSend(id, value) {
-  const v = parseInt(value);
-  const l = findLight(id);
-  if (l && v > 0) l.lastLevel = v;
-  publishLight(id, v > 0 ? String(v) : 'off');
-  markSceneDirty();
-}
-
 function dimLight(id, value) {
   dimLightUI(id, value);
-  dimLightSend(id, value);
 }
 
 function toggleGroup(groupId) {
@@ -2429,13 +2577,17 @@ function lucideIcon(name, size = 16, sw = 2) {
 // ── Scenes ────────────────────────────────────────
 const DEFAULT_SCENES = [
   { id:'sleep',   name:'Sleep',   icon:'moon',
-    lights:{ main:{on:false,level:0}, kitchen:{on:false,level:0}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:false,level:0}, awning:{on:false,level:0}, step:{on:false,level:0} }},
+    lights:{ main:{on:false,level:0}, kitchen:{on:false,level:0}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:false,level:0}, awning:{on:false,level:0}, step:{on:false,level:0} },
+    rope:{ on:false, color:null, effect:null }},
   { id:'movie',   name:'Movie',   icon:'film',
-    lights:{ main:{on:true,level:15}, kitchen:{on:false,level:0}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:true,level:20}, bench:{on:true,level:15}, awning:{on:false,level:0}, step:{on:false,level:0} }},
+    lights:{ main:{on:true,level:15}, kitchen:{on:false,level:0}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:true,level:20}, bench:{on:true,level:15}, awning:{on:false,level:0}, step:{on:false,level:0} },
+    rope:{ on:true, color:'amber', effect:null }},
   { id:'morning', name:'Morning', icon:'sun',
-    lights:{ main:{on:true,level:60}, kitchen:{on:true,level:80}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:false,level:0}, awning:{on:false,level:0}, step:{on:false,level:0} }},
+    lights:{ main:{on:true,level:60}, kitchen:{on:true,level:80}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:false,level:0}, awning:{on:false,level:0}, step:{on:false,level:0} },
+    rope:{ on:false, color:null, effect:null }},
   { id:'dinner',  name:'Dinner',  icon:'utensils',
-    lights:{ main:{on:true,level:70}, kitchen:{on:true,level:100}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:true,level:50}, awning:{on:false,level:0}, step:{on:false,level:0} }},
+    lights:{ main:{on:true,level:70}, kitchen:{on:true,level:100}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:true,level:50}, awning:{on:false,level:0}, step:{on:false,level:0} },
+    rope:{ on:true, color:'amber', effect:null }},
 ];
 
 let scenes = [];
@@ -2447,7 +2599,9 @@ const SCENE_ID_ICONS = { sleep:'moon', movie:'film', morning:'sun', dinner:'uten
 function migrateScene(s) {
   const name = s.name.replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}]️?\s*/u, '').trim() || s.name;
   const icon = s.icon || SCENE_ID_ICONS[s.id] || 'star';
-  return { ...s, name, icon };
+  // Add rope state for scenes saved before rope support was added
+  const rope = s.rope || { on: false, color: null, effect: null };
+  return { ...s, name, icon, rope };
 }
 
 function loadScenes() {
@@ -2544,6 +2698,16 @@ function applyScene(id) {
     l.level = s.level;
     publishLight(l.id, l.on ? String(l.level) : 'off');
   });
+  // Apply rope light state
+  if (scene.rope) {
+    if (scene.rope.on) {
+      if (scene.rope.effect) setRopeEffect(scene.rope.effect);
+      else if (scene.rope.color) setRopeColor(scene.rope.color);
+      else if (!ropeOn) toggleRopeLight();
+    } else if (ropeOn) {
+      toggleRopeLight();
+    }
+  }
   lastAppliedSceneId = id;
   sceneIsDirty = false;
   renderLights();
@@ -2554,6 +2718,7 @@ function saveToScene(id) {
   const scene = scenes.find(s => s.id === id);
   if (!scene) return;
   allLights().forEach(l => { scene.lights[l.id] = { on: l.on, level: l.level }; });
+  scene.rope = { on: ropeOn, color: ropeActiveColor, effect: ropeActiveEffect };
   sceneIsDirty = false;
   saveScenes();
   renderScenes();
@@ -2723,6 +2888,7 @@ function toggleRopeLight() {
     ropeActiveEffect = null;
   }
   if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', ropeOn ? 'on' : 'off');
+  markSceneDirty();
 }
 
 function updateRopeIcon() {
@@ -2739,6 +2905,7 @@ function setRopeColor(color) {
   ropeActiveColor = color;
   ropeActiveEffect = null;
   if (mqttClient?.connected) mqttClient.publish('van/rope-light/color', color);
+  markSceneDirty();
 }
 
 function setRopeEffect(effect) {
@@ -2752,6 +2919,7 @@ function setRopeEffect(effect) {
   ropeActiveColor = null;
   ropeActiveEffect = effect;
   if (mqttClient?.connected) mqttClient.publish('van/rope-light/effect', effect);
+  markSceneDirty();
 }
 
 function setRopeBrightness(val) {
