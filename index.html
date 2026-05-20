@@ -496,109 +496,207 @@
       margin: 0 0 8px;
     }
 
-    .scenes-scroll {
-      display: flex;
+    .scenes-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       gap: 8px;
-      overflow-x: auto;
-      padding: 4px 2px 6px;
-      scrollbar-width: none;
-      -webkit-overflow-scrolling: touch;
-      align-items: center;
     }
 
-    .scenes-scroll::-webkit-scrollbar { display: none; }
-
-    .scene-chip {
+    .scene-tile {
+      position: relative;
       display: flex;
+      flex-direction: column;
       align-items: center;
-      padding: 11px 16px;
-      min-height: 44px;
+      justify-content: center;
+      gap: 7px;
+      padding: 16px 8px;
+      min-height: 76px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 22px;
-      font-size: 14px;
-      font-weight: 600;
+      border-radius: 14px;
       color: var(--txt2);
-      white-space: nowrap;
       cursor: pointer;
-      flex-shrink: 0;
-      position: relative;
-      transition: all 0.2s;
+      transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.1s;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
     }
 
-    .scene-chip.active {
+    .scene-tile.active {
       background: var(--amber-dim);
       border-color: var(--amber);
       color: var(--amber);
     }
 
-    .scene-chip:active { transform: scale(0.95); }
-    .scene-move-btn {
+    .scene-tile:active { transform: scale(0.96); }
+
+    .scene-tile-name {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1;
+    }
+
+    .scene-dirty-dot {
+      position: absolute;
+      top: 9px;
+      right: 9px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--amber);
+      box-shadow: 0 0 0 2px var(--amber-dim);
+    }
+
+    .scene-add-tile {
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: none;
-      border: none;
-      color: inherit;
-      padding: 0;
-      width: 32px;
-      align-self: stretch;
-      cursor: pointer;
-      opacity: 0.55;
-      flex-shrink: 0;
-      -webkit-tap-highlight-color: transparent;
-      transition: opacity 0.15s;
-    }
-    .scene-move-btn:active { opacity: 1; transform: scale(0.85); }
-    .scene-move-btn:disabled { opacity: 0.15; pointer-events: none; }
-
-
-    .scene-add-btn {
-      width: 44px;
-      height: 44px;
-      background: var(--surface2);
+      gap: 6px;
+      min-height: 76px;
+      background: transparent;
       border: 1.5px dashed var(--border);
-      border-radius: 50%;
-      font-size: 20px;
+      border-radius: 14px;
       color: var(--txt2);
       cursor: pointer;
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       -webkit-tap-highlight-color: transparent;
       transition: all 0.2s;
     }
 
-    .scene-name-input-wrap {
+    .scene-edit-btn {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 13px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--txt2);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: all 0.2s;
+    }
+    .scene-edit-btn.editing {
+      color: var(--amber);
+      border-color: var(--amber);
+      background: var(--amber-dim);
+    }
+
+    .scene-tile.edit-mode {
+      grid-column: 1 / -1;
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+      padding: 0 12px;
+      min-height: 52px;
+      cursor: default;
+    }
+    .scene-tile.edit-mode:active { transform: unset; }
+
+    .scene-tile-trash {
       display: flex;
       align-items: center;
-      gap: 6px;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--red);
+      color: #fff;
       flex-shrink: 0;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      border: none;
+      padding: 0;
+    }
+
+    .scene-tile-grip {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--txt2);
+      flex-shrink: 0;
+      touch-action: none;
+      cursor: grab;
+      padding: 4px;
+    }
+    .scene-tile-grip:active { cursor: grabbing; }
+
+    @keyframes scene-jiggle {
+      0%   { transform: rotate(0deg); }
+      30%  { transform: rotate(0.35deg); }
+      70%  { transform: rotate(-0.35deg); }
+      100% { transform: rotate(0deg); }
+    }
+    .scene-tile.jiggle { animation: scene-jiggle 0.55s ease-in-out infinite; transform-origin: center; }
+    .scene-tile.drag-source { opacity: 0; }
+
+    .scene-drag-ghost {
+      position: fixed;
+      pointer-events: none;
+      z-index: 999;
+      border-radius: 14px;
+      background: var(--surface2);
+      border: 1.5px solid var(--amber);
+      box-shadow: 0 0 0 2px var(--amber-dim), 0 8px 32px rgba(0,0,0,0.55);
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+      padding: 0 12px;
+      color: var(--txt);
+      font-size: 13px;
+      font-weight: 600;
+      transform: scale(1.05) rotate(1.5deg);
+    }
+    .scene-drag-ghost .scene-tile-grip { color: var(--txt2); }
+
+    #scene-toast {
+      position: fixed;
+      bottom: calc(env(safe-area-inset-bottom) + 84px);
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 9px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--txt);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.22s, transform 0.22s;
+      z-index: 95;
+      white-space: nowrap;
+    }
+    #scene-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    .scene-name-input-wrap {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .scene-name-input {
-      width: 120px;
-      padding: 6px 10px;
+      flex: 1;
+      padding: 10px 14px;
       background: var(--surface2);
       border: 1px solid var(--amber);
-      border-radius: 16px;
+      border-radius: 12px;
       color: var(--txt);
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 500;
       outline: none;
       -webkit-appearance: none;
     }
 
     .scene-save-btn {
-      padding: 6px 12px;
+      padding: 10px 16px;
       background: var(--amber-dim);
       border: 1px solid var(--amber);
-      border-radius: 16px;
+      border-radius: 12px;
       color: var(--amber);
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 600;
       cursor: pointer;
       white-space: nowrap;
@@ -778,31 +876,43 @@
     .rope-color-btn {
       width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent;
       cursor: pointer; transition: transform 0.15s, border-color 0.15s;
-      -webkit-tap-highlight-color: transparent;
+      -webkit-tap-highlight-color: transparent; flex-shrink: 0;
     }
     .rope-color-btn:active { transform: scale(0.85); }
-    .rope-color-btn.active { border-color: var(--amber); }
-    .rope-effects { padding: 0 14px 14px; }
-    .rope-effect-btn {
-      width: 100%; height: 36px; border-radius: 18px; border: none;
-      cursor: pointer; font-size: 13px; font-weight: 600; letter-spacing: 0.3px;
-      color: #000;
-      background: linear-gradient(90deg, #ff2222, #ff7700, #ffee00, #22cc44, #00eeff, #2244ff, #8822ff);
-      transition: opacity 0.15s, transform 0.15s;
-      -webkit-tap-highlight-color: transparent;
+    .rope-color-btn.active { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber); }
+
+    /* Color Cycle — same circle size as swatches, rainbow gradient */
+    .rope-cycle-btn {
+      width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent;
+      background: conic-gradient(#ff2222 0%, #ff7700 16%, #ffee00 33%, #22cc44 50%, #00eeff 66%, #2244ff 82%, #8822ff 100%);
+      cursor: pointer; transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+      -webkit-tap-highlight-color: transparent; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
     }
-    .rope-effect-btn:active { transform: scale(0.97); opacity: 0.85; }
-    .rope-effect-btn.active { box-shadow: 0 0 0 2px var(--amber), 0 0 14px rgba(255,160,64,0.3); }
+    .rope-cycle-btn:active { transform: scale(0.85); }
+    .rope-cycle-btn.active { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber), 0 0 10px rgba(255,160,64,0.4); }
 
     .rope-slider-row {
       display: flex; align-items: center; gap: 10px;
-      padding: 4px 14px;
+      padding: 6px 14px;
     }
     .rope-slider-row svg { flex-shrink: 0; opacity: 0.6; }
-    .rope-slider-row .dim-slider { flex: 1; }
-    .rope-slider-row .dim-pct { font-size: 13px; font-weight: 600; color: var(--txt2); width: 34px; text-align: right; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+    /* Rope sliders always show the amber fill (same style as active light rows) */
+    .rope-slider-row .dim-slider {
+      flex: 1;
+      background: linear-gradient(
+        to right,
+        var(--amber) 0%,
+        var(--amber) var(--pct, 0%),
+        var(--surface2) var(--pct, 0%),
+        var(--surface2) 100%
+      );
+    }
+    .rope-slider-row .dim-pct { font-size: 13px; font-weight: 600; color: var(--amber); width: 34px; text-align: right; font-variant-numeric: tabular-nums; flex-shrink: 0; }
     .rope-slider-row.speed-row { opacity: 0.4; transition: opacity 0.2s; }
+    .rope-slider-row.speed-row .dim-pct { color: var(--txt2); }
     .rope-slider-row.speed-row.active { opacity: 1; }
+    .rope-slider-row.speed-row.active .dim-pct { color: var(--amber); }
 
     /* ── Climate ──────────────────────────────────── */
     .climate-card {
@@ -1768,10 +1878,10 @@ safe-buffer/index.js:
   <div id="tab-lights" class="tab-panel" hidden>
     <div class="section-label-row">
       <span class="section-label">Lights</span>
-      <button class="toggle-switch" id="masterBtn" onclick="toggleAllLights()" aria-label="All lights"></button>
+      <button class="scene-edit-btn" id="sceneEditBtn" onclick="toggleSceneEdit()">Edit</button>
     </div>
     <div class="scenes-wrap">
-      <div class="scenes-scroll" id="scenesScroll"></div>
+      <div class="scenes-grid" id="scenesScroll"></div>
     </div>
     <div class="card">
       <div id="lightsList"></div>
@@ -1805,8 +1915,15 @@ safe-buffer/index.js:
         <button class="rope-color-btn" id="ropePurple" onclick="setRopeColor('purple')" style="background:#8822ff" title="Purple"></button>
         <button class="rope-color-btn" id="ropePink"   onclick="setRopeColor('pink')"   style="background:#ff44aa" title="Pink"></button>
         <button class="rope-color-btn" id="ropeWhite"  onclick="setRopeColor('white')"  style="background:#ffffff" title="White"></button>
+        <!-- Color Cycle: round rainbow circle, same size as color swatches -->
+        <button class="rope-cycle-btn" id="ropeEffectCycle" onclick="setRopeEffect('cycle')" title="Color Cycle">
+          <!-- sparkle / play icon -->
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.7)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+          </svg>
+        </button>
       </div>
-      <div class="rope-slider-row" style="padding-top:8px">
+      <div class="rope-slider-row">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--txt2)" stroke-width="2" stroke-linecap="round">
           <circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/>
           <line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/>
@@ -1825,11 +1942,9 @@ safe-buffer/index.js:
           oninput="setRopeSpeed(this.value)" style="--pct:44%">
         <span class="dim-pct" id="ropeSpeedPct">5</span>
       </div>
-      <div class="rope-effects">
-        <button class="rope-effect-btn" id="ropeEffectCycle" onclick="setRopeEffect('cycle')">✦ Color Cycle</button>
-      </div>
     </div>
   </div>
+  <div id="scene-toast"></div>
 
   <!-- TAB: CLIMATE -->
   <div id="tab-climate" class="tab-panel" hidden>
@@ -2438,13 +2553,17 @@ function lucideIcon(name, size = 16, sw = 2) {
 // ── Scenes ────────────────────────────────────────
 const DEFAULT_SCENES = [
   { id:'sleep',   name:'Sleep',   icon:'moon',
-    lights:{ main:{on:false,level:0}, kitchen:{on:false,level:0}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:false,level:0}, awning:{on:false,level:0}, step:{on:false,level:0} }},
+    lights:{ main:{on:false,level:0}, kitchen:{on:false,level:0}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:false,level:0}, awning:{on:false,level:0}, step:{on:false,level:0} },
+    rope:{ on:false, color:null, effect:null }},
   { id:'movie',   name:'Movie',   icon:'film',
-    lights:{ main:{on:true,level:15}, kitchen:{on:false,level:0}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:true,level:20}, bench:{on:true,level:15}, awning:{on:false,level:0}, step:{on:false,level:0} }},
+    lights:{ main:{on:true,level:15}, kitchen:{on:false,level:0}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:true,level:20}, bench:{on:true,level:15}, awning:{on:false,level:0}, step:{on:false,level:0} },
+    rope:{ on:true, color:'amber', effect:null }},
   { id:'morning', name:'Morning', icon:'sun',
-    lights:{ main:{on:true,level:60}, kitchen:{on:true,level:80}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:false,level:0}, awning:{on:false,level:0}, step:{on:false,level:0} }},
+    lights:{ main:{on:true,level:60}, kitchen:{on:true,level:80}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:false,level:0}, awning:{on:false,level:0}, step:{on:false,level:0} },
+    rope:{ on:false, color:null, effect:null }},
   { id:'dinner',  name:'Dinner',  icon:'utensils',
-    lights:{ main:{on:true,level:70}, kitchen:{on:true,level:100}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:true,level:50}, awning:{on:false,level:0}, step:{on:false,level:0} }},
+    lights:{ main:{on:true,level:70}, kitchen:{on:true,level:100}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:true,level:50}, awning:{on:false,level:0}, step:{on:false,level:0} },
+    rope:{ on:true, color:'amber', effect:null }},
 ];
 
 let scenes = [];
@@ -2456,7 +2575,8 @@ const SCENE_ID_ICONS = { sleep:'moon', movie:'film', morning:'sun', dinner:'uten
 function migrateScene(s) {
   const name = s.name.replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}]️?\s*/u, '').trim() || s.name;
   const icon = s.icon || SCENE_ID_ICONS[s.id] || 'star';
-  return { ...s, name, icon };
+  const rope = s.rope || { on: false, color: null, effect: null };
+  return { ...s, name, icon, rope };
 }
 
 function loadScenes() {
@@ -2474,20 +2594,31 @@ function saveScenes() {
   localStorage.setItem('scenes', JSON.stringify(scenes));
 }
 
-function moveSceneLeft(id) {
-  const idx = scenes.findIndex(s => s.id === id);
-  if (idx <= 0) return;
-  [scenes[idx - 1], scenes[idx]] = [scenes[idx], scenes[idx - 1]];
-  saveScenes();
+// ── Scene edit mode ───────────────────────────────
+let sceneEditMode = false;
+let _sceneDragId  = null;
+
+function toggleSceneEdit() {
+  sceneEditMode = !sceneEditMode;
+  if (!sceneEditMode) {
+    saveScenes();
+    showSceneToast('Scenes saved ✓');
+  }
+  const btn = document.getElementById('sceneEditBtn');
+  if (btn) {
+    btn.textContent = sceneEditMode ? 'Done' : 'Edit';
+    btn.classList.toggle('editing', sceneEditMode);
+  }
   renderScenes();
 }
 
-function moveSceneRight(id) {
-  const idx = scenes.findIndex(s => s.id === id);
-  if (idx >= scenes.length - 1) return;
-  [scenes[idx], scenes[idx + 1]] = [scenes[idx + 1], scenes[idx]];
-  saveScenes();
-  renderScenes();
+function showSceneToast(msg) {
+  const el = document.getElementById('scene-toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove('show'), 2000);
 }
 
 function renderScenes() {
@@ -2495,66 +2626,167 @@ function renderScenes() {
   if (!wrap) return;
   wrap.innerHTML = '';
 
-  scenes.forEach((scene, si) => {
-    const chip = document.createElement('button');
-    const isActive = scene.id === lastAppliedSceneId;
-    const showSave = isActive && sceneIsDirty;
-    chip.className = 'scene-chip' + (isActive ? ' active' : '');
+  if (sceneEditMode) {
+    scenes.forEach((scene, i) => wrap.appendChild(_buildEditTile(scene, null, i)));
+  } else {
+    scenes.forEach(scene => {
+      const isActive = scene.id === lastAppliedSceneId;
+      const isDirty  = isActive && sceneIsDirty;
+      const tile = document.createElement('button');
+      tile.className = 'scene-tile' + (isActive ? ' active' : '');
+      tile.dataset.sceneId = scene.id;
 
-    // ← move left
-    const leftBtn = document.createElement('button');
-    leftBtn.className = 'scene-move-btn';
-    leftBtn.innerHTML = lucideIcon('chevron-left', 17);
-    leftBtn.disabled = si === 0;
-    leftBtn.addEventListener('click', e => { e.stopPropagation(); moveSceneLeft(scene.id); });
-    chip.appendChild(leftBtn);
+      const iconEl = document.createElement('span');
+      iconEl.innerHTML = lucideIcon(scene.icon || 'star', 22);
+      tile.appendChild(iconEl);
 
-    const iconEl = document.createElement('span');
-    iconEl.style.cssText = 'display:flex;align-items:center;margin-right:6px;margin-left:4px;';
-    iconEl.innerHTML = lucideIcon(scene.icon || 'star', 14);
-    const inner = document.createElement('span');
-    inner.style.cssText = 'display:inline-grid;';
-    const normalSpan = document.createElement('span');
-    normalSpan.textContent = scene.name;
-    normalSpan.style.cssText = 'grid-area:1/1;' + (showSave ? 'visibility:hidden;' : '');
-    const saveSpan = document.createElement('span');
-    saveSpan.textContent = 'Save';
-    saveSpan.style.cssText = 'grid-area:1/1;' + (!showSave ? 'visibility:hidden;' : '');
-    inner.appendChild(normalSpan);
-    inner.appendChild(saveSpan);
-    chip.appendChild(iconEl);
-    chip.appendChild(inner);
+      const nameEl = document.createElement('span');
+      nameEl.className = 'scene-tile-name';
+      nameEl.textContent = scene.name;
+      tile.appendChild(nameEl);
 
-    // → move right
-    const rightBtn = document.createElement('button');
-    rightBtn.className = 'scene-move-btn';
-    rightBtn.innerHTML = lucideIcon('chevron-right', 17);
-    rightBtn.disabled = si === scenes.length - 1;
-    rightBtn.addEventListener('click', e => { e.stopPropagation(); moveSceneRight(scene.id); });
-    chip.appendChild(rightBtn);
+      if (isDirty) {
+        const dot = document.createElement('span');
+        dot.className = 'scene-dirty-dot';
+        dot.title = 'Tap to save changes';
+        tile.appendChild(dot);
+      }
 
-    // Long-press to delete with confirmation
-    let pressTimer;
-    chip.addEventListener('touchstart', () => {
-      pressTimer = setTimeout(() => {
-        if (confirm(`Delete "${scene.name}"?`)) deleteScene(scene.id);
-      }, 600);
-    }, { passive: true });
-    chip.addEventListener('touchend',  () => clearTimeout(pressTimer));
-    chip.addEventListener('touchmove', () => clearTimeout(pressTimer));
+      let longPressTimer;
+      tile.addEventListener('touchstart', () => {
+        longPressTimer = setTimeout(() => toggleSceneEdit(), 500);
+      }, { passive: true });
+      tile.addEventListener('touchend',  () => clearTimeout(longPressTimer));
+      tile.addEventListener('touchmove', () => clearTimeout(longPressTimer));
 
-    chip.addEventListener('click', () => {
-      if (scene.id === lastAppliedSceneId && sceneIsDirty) saveToScene(scene.id);
-      else applyScene(scene.id);
+      tile.addEventListener('click', () => {
+        if (isActive && sceneIsDirty) saveToScene(scene.id);
+        else applyScene(scene.id);
+      });
+      wrap.appendChild(tile);
     });
-    wrap.appendChild(chip);
-  });
 
-  const addBtn = document.createElement('button');
-  addBtn.className = 'scene-add-btn';
-  addBtn.innerHTML = lucideIcon('plus', 18);
-  addBtn.addEventListener('click', promptNewScene);
-  wrap.appendChild(addBtn);
+    const addTile = document.createElement('button');
+    addTile.className = 'scene-add-tile';
+    addTile.innerHTML = lucideIcon('plus', 20);
+    addTile.addEventListener('click', promptNewScene);
+    wrap.appendChild(addTile);
+  }
+}
+
+// ── Drag-to-reorder ───────────────────────────────
+function setupDragHandle(gripEl, sceneId) {
+  gripEl.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    _startSceneDrag(e, sceneId, gripEl);
+  }, { passive: false });
+}
+
+function _startSceneDrag(e, sceneId, gripEl) {
+  const wrap = document.getElementById('scenesScroll');
+  if (!wrap) return;
+  const sourceTile = wrap.querySelector(`[data-scene-id="${sceneId}"]`);
+  if (!sourceTile) return;
+  const tileRect = sourceTile.getBoundingClientRect();
+
+  const ghost = document.createElement('div');
+  ghost.className = 'scene-drag-ghost';
+  ghost.style.width  = tileRect.width + 'px';
+  ghost.style.height = tileRect.height + 'px';
+  ghost.style.left   = tileRect.left + 'px';
+  ghost.style.top    = tileRect.top + 'px';
+  const scene = scenes.find(s => s.id === sceneId);
+  if (scene) {
+    const gName = document.createElement('span');
+    gName.className = 'scene-tile-name'; gName.textContent = scene.name;
+    const gGrip = document.createElement('span');
+    gGrip.className = 'scene-tile-grip'; gGrip.style.marginLeft = 'auto';
+    gGrip.innerHTML = lucideIcon('grip-vertical', 18, 2);
+    ghost.appendChild(gName); ghost.appendChild(gGrip);
+  }
+  document.body.appendChild(ghost);
+  sourceTile.classList.add('drag-source');
+  _sceneDragId = sceneId;
+
+  const offsetX = e.clientX - tileRect.left;
+  const offsetY = e.clientY - tileRect.top;
+
+  function onMove(ev) {
+    ghost.style.left = (ev.clientX - offsetX) + 'px';
+    ghost.style.top  = (ev.clientY - offsetY) + 'px';
+    const tiles = Array.from(wrap.querySelectorAll('[data-scene-id]'));
+    for (const t of tiles) {
+      if (t.dataset.sceneId === sceneId) continue;
+      const r = t.getBoundingClientRect();
+      if (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom) {
+        const di = scenes.findIndex(s => s.id === sceneId);
+        const ti = scenes.findIndex(s => s.id === t.dataset.sceneId);
+        if (di !== -1 && ti !== -1 && di !== ti) {
+          [scenes[di], scenes[ti]] = [scenes[ti], scenes[di]];
+          _reRenderEditTiles(sceneId);
+        }
+        break;
+      }
+    }
+  }
+
+  function onUp() {
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    document.removeEventListener('pointercancel', onUp);
+    ghost.remove(); _sceneDragId = null; renderScenes();
+  }
+
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
+  document.addEventListener('pointercancel', onUp);
+}
+
+function _buildEditTile(scene, dragSceneId, i) {
+  const tile = document.createElement('div');
+  tile.className = 'scene-tile edit-mode jiggle' + (scene.id === dragSceneId ? ' drag-source' : '');
+  tile.dataset.sceneId = scene.id;
+  tile.style.animationDelay = `${(i * 47) % 200}ms`;
+
+  const nameEl = document.createElement('span');
+  nameEl.className = 'scene-tile-name'; nameEl.style.flex = '1'; nameEl.textContent = scene.name;
+  tile.appendChild(nameEl);
+
+  const trashBtn = document.createElement('button');
+  trashBtn.className = 'scene-tile-trash';
+  trashBtn.innerHTML = lucideIcon('trash-2', 14, 2.5);
+  trashBtn.addEventListener('click', e => { e.stopPropagation(); deleteScene(scene.id); });
+  tile.appendChild(trashBtn);
+
+  const gripEl = document.createElement('span');
+  gripEl.className = 'scene-tile-grip'; gripEl.style.marginLeft = '0';
+  gripEl.innerHTML = lucideIcon('grip-vertical', 18, 2);
+  setupDragHandle(gripEl, scene.id);
+  tile.appendChild(gripEl);
+  return tile;
+}
+
+function _reRenderEditTiles(dragSceneId) {
+  const wrap = document.getElementById('scenesScroll');
+  if (!wrap) return;
+  const before = {};
+  wrap.querySelectorAll('[data-scene-id]').forEach(t => { before[t.dataset.sceneId] = t.getBoundingClientRect(); });
+  wrap.innerHTML = '';
+  scenes.forEach((scene, i) => wrap.appendChild(_buildEditTile(scene, dragSceneId, i)));
+  wrap.querySelectorAll('[data-scene-id]').forEach(tile => {
+    const id = tile.dataset.sceneId;
+    if (id === dragSceneId) return;
+    const oldRect = before[id]; if (!oldRect) return;
+    const newRect = tile.getBoundingClientRect();
+    const dx = oldRect.left - newRect.left; const dy = oldRect.top - newRect.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+    tile.style.animationPlayState = 'paused';
+    tile.style.transition = 'none'; tile.style.transform = `translate(${dx}px,${dy}px)`;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      tile.style.transition = 'transform 0.2s cubic-bezier(0.4,0,0.2,1)'; tile.style.transform = '';
+      setTimeout(() => { tile.style.transition = ''; tile.style.animationPlayState = ''; }, 220);
+    }));
+  });
 }
 
 function applyScene(id) {
@@ -2567,6 +2799,16 @@ function applyScene(id) {
     l.level = s.level;
     publishLight(l.id, l.on ? String(l.level) : 'off');
   });
+  // Apply rope light state
+  if (scene.rope) {
+    if (scene.rope.on) {
+      if (scene.rope.effect) setRopeEffect(scene.rope.effect);
+      else if (scene.rope.color) setRopeColor(scene.rope.color);
+      else if (!ropeOn) toggleRopeLight();
+    } else if (ropeOn) {
+      toggleRopeLight();
+    }
+  }
   lastAppliedSceneId = id;
   sceneIsDirty = false;
   renderLights();
@@ -2577,6 +2819,7 @@ function saveToScene(id) {
   const scene = scenes.find(s => s.id === id);
   if (!scene) return;
   allLights().forEach(l => { scene.lights[l.id] = { on: l.on, level: l.level }; });
+  scene.rope = { on: ropeOn, color: ropeActiveColor, effect: ropeActiveEffect };
   sceneIsDirty = false;
   saveScenes();
   renderScenes();
@@ -2604,17 +2847,15 @@ function deleteScene(id) {
 }
 
 function promptNewScene() {
-  const scroll = document.getElementById('scenesScroll');
-  const addBtn = scroll.querySelector('.scene-add-btn');
-  if (addBtn) addBtn.style.display = 'none';
+  const grid = document.getElementById('scenesScroll');
+  const addTile = grid.querySelector('.scene-add-tile');
+  if (addTile) addTile.remove();
 
   const wrapper = document.createElement('div');
   wrapper.className = 'scene-name-input-wrap';
-  wrapper.innerHTML = `<input class="scene-name-input" id="sceneNameInput" placeholder="Name…" maxlength="20">
+  wrapper.innerHTML = `<input class="scene-name-input" id="sceneNameInput" placeholder="Scene name…" maxlength="20">
     <button class="scene-save-btn" id="sceneSaveBtn">Save</button>`;
-  scroll.appendChild(wrapper);
-
-  setTimeout(() => scroll.scrollLeft = scroll.scrollWidth, 30);
+  grid.appendChild(wrapper);
 
   const input = document.getElementById('sceneNameInput');
   input.focus();
@@ -2632,7 +2873,8 @@ function saveNewScene() {
   const id = 'scene_' + Date.now();
   const lights = {};
   allLights().forEach(l => { lights[l.id] = { on: l.on, level: l.level }; });
-  scenes.push({ id, name, icon: 'star', lights });
+  const rope = { on: ropeOn, color: ropeActiveColor, effect: ropeActiveEffect };
+  scenes.push({ id, name, icon: 'star', lights, rope });
   saveScenes();
   renderScenes();
 }
@@ -2703,7 +2945,7 @@ function toggleRopeLight() {
   document.getElementById('ropeIcon').setAttribute('stroke', ropeOn ? 'var(--amber)' : 'var(--txt2)');
   if (!ropeOn) {
     document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.rope-effect-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.rope-cycle-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('ropeSpeedRow').classList.remove('active');
     ropeActiveColor = null;
     ropeActiveEffect = null;
@@ -2716,7 +2958,7 @@ function setRopeColor(color) {
   document.getElementById('ropeRow').classList.add('on');
   document.getElementById('ropeIcon').setAttribute('stroke', 'var(--amber)');
   document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.rope-effect-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.rope-cycle-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('rope' + color.charAt(0).toUpperCase() + color.slice(1)).classList.add('active');
   ropeActiveColor = color;
   ropeActiveEffect = null;
@@ -2728,7 +2970,7 @@ function setRopeEffect(effect) {
   document.getElementById('ropeRow').classList.add('on');
   document.getElementById('ropeIcon').setAttribute('stroke', 'var(--amber)');
   document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.rope-effect-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.rope-cycle-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('ropeEffect' + effect.charAt(0).toUpperCase() + effect.slice(1)).classList.add('active');
   document.getElementById('ropeSpeedRow').classList.add('active');
   ropeActiveColor = null;
@@ -2923,7 +3165,7 @@ function enterDrivingMode() {
     document.getElementById('ropeRow')?.classList.remove('on');
     document.getElementById('ropeIcon')?.setAttribute('stroke', 'var(--txt2)');
     document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.rope-effect-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.rope-cycle-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('ropeSpeedRow')?.classList.remove('active');
     ropeActiveColor = null;
     ropeActiveEffect = null;
