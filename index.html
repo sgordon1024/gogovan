@@ -461,29 +461,34 @@
     }
 
     @keyframes bolt-strike {
+      /* 3-stroke pattern — bright → gap → medium → gap → dim → out */
       0%   { opacity: 0; }
-      5%   { opacity: 0.95; }
-      15%  { opacity: 0.03; }
-      24%  { opacity: 0.80; }
-      42%  { opacity: 0; }
+      4%   { opacity: 1; }       /* stroke 1 — full brightness */
+      11%  { opacity: 0.02; }    /* gap */
+      18%  { opacity: 0.88; }    /* stroke 2 */
+      27%  { opacity: 0.02; }    /* gap */
+      33%  { opacity: 0.62; }    /* stroke 3 — trailing */
+      48%  { opacity: 0; }
       100% { opacity: 0; }
     }
 
     @keyframes card-strike {
       0%   { opacity: 0; }
-      5%   { opacity: 0.18; }
-      15%  { opacity: 0; }
-      24%  { opacity: 0.10; }
-      42%  { opacity: 0; }
+      4%   { opacity: 0.20; }
+      11%  { opacity: 0; }
+      18%  { opacity: 0.14; }
+      27%  { opacity: 0; }
+      33%  { opacity: 0.08; }
+      48%  { opacity: 0; }
       100% { opacity: 0; }
     }
 
     #batt-bolt.bolt-flash {
-      animation: bolt-strike 0.65s ease-out forwards;
+      animation: bolt-strike 0.9s ease-out forwards;
     }
 
     #batt-flash.card-flash {
-      animation: card-strike 0.65s ease-out forwards;
+      animation: card-strike 0.9s ease-out forwards;
     }
 
     .power-strip-3, .power-strip-4 {
@@ -3052,7 +3057,10 @@ function scheduleLightning() {
   }
   if (lightningTimer) return;   // already scheduled — don't reset the timer
   // Strike randomly between 10 and 35 seconds from now
-  const delay = 10000 + Math.random() * 25000;
+  // Shorter interval in test mode so looping is obvious; longer when real
+  const delay = testCharging && !(drivingMode || highIdleMode)
+    ? 4000  + Math.random() * 8000    // 4–12s  in test mode
+    : 12000 + Math.random() * 23000;  // 12–35s when actually charging
   lightningTimer = setTimeout(() => {
     lightningTimer = null;
     strikeLightning();
