@@ -986,6 +986,8 @@
     }
     .rope-effect-btn:active { transform: scale(0.97); opacity: 0.85; }
     .rope-effect-btn.active { box-shadow: 0 0 0 2px var(--amber), 0 0 14px rgba(255,160,64,0.3); }
+    .rope-off-btn { background: rgba(239,83,80,0.15); color: var(--red); border-color: var(--red); }
+    .rope-off-btn:active { background: rgba(239,83,80,0.3); }
 
     .rope-slider-row {
       display: flex; align-items: center; gap: 10px;
@@ -1021,7 +1023,7 @@
     .climate-mode.off { color: var(--txt2); }
 
     .climate-temp-actual {
-      font-size: clamp(34px, 9vw, 42px);
+      font-size: clamp(56px, 15vw, 80px);
       font-weight: 700;
       letter-spacing: -1.5px;
       line-height: 1;
@@ -1534,16 +1536,16 @@
       gap: 6px;
     }
     body.driving .power-label {
-      font-size: clamp(13px,2.8vw,20px);
+      font-size: clamp(16px,4vw,26px);
       white-space: nowrap;
     }
     body.driving .power-value {
-      font-size: clamp(22px,5.5vw,40px) !important;
+      font-size: clamp(30px,7.5vw,54px) !important;
       letter-spacing: -1px;
       white-space: nowrap;
     }
     body.driving .power-sub {
-      font-size: clamp(12px,2vw,16px);
+      font-size: clamp(13px,2.8vw,20px);
       white-space: nowrap;
     }
 
@@ -1592,8 +1594,8 @@
     #drive-speed-panel {
       display: none;
       flex-direction: column;
-      align-items: center;
-      justify-content: center;
+      align-items: stretch;
+      justify-content: flex-start;
       flex: 1;
       min-height: 200px;
       padding: 0;
@@ -1601,11 +1603,73 @@
 
     body.driving #drive-speed-panel { display: flex; }
 
+    /* Top row: rest stop left, speedometer right */
+    #drive-top-row {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* Rest stop box */
+    #drive-rest-box {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 10px;
+      border-right: 1px solid var(--border);
+      gap: 6px;
+    }
+    #drive-rest-icon {
+      font-size: clamp(28px, 7vw, 40px);
+      line-height: 1;
+    }
+    #drive-rest-name {
+      font-size: clamp(13px, 3.5vw, 18px);
+      font-weight: 700;
+      color: var(--txt);
+      text-align: center;
+      line-height: 1.2;
+    }
+    #drive-rest-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    #drive-rest-dist {
+      font-size: clamp(22px, 6vw, 36px);
+      font-weight: 700;
+      color: var(--amber);
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+    #drive-rest-time {
+      font-size: clamp(12px, 3vw, 16px);
+      color: var(--txt2);
+    }
+    #drive-rest-exit {
+      font-size: clamp(11px, 2.8vw, 14px);
+      color: var(--txt2);
+    }
+
+    /* Speedometer box */
+    #drive-speed-box {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+    }
+
     #drive-speed-number {
-      font-size: clamp(96px, 28vw, 148px);
+      font-size: clamp(72px, 20vw, 110px);
       font-weight: 200;
       font-family: 'Courier New', 'Lucida Console', monospace;
-      letter-spacing: 6px;
+      letter-spacing: 4px;
       line-height: 1;
       color: #fff;
       font-variant-numeric: tabular-nums;
@@ -1624,14 +1688,14 @@
     }
 
     #drive-speed-unit {
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 700;
       font-family: 'Courier New', 'Lucida Console', monospace;
       letter-spacing: 8px;
       text-transform: uppercase;
       color: var(--txt2);
       opacity: 0.7;
-      margin-top: 6px;
+      margin-top: 4px;
       text-shadow: none;
     }
 
@@ -1921,18 +1985,31 @@ safe-buffer/index.js:
   <!-- TAB: POWER -->
   <div id="tab-power" class="tab-panel">
 
-    <!-- Speed display — only visible in driving mode -->
+    <!-- Drive mode top row: rest stop (left) + speed (right) -->
     <div id="drive-speed-panel">
-      <div id="drive-speed-number">—</div>
-      <div id="drive-speed-unit">mph</div>
-      <div id="drive-gps-status" style="font-size:13px;color:var(--txt2);margin-top:8px;letter-spacing:0.3px;"></div>
+      <div id="drive-top-row">
+        <div id="drive-rest-box">
+          <div id="drive-rest-icon">🛑</div>
+          <div id="drive-rest-name">Finding rest stops…</div>
+          <div id="drive-rest-meta" style="display:none">
+            <span id="drive-rest-dist"></span>
+            <span id="drive-rest-time"></span>
+            <span id="drive-rest-exit"></span>
+          </div>
+        </div>
+        <div id="drive-speed-box">
+          <div id="drive-speed-number">—</div>
+          <div id="drive-speed-unit">mph</div>
+        </div>
+      </div>
+      <div id="drive-gps-status" style="font-size:13px;color:var(--txt2);margin-top:4px;letter-spacing:0.3px;text-align:center;padding:0 12px;"></div>
     </div>
 
     <div id="drive-power-detail">
     <div class="card" id="battCard">
       <div class="batt-hero-area">
         <div class="batt-hero-label">Battery</div>
-        <div class="batt-hero-soc" id="battPct" onclick="startPuzzles()" style="cursor:pointer"><span class="skel">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+        <div class="batt-hero-soc" id="battPct"><span class="skel">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
         <div class="batt-hero-voltage" id="battSub"><span class="skel">&nbsp;&nbsp;&nbsp;</span></div>
         <!-- charging lightning bolt — visible only when animating -->
         <svg id="batt-bolt" aria-hidden="true" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -2084,6 +2161,7 @@ safe-buffer/index.js:
       </div>
       <div class="rope-effects">
         <button class="rope-effect-btn" id="ropeEffectCycle" onclick="setRopeEffect('cycle')">✦ Color Cycle</button>
+        <button class="rope-effect-btn rope-off-btn" onclick="ropeOff()">✕ Off</button>
       </div>
     </div>
   </div>
@@ -2817,41 +2895,7 @@ function renderScenes() {
   wrap.innerHTML = '';
 
   if (sceneEditMode) {
-    // Edit mode: horizontal rows with trash + name + grip
-    scenes.forEach((scene, i) => {
-      const tile = document.createElement('div');
-      tile.className = 'scene-tile edit-mode jiggle';
-      tile.dataset.sceneId = scene.id;
-      // Stagger jiggle so tiles don't all move in lockstep
-      tile.style.animationDelay = `${(i * 47) % 200}ms`;
-
-      // Name (flex:1 pushes buttons to the right)
-      const nameEl = document.createElement('span');
-      nameEl.className = 'scene-tile-name';
-      nameEl.style.flex = '1';
-      nameEl.textContent = scene.name;
-      tile.appendChild(nameEl);
-
-      // Trash button (right side)
-      const trashBtn = document.createElement('button');
-      trashBtn.className = 'scene-tile-trash';
-      trashBtn.innerHTML = lucideIcon('trash-2', 14, 2.5);
-      trashBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        deleteScene(scene.id);
-      });
-      tile.appendChild(trashBtn);
-
-      // Grip handle (right of trash)
-      const gripEl = document.createElement('span');
-      gripEl.className = 'scene-tile-grip';
-      gripEl.style.marginLeft = '0';
-      gripEl.innerHTML = lucideIcon('grip-vertical', 18, 2);
-      setupDragHandle(gripEl, scene.id);
-      tile.appendChild(gripEl);
-
-      wrap.appendChild(tile);
-    });
+    scenes.forEach((scene, i) => wrap.appendChild(_buildEditTile(scene, null, i)));
   } else {
     // Normal mode
     scenes.forEach(scene => {
@@ -3003,37 +3047,76 @@ function _startSceneDrag(e, sceneId, gripEl) {
   // Pointer events are tracked at document level, no capture needed
 }
 
+// Shared tile builder for both renderScenes (edit mode) and _reRenderEditTiles
+function _buildEditTile(scene, dragSceneId, i) {
+  const tile = document.createElement('div');
+  tile.className = 'scene-tile edit-mode jiggle' + (scene.id === dragSceneId ? ' drag-source' : '');
+  tile.dataset.sceneId = scene.id;
+  tile.style.animationDelay = `${(i * 47) % 200}ms`;
+
+  const nameEl = document.createElement('span');
+  nameEl.className = 'scene-tile-name';
+  nameEl.style.flex = '1';
+  nameEl.textContent = scene.name;
+  tile.appendChild(nameEl);
+
+  const trashBtn = document.createElement('button');
+  trashBtn.className = 'scene-tile-trash';
+  trashBtn.innerHTML = lucideIcon('trash-2', 14, 2.5);
+  trashBtn.addEventListener('click', (e) => { e.stopPropagation(); deleteScene(scene.id); });
+  tile.appendChild(trashBtn);
+
+  const gripEl = document.createElement('span');
+  gripEl.className = 'scene-tile-grip';
+  gripEl.style.marginLeft = '0';
+  gripEl.innerHTML = lucideIcon('grip-vertical', 18, 2);
+  setupDragHandle(gripEl, scene.id);
+  tile.appendChild(gripEl);
+
+  return tile;
+}
+
+// Rebuild edit tiles with FLIP animation so displaced tiles slide instead of snap
 function _reRenderEditTiles(dragSceneId) {
   const wrap = document.getElementById('scenesScroll');
   if (!wrap) return;
+
+  // FLIP — step 1: snapshot positions before the rebuild
+  const before = {};
+  wrap.querySelectorAll('[data-scene-id]').forEach(t => {
+    before[t.dataset.sceneId] = t.getBoundingClientRect();
+  });
+
+  // Rebuild
   wrap.innerHTML = '';
-  scenes.forEach((scene, i) => {
-    const tile = document.createElement('div');
-    tile.className = 'scene-tile edit-mode jiggle' + (scene.id === dragSceneId ? ' drag-source' : '');
-    tile.dataset.sceneId = scene.id;
-    tile.style.animationDelay = `${(i * 47) % 200}ms`;
+  scenes.forEach((scene, i) => wrap.appendChild(_buildEditTile(scene, dragSceneId, i)));
 
-    const trashBtn = document.createElement('button');
-    trashBtn.className = 'scene-tile-trash';
-    trashBtn.innerHTML = lucideIcon('trash-2', 14, 2.5);
-    trashBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      deleteScene(scene.id);
-    });
-    tile.appendChild(trashBtn);
+  // FLIP — steps 2–4: for each tile that moved, play it from old → new position
+  wrap.querySelectorAll('[data-scene-id]').forEach(tile => {
+    const id = tile.dataset.sceneId;
+    if (id === dragSceneId) return; // ghost handles the dragged tile visually
+    const oldRect = before[id];
+    if (!oldRect) return;
+    const newRect = tile.getBoundingClientRect();
+    const dx = oldRect.left - newRect.left;
+    const dy = oldRect.top  - newRect.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return; // didn't move
 
-    const nameEl = document.createElement('span');
-    nameEl.className = 'scene-tile-name';
-    nameEl.textContent = scene.name;
-    tile.appendChild(nameEl);
+    // Freeze at old position (pause jiggle so transforms don't conflict)
+    tile.style.animationPlayState = 'paused';
+    tile.style.transition = 'none';
+    tile.style.transform  = `translate(${dx}px, ${dy}px)`;
 
-    const gripEl = document.createElement('span');
-    gripEl.className = 'scene-tile-grip';
-    gripEl.innerHTML = lucideIcon('grip-vertical', 18, 2);
-    setupDragHandle(gripEl, scene.id);
-    tile.appendChild(gripEl);
-
-    wrap.appendChild(tile);
+    // Two rAFs: first ensures the frozen state is painted, second starts the transition
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      tile.style.transition = 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)';
+      tile.style.transform  = '';
+      // Resume jiggle once the slide is done
+      setTimeout(() => {
+        tile.style.transition = '';
+        tile.style.animationPlayState = '';
+      }, 220);
+    }));
   });
 }
 
@@ -3222,8 +3305,19 @@ function toggleTankHeater() {
 
 // ── Rope lights ───────────────────────────────────
 let ropeOn = false;
+let preRopeOn     = false;  // rope light state before drive mode
+let preRopeColor  = null;
+let preRopeEffect = null;
 let ropeActiveColor = null;
 let ropeActiveEffect = null;
+
+function ropeOff() {
+  if (!ropeOn) return;
+  ropeOn = false;
+  document.getElementById('ropeRow').classList.remove('on');
+  document.getElementById('ropeIcon').setAttribute('stroke', 'var(--txt2)');
+  if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', 'off');
+}
 
 function toggleRopeLight() {
   ropeOn = !ropeOn;
@@ -3352,6 +3446,11 @@ function setGPSStatus(msg) {
 
 function onGPSUpdate(pos) {
   const raw = pos.coords.speed; // m/s — only populated with enableHighAccuracy: true
+  lastGPSLat = pos.coords.latitude;
+  lastGPSLng = pos.coords.longitude;
+  if (pos.coords.heading != null && !isNaN(pos.coords.heading)) {
+    lastGPSHeading = pos.coords.heading;
+  }
   if (raw == null) {
     setGPSStatus('Speed unavailable — check GPS permissions');
     currentSpeedMph = 0;
@@ -3404,7 +3503,18 @@ function enterDrivingMode() {
     if (pumpState) pumpState.textContent = 'Off';
   }
 
-  // 3. Retract awning (G12 stops at limit switch if already retracted)
+  // 3. Save rope light state and turn off
+  preRopeOn     = ropeOn;
+  preRopeColor  = ropeActiveColor;
+  preRopeEffect = ropeActiveEffect;
+  if (ropeOn) {
+    ropeOn = false;
+    document.getElementById('ropeRow').classList.remove('on');
+    document.getElementById('ropeIcon').setAttribute('stroke', 'var(--txt2)');
+    if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', 'off');
+  }
+
+  // 4. Retract awning (G12 stops at limit switch if already retracted)
   if (mqttClient?.connected) mqttClient.publish('van/motor/awning-retract', 'on');
 
   // 4. Lock UI to speed/internet only
@@ -3417,11 +3527,13 @@ function enterDrivingMode() {
   refreshModeChip();
   updateDriveModeToggle();
   updateAltColumn();
+  startRestStopUpdates();
 }
 
 function exitDrivingMode() {
   drivingMode = false;
   document.body.classList.remove('driving');
+  stopRestStopUpdates();
   switchTab(preDriveTab);
   refreshModeChip();
   updateDriveModeToggle();
@@ -3434,6 +3546,17 @@ function exitDrivingMode() {
   const pumpState = document.getElementById('pumpState');
   if (pumpBtn)   pumpBtn.classList.add('active');
   if (pumpState) pumpState.textContent = 'On';
+
+  // Restore rope lights to pre-drive state
+  if (preRopeOn) {
+    if (preRopeEffect === 'cycle') {
+      setRopeEffect('cycle');
+    } else if (preRopeColor) {
+      setRopeColor(preRopeColor);
+    } else {
+      toggleRopeLight(); // just turn on
+    }
+  }
 
   // Show "Arrived?" toast if any lights were on before driving
   if (preDriveLights.length > 0) showArrivedToast();
@@ -3641,17 +3764,78 @@ function strikeLightning() {
 }
 
 // ── 100% emoji puzzle ─────────────────────────────
-const PUZZLES = [
-  { e: '🦁 👑',         a: 'Lion King' },
-  { e: '🐢 🍕',         a: 'Ninja Turtles' },
-  { e: '🌮 🔔',         a: 'Taco Bell' },
-  { e: '🕷️ 🕸️',        a: 'Spider-Man' },
-  { e: '🐻 🍯',         a: 'Winnie the Pooh' },
-  { e: '❄️ 👸',         a: 'Frozen' },
-  { e: '🍌 🍞',         a: 'Banana Bread' },
-  { e: '🎸 ⭐',         a: 'Rock Star' },
-  { e: '🚐 ⚡',         a: "That's you! 🎉" },
-  { e: '🔋 💯',         a: 'FULL CHARGE!! 🎊' },
+// Seeded LCG PRNG (Lehmer) — deterministic daily shuffle
+function seededRng(seed) {
+  let s = seed >>> 0;
+  return () => { s = Math.imul(1664525, s) + 1013904223 >>> 0; return s / 0x100000000; };
+}
+function dailySeed() {
+  const d = new Date();
+  return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+}
+function shuffleSeeded(arr, rng) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Puzzle types: 'puzzle' = guess the emoji, 'joke' = Q&A joke, 'compliment'
+const PUZZLE_POOL = [
+  { t:'puzzle', e:'🦁 👑',         a:'Lion King' },
+  { t:'puzzle', e:'🐢 🍕',         a:'Ninja Turtles' },
+  { t:'puzzle', e:'🌮 🔔',         a:'Taco Bell' },
+  { t:'puzzle', e:'🕷️ 🕸️',        a:'Spider-Man' },
+  { t:'puzzle', e:'🐻 🍯',         a:'Winnie the Pooh' },
+  { t:'puzzle', e:'❄️ 👸',         a:'Frozen' },
+  { t:'puzzle', e:'🍌 🍞',         a:'Banana Bread' },
+  { t:'puzzle', e:'🎸 ⭐',         a:'Rock Star' },
+  { t:'puzzle', e:'🍎 📱',         a:'Apple iPhone' },
+  { t:'puzzle', e:'☀️ 🕶️',        a:'Summer Vibes' },
+  { t:'puzzle', e:'🦇 🧛',         a:'Dracula' },
+  { t:'puzzle', e:'🎵 👻',         a:'Ghostbusters' },
+  { t:'puzzle', e:'🐉 ♟️',         a:'Game of Thrones' },
+  { t:'puzzle', e:'🏝️ 🤠',         a:'Cowboy on a Beach' },
+  { t:'puzzle', e:'🐝 🎬',         a:'Bee Movie' },
+  { t:'puzzle', e:'🍕 🔺',         a:'Pizza Hut' },
+  { t:'puzzle', e:'🦊 🔵',         a:'Firefox' },
+  { t:'puzzle', e:'🐦 𝕏',          a:'Twitter / X' },
+  { t:'puzzle', e:'🦄 🌈',         a:'Magic!' },
+  { t:'puzzle', e:'🧙 💍',         a:'Lord of the Rings' },
+];
+
+const JOKE_POOL = [
+  { t:'joke', e:'Why did the battery go to therapy?', a:'It had too many issues with charging! 😄' },
+  { t:'joke', e:"Why don't scientists trust atoms?", a:'Because they make up everything! 😂' },
+  { t:'joke', e:'What do you call a van with no wheels?', a:'A living room! 🚐💀' },
+  { t:'joke', e:'How does the moon cut his hair?', a:'Eclipse it! 🌙✂️' },
+  { t:'joke', e:'Why did the solar panel break up with the grid?', a:"It wanted to be off with someone else! ☀️💔" },
+  { t:'joke', e:'What did one power cell say to the other?', a:'You electric me! ⚡😍' },
+  { t:'joke', e:'Why is the van always calm?', a:'Because it has good suspension! 🚐😌' },
+  { t:'joke', e:'What do you call cheese that isn\'t yours?', a:'Nacho cheese! 🧀' },
+  { t:'joke', e:'Why did the camper go to school?', a:"Because it wanted to go further! 🎒🚐" },
+  { t:'joke', e:"I'm reading a book about anti-gravity.", a:"It's impossible to put down! 📚🪐" },
+];
+
+const COMPLIMENT_POOL = [
+  { t:'compliment', e:'You\'re basically a solar-powered superhero. ☀️🦸', a:'Seriously. You live off the sun. That\'s incredible.' },
+  { t:'compliment', e:'Most people dream of van life. You\'re living it. 🌅', a:'Every sunrise out your window is earned.' },
+  { t:'compliment', e:'You\'re 100% charged and so is your vibe. 🔋✨', a:'Top tier energy. Always.' },
+  { t:'compliment', e:'Adventuring on your own terms. 🗺️🚐', a:'That takes guts. You\'ve got them.' },
+  { t:'compliment', e:'You make "fully charged" look effortless. 💯⚡', a:'Peak performance. Peak person.' },
+  { t:'compliment', e:'The van has good energy because you brought yours. 🌟', a:'Mood is contagious — keep spreading it.' },
+  { t:'compliment', e:'You turned a Sprinter into a spaceship. 🚀', a:'Engineering, design, vibes — all yours.' },
+  { t:'compliment', e:'100% battery. 100% you. 💪🔋', a:'Both fully loaded and ready to roll.' },
+  { t:'compliment', e:'You built something people only Pinterest about. 📌', a:'That\'s the real flex.' },
+  { t:'compliment', e:'GoGoVan is basically your superpower. ⚡🚐', a:'Fully charged and fully awesome.' },
+];
+
+// Always end with these two
+const PUZZLE_FINALE = [
+  { t:'puzzle', e:'🚐 ⚡', a:"That's you! 🎉" },
+  { t:'compliment', e:'🔋 💯', a:'FULL CHARGE!! 🎊' },
 ];
 
 let puzzleList  = [];
@@ -3670,9 +3854,12 @@ function checkBattFull(pct) {
 }
 
 function startPuzzles() {
-  // Shuffle first 8, always end with the GoGoVan + Full Charge ones
-  const pool = [...PUZZLES.slice(0, 8)].sort(() => Math.random() - 0.5);
-  puzzleList  = [...pool, PUZZLES[8], PUZZLES[9]];
+  const rng = seededRng(dailySeed());
+  const puzzles    = shuffleSeeded(PUZZLE_POOL, rng).slice(0, 3);
+  const jokes      = shuffleSeeded(JOKE_POOL, rng).slice(0, 2);
+  const compliments = shuffleSeeded(COMPLIMENT_POOL, rng).slice(0, 3);
+  const mixed      = shuffleSeeded([...puzzles, ...jokes, ...compliments], rng);
+  puzzleList  = [...mixed, ...PUZZLE_FINALE];
   puzzleIdx   = 0;
   showPuzzle();
 }
@@ -3686,11 +3873,20 @@ function showPuzzle() {
   const hint = document.getElementById('puzzle-hint');
   const prog = document.getElementById('puzzle-progress');
   // Reset
-  ans.hidden        = true;
-  ans.textContent   = p.a;
-  em.textContent    = p.e;
-  prog.textContent  = `${puzzleIdx + 1} / ${puzzleList.length}`;
-  hint.textContent  = 'tap to reveal';
+  ans.hidden      = true;
+  ans.textContent = p.a;
+  prog.textContent = `${puzzleIdx + 1} / ${puzzleList.length}`;
+
+  if (p.t === 'joke') {
+    em.textContent   = p.e;           // question text
+    hint.textContent = 'tap for punchline';
+  } else if (p.t === 'compliment') {
+    em.textContent   = p.e;
+    hint.textContent = 'tap to read more';
+  } else {
+    em.textContent   = p.e;           // emojis
+    hint.textContent = 'tap to reveal';
+  }
   // Restart overlay animation by briefly removing it
   over.hidden = true;
   requestAnimationFrame(() => {
@@ -3719,6 +3915,122 @@ function closePuzzle() {
   document.getElementById('puzzle-overlay').hidden = true;
   puzzlePhase = 'hidden';
   clearTimeout(puzzleTimer);
+}
+
+
+// ── Rest stop finder ──────────────────────────────
+let restStopInterval  = null;
+let lastRestStopFetch = 0;
+const REST_STOP_CACHE_MS = 60000; // refetch every 60s when driving
+let lastGPSLat = null;
+let lastGPSLng = null;
+let lastGPSHeading = null;
+
+function startRestStopUpdates() {
+  stopRestStopUpdates();
+  updateRestStop();
+  restStopInterval = setInterval(updateRestStop, REST_STOP_CACHE_MS);
+}
+function stopRestStopUpdates() {
+  if (restStopInterval) { clearInterval(restStopInterval); restStopInterval = null; }
+  setRestStopUI('rest', 'Finding rest stops…', null, null, null);
+}
+
+function setRestStopUI(icon, name, distMi, timeMin, exitStr) {
+  const iconEl = document.getElementById('drive-rest-icon');
+  const nameEl = document.getElementById('drive-rest-name');
+  const metaEl = document.getElementById('drive-rest-meta');
+  const distEl = document.getElementById('drive-rest-dist');
+  const timeEl = document.getElementById('drive-rest-time');
+  const exitEl = document.getElementById('drive-rest-exit');
+  if (!iconEl) return;
+  iconEl.textContent = icon === 'rest' ? '🛑' : icon === 'loading' ? '🔍' : '📍';
+  nameEl.textContent = name;
+  if (distMi != null) {
+    metaEl.style.display = 'flex';
+    distEl.textContent = distMi < 10 ? distMi.toFixed(1) + ' mi' : Math.round(distMi) + ' mi';
+    timeEl.textContent = timeMin < 60
+      ? Math.round(timeMin) + ' min away'
+      : Math.floor(timeMin/60) + 'h ' + (Math.round(timeMin%60)) + 'm away';
+    exitEl.textContent = exitStr || '';
+    exitEl.style.display = exitStr ? '' : 'none';
+  } else {
+    metaEl.style.display = 'none';
+  }
+}
+
+async function updateRestStop() {
+  if (!lastGPSLat || !lastGPSLng) return;
+  setRestStopUI('loading', 'Searching ahead…', null, null, null);
+  try {
+    // Search 80km radius for rest areas, service areas, truck stops
+    const r = 80000;
+    const query = `[out:json][timeout:10];
+(
+  node["highway"="rest_area"](around:${r},${lastGPSLat},${lastGPSLng});
+  node["highway"="services"](around:${r},${lastGPSLat},${lastGPSLng});
+  way["highway"="rest_area"](around:${r},${lastGPSLat},${lastGPSLng});
+  way["highway"="services"](around:${r},${lastGPSLat},${lastGPSLng});
+  node["amenity"="rest_area"](around:${r},${lastGPSLat},${lastGPSLng});
+);
+out center;`;
+    const resp = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: 'data=' + encodeURIComponent(query),
+      signal: AbortSignal.timeout(12000)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    const elements = data.elements || [];
+
+    // Convert to {lat,lng,name,ref} and filter to ahead (within ±90° of heading)
+    const candidates = elements.map(el => {
+      const lat = el.lat ?? el.center?.lat;
+      const lng = el.lon ?? el.center?.lon;
+      if (!lat || !lng) return null;
+      const name = el.tags?.name || el.tags?.['name:en'] || el.tags?.ref || '';
+      const ref  = el.tags?.ref || '';
+      const bearing = calcBearing(lastGPSLat, lastGPSLng, lat, lng);
+      const angDiff = headingDiff(lastGPSHeading ?? 0, bearing);
+      const distM   = haversineM(lastGPSLat, lastGPSLng, lat, lng);
+      return { lat, lng, name, ref, bearing, angDiff, distM };
+    }).filter(c => c && c.distM > 100 && (lastGPSHeading == null || Math.abs(c.angDiff) <= 90));
+
+    if (!candidates.length) {
+      setRestStopUI('rest', 'No rest stops found ahead', null, null, null);
+      return;
+    }
+    candidates.sort((a, b) => a.distM - b.distM);
+    const best = candidates[0];
+    const distMi = best.distM / 1609.34;
+    const speedMph = (currentSpeedMph && currentSpeedMph > 5) ? currentSpeedMph : 55;
+    const timeMin  = (distMi / speedMph) * 60;
+    const exitStr  = best.ref ? 'Exit ' + best.ref : '';
+    const displayName = best.name || 'Rest Area';
+    setRestStopUI('rest', displayName, distMi, timeMin, exitStr);
+  } catch(e) {
+    setRestStopUI('rest', 'Rest stops unavailable', null, null, null);
+  }
+}
+
+function calcBearing(lat1, lng1, lat2, lng2) {
+  const R2D = 180 / Math.PI, D2R = Math.PI / 180;
+  const dL = (lng2 - lng1) * D2R;
+  const φ1 = lat1 * D2R, φ2 = lat2 * D2R;
+  const y = Math.sin(dL) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(dL);
+  return (Math.atan2(y, x) * R2D + 360) % 360;
+}
+function headingDiff(h1, h2) {
+  let d = ((h2 - h1) + 540) % 360 - 180;
+  return d;
+}
+function haversineM(lat1, lng1, lat2, lng2) {
+  const R = 6371000, D2R = Math.PI / 180;
+  const φ1 = lat1 * D2R, φ2 = lat2 * D2R;
+  const dφ = (lat2-lat1)*D2R, dλ = (lng2-lng1)*D2R;
+  const a = Math.sin(dφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(dλ/2)**2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
 // ── Internet / Network switching ──────────────────
