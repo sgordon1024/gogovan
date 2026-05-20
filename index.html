@@ -491,6 +491,57 @@
       animation: card-strike 0.9s ease-out forwards;
     }
 
+    /* ── 100% emoji puzzle overlay ───────────────────── */
+    #puzzle-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(11, 11, 22, 0.97);
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      z-index: 20;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      animation: puzzle-in 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    @keyframes puzzle-in {
+      from { opacity: 0; transform: scale(0.88); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    #puzzle-progress {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--txt2);
+    }
+    #puzzle-emoji {
+      font-size: 44px;
+      line-height: 1.1;
+      letter-spacing: 6px;
+      text-align: center;
+    }
+    #puzzle-answer {
+      font-size: 19px;
+      font-weight: 800;
+      color: var(--green);
+      text-align: center;
+      letter-spacing: -0.3px;
+      animation: pop-in 0.25s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    @keyframes pop-in {
+      from { opacity: 0; transform: scale(0.7); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    #puzzle-hint {
+      font-size: 12px;
+      color: var(--txt2);
+      margin-top: 2px;
+    }
+
     .power-strip-3, .power-strip-4 {
       display: grid;
       border-top: 1px solid var(--border);
@@ -1767,6 +1818,13 @@ safe-buffer/index.js:
       </div>
       <!-- card-wide flash overlay for lightning effect -->
       <div id="batt-flash" aria-hidden="true"></div>
+      <!-- 100% emoji puzzle overlay -->
+      <div id="puzzle-overlay" hidden onclick="puzzleTap()">
+        <div id="puzzle-progress">1 / 10</div>
+        <div id="puzzle-emoji">🦁 👑</div>
+        <div id="puzzle-answer" hidden></div>
+        <div id="puzzle-hint">tap to reveal</div>
+      </div>
     </div>
 
     <div class="card" id="drive-mode-card">
@@ -3091,7 +3149,7 @@ function lightningTick() {
   if (now >= nextStrikeAt) {
     strikeLightning();
     const delay = testOnly
-      ? 4000  + Math.random() * 7000    // 4–11s  in test mode
+      ? 2000  + Math.random() * 2000    // 2–4s   in test mode  (obvious loop)
       : 12000 + Math.random() * 23000;  // 12–35s when actually charging
     nextStrikeAt = now + delay;
   }
@@ -3101,12 +3159,95 @@ function strikeLightning() {
   const bolt  = document.getElementById('batt-bolt');
   const flash = document.getElementById('batt-flash');
   if (!bolt || !flash) return;
-  // Restart the animations cleanly
+  // Remove classes, let the browser paint one frame, then re-add
+  // (requestAnimationFrame is more reliable than void offsetWidth on iOS)
   bolt.classList.remove('bolt-flash');
   flash.classList.remove('card-flash');
-  void bolt.offsetWidth;        // force reflow so animation restarts
-  bolt.classList.add('bolt-flash');
-  flash.classList.add('card-flash');
+  requestAnimationFrame(() => {
+    bolt.classList.add('bolt-flash');
+    flash.classList.add('card-flash');
+  });
+}
+
+// ── 100% emoji puzzle ─────────────────────────────
+const PUZZLES = [
+  { e: '🦁 👑',         a: 'Lion King' },
+  { e: '🐢 🍕',         a: 'Ninja Turtles' },
+  { e: '🌮 🔔',         a: 'Taco Bell' },
+  { e: '🕷️ 🕸️',        a: 'Spider-Man' },
+  { e: '🐻 🍯',         a: 'Winnie the Pooh' },
+  { e: '❄️ 👸',         a: 'Frozen' },
+  { e: '🍌 🍞',         a: 'Banana Bread' },
+  { e: '🎸 ⭐',         a: 'Rock Star' },
+  { e: '🚐 ⚡',         a: "That's you! 🎉" },
+  { e: '🔋 💯',         a: 'FULL CHARGE!! 🎊' },
+];
+
+let puzzleList  = [];
+let puzzleIdx   = 0;
+let puzzlePhase = 'hidden';   // 'question' | 'answer' | 'hidden'
+let puzzleTimer = null;
+let lastSocFull = false;
+
+function checkBattFull(pct) {
+  if (pct >= 100 && !lastSocFull) {
+    lastSocFull = true;
+    startPuzzles();
+  } else if (pct < 100) {
+    lastSocFull = false;
+  }
+}
+
+function startPuzzles() {
+  // Shuffle first 8, always end with the GoGoVan + Full Charge ones
+  const pool = [...PUZZLES.slice(0, 8)].sort(() => Math.random() - 0.5);
+  puzzleList  = [...pool, PUZZLES[8], PUZZLES[9]];
+  puzzleIdx   = 0;
+  showPuzzle();
+}
+
+function showPuzzle() {
+  if (puzzleIdx >= puzzleList.length) { closePuzzle(); return; }
+  const p    = puzzleList[puzzleIdx];
+  const over = document.getElementById('puzzle-overlay');
+  const em   = document.getElementById('puzzle-emoji');
+  const ans  = document.getElementById('puzzle-answer');
+  const hint = document.getElementById('puzzle-hint');
+  const prog = document.getElementById('puzzle-progress');
+  // Reset
+  ans.hidden        = true;
+  ans.textContent   = p.a;
+  em.textContent    = p.e;
+  prog.textContent  = `${puzzleIdx + 1} / ${puzzleList.length}`;
+  hint.textContent  = 'tap to reveal';
+  // Restart overlay animation by briefly removing it
+  over.hidden = true;
+  requestAnimationFrame(() => {
+    over.hidden = false;
+    puzzlePhase = 'question';
+  });
+  clearTimeout(puzzleTimer);
+}
+
+function puzzleTap() {
+  clearTimeout(puzzleTimer);
+  if (puzzlePhase === 'question') {
+    const ans  = document.getElementById('puzzle-answer');
+    const hint = document.getElementById('puzzle-hint');
+    ans.hidden       = false;
+    hint.textContent = puzzleIdx < puzzleList.length - 1 ? 'tap for next →' : 'tap to close';
+    puzzlePhase      = 'answer';
+    puzzleTimer      = setTimeout(() => { puzzleIdx++; showPuzzle(); }, 3500);
+  } else if (puzzlePhase === 'answer') {
+    puzzleIdx++;
+    showPuzzle();
+  }
+}
+
+function closePuzzle() {
+  document.getElementById('puzzle-overlay').hidden = true;
+  puzzlePhase = 'hidden';
+  clearTimeout(puzzleTimer);
 }
 
 // ── Internet / Network switching ──────────────────
@@ -3454,6 +3595,7 @@ function updateSoc(val) {
   const bar = document.getElementById('battBar');
   if (bar) bar.style.width = pct + '%';
   recalcTTE();
+  checkBattFull(pct);
 }
 
 let battPower   = 0;
