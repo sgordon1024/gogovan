@@ -404,24 +404,13 @@
 
     #batt-bolt {
       position: absolute;
-      top: 50%;
-      right: 16px;
-      transform: translateY(-50%);
-      width: 54px;
-      height: 54px;
       fill: #ffffff;
       opacity: 0;
       pointer-events: none;
       filter: drop-shadow(0 0 6px rgba(255,255,255,0.9))
               drop-shadow(0 0 18px rgba(79,195,247,0.8))
               drop-shadow(0 0 36px rgba(79,195,247,0.4));
-    }
-
-    body.driving #batt-bolt {
-      width: 80px;
-      height: 80px;
-      right: 22px;
-      top: 44%;
+      /* position + size set randomly in JS on each strike */
     }
 
     #batt-flash {
@@ -1621,6 +1610,22 @@
       padding: 12px 10px;
       border-right: 1px solid var(--border);
       gap: 6px;
+      position: relative;
+    }
+    #drive-rest-spinner {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.15);
+      border-top-color: var(--amber);
+      border-radius: 50%;
+      animation: rest-spin 0.75s linear infinite;
+    }
+    #drive-rest-spinner[hidden] { display: none; }
+    @keyframes rest-spin {
+      to { transform: rotate(360deg); }
     }
     #drive-rest-icon {
       display: flex;
@@ -2021,6 +2026,7 @@ safe-buffer/index.js:
     <div id="drive-speed-panel">
       <div id="drive-top-row">
         <div id="drive-rest-box">
+          <div id="drive-rest-spinner" hidden></div>
           <div id="drive-rest-state" style="display:none"></div>
           <div id="drive-rest-icon"></div>
           <div id="drive-rest-name">Finding rest stops…</div>
@@ -3774,8 +3780,13 @@ function refreshModeChip() {
 }
 
 // ── Charging lightning bolt ────────────────────────
+function isAltCharging() {
+  // True when the alternator column is visible and showing a positive number
+  return (highIdleMode || drivingMode) && (battPower - currentSolarW) > 0;
+}
+
 function scheduleLightning() {
-  const active = drivingMode || highIdleMode;
+  const active = isAltCharging();
   if (active && !lightningLoopId) {
     nextStrikeAt = 0;
     lightningLoopId = setInterval(lightningTick, 500);
@@ -3787,7 +3798,7 @@ function scheduleLightning() {
 }
 
 function lightningTick() {
-  const active = drivingMode || highIdleMode;
+  const active = isAltCharging();
   if (!active) {
     clearInterval(lightningLoopId);
     lightningLoopId = null;
@@ -3809,6 +3820,24 @@ function strikeLightning() {
   const bolt  = document.getElementById('batt-bolt');
   const flash = document.getElementById('batt-flash');
   if (!bolt || !flash) return;
+
+  // Randomise position, size, and rotation every strike
+  const card = document.getElementById('battCard');
+  const cw   = card ? card.offsetWidth  : 300;
+  const ch   = card ? card.offsetHeight : 160;
+  const size = 32 + Math.random() * 60;          // 32–92 px
+  const rot  = (Math.random() - 0.5) * 40;       // –20° to +20°
+  const maxL = Math.max(0, cw - size - 8);
+  const maxT = Math.max(0, ch - size - 8);
+  const left = 8 + Math.random() * maxL;
+  const top  = 8 + Math.random() * maxT;
+
+  bolt.style.width     = size + 'px';
+  bolt.style.height    = size + 'px';
+  bolt.style.left      = left + 'px';
+  bolt.style.top       = top  + 'px';
+  bolt.style.transform = `rotate(${rot}deg)`;
+
   // Remove classes, let the browser paint one frame, then re-add
   // (requestAnimationFrame is more reliable than void offsetWidth on iOS)
   bolt.classList.remove('bolt-flash');
@@ -3981,15 +4010,30 @@ const REST_STOP_CACHE_MS = 60000; // refetch every 60s when driving
 let lastGPSLat = null;
 let lastGPSLng = null;
 let lastGPSHeading = null;
+let restStopHasData = false;  // true once we've shown a result at least once
+
+function showRestSpinner() {
+  const el = document.getElementById('drive-rest-spinner');
+  if (el) el.hidden = false;
+}
+function hideRestSpinner() {
+  const el = document.getElementById('drive-rest-spinner');
+  if (el) el.hidden = true;
+}
 
 function startRestStopUpdates() {
   stopRestStopUpdates();
+  restStopHasData = false;
   updateRestStop();
   restStopInterval = setInterval(updateRestStop, REST_STOP_CACHE_MS);
 }
 function stopRestStopUpdates() {
   if (restStopInterval) { clearInterval(restStopInterval); restStopInterval = null; }
+  hideRestSpinner();
+  restStopHasData = false;
   setRestStopUI('loading', 'Finding rest stops…', null, null, null);
+  clearRestStopWeather();
+  clearRestStopState();
 }
 
 function setRestStopUI(icon, name, distMi, timeMin, exitStr) {
@@ -4025,9 +4069,13 @@ function clearRestStopState() {
 
 async function updateRestStop() {
   if (!lastGPSLat || !lastGPSLng) return;
-  setRestStopUI('loading', 'Searching ahead…', null, null, null);
-  clearRestStopWeather();
-  clearRestStopState();
+  // First load: show placeholder. Subsequent refreshes: just show spinner, keep existing content.
+  if (!restStopHasData) {
+    setRestStopUI('loading', 'Searching ahead…', null, null, null);
+    clearRestStopWeather();
+    clearRestStopState();
+  }
+  showRestSpinner();
   try {
     // Search 80km radius for rest areas, service areas, truck stops
     const r = 80000;
@@ -4066,6 +4114,8 @@ out center;`;
       setRestStopUI('rest', 'No rest stops found ahead', null, null, null);
       clearRestStopWeather();
       clearRestStopState();
+      restStopHasData = true;
+      hideRestSpinner();
       return;
     }
     candidates.sort((a, b) => a.distM - b.distM);
@@ -4078,10 +4128,16 @@ out center;`;
     setRestStopUI('rest', displayName, distMi, timeMin, exitStr);
     fetchRestStopWeather(best.lat, best.lng);
     fetchRestStopState(best.lat, best.lng);
+    restStopHasData = true;
+    hideRestSpinner();
   } catch(e) {
-    setRestStopUI('rest', 'Rest stops unavailable', null, null, null);
-    clearRestStopWeather();
-    clearRestStopState();
+    // On error, only replace content if we have nothing to show yet
+    if (!restStopHasData) {
+      setRestStopUI('rest', 'Rest stops unavailable', null, null, null);
+      clearRestStopWeather();
+      clearRestStopState();
+    }
+    hideRestSpinner();
   }
 }
 
