@@ -1317,9 +1317,20 @@
     body.driving #powerStrip {
       flex: 1;
       min-height: 0;
+      position: relative;
       grid-template-columns: 1fr 1fr !important;
       grid-template-rows: 1fr 1fr;
       align-items: stretch;
+    }
+    body.driving #powerStrip::before {
+      content: '';
+      position: absolute;
+      left: 0; right: 0;
+      top: 50%;
+      height: 1px;
+      background: var(--border);
+      pointer-events: none;
+      z-index: 1;
     }
 
     /* Center content within taller cells, scale text to fill space */
@@ -2789,8 +2800,9 @@ function adjustInputAmps(delta) {
 // ── Driving Mode ─────────────────────────────────
 let drivingMode     = false;
 let highIdleMode    = false;
-let lightningTimer  = null;
 let testCharging    = false;
+let lightningLoopId = null;   // setInterval handle
+let nextStrikeAt    = 0;      // timestamp of next planned strike
 let drivingTimer    = null;
 let currentSpeedMph = null;
 let currentSolarW   = 0;
@@ -3045,27 +3057,44 @@ function refreshModeChip() {
 function toggleChargingTest() {
   testCharging = !testCharging;
   document.getElementById('chargingTestBtn').classList.toggle('active', testCharging);
-  if (testCharging) strikeLightning();   // immediate preview on enable
   scheduleLightning();
+  if (testCharging) strikeLightning();   // immediate preview on enable
 }
 
 function scheduleLightning() {
-  if (!(drivingMode || highIdleMode || testCharging)) {
-    clearTimeout(lightningTimer);
-    lightningTimer = null;
+  const active = drivingMode || highIdleMode || testCharging;
+  if (active && !lightningLoopId) {
+    nextStrikeAt = 0;                          // reset so tick schedules first strike
+    lightningLoopId = setInterval(lightningTick, 500);
+  } else if (!active && lightningLoopId) {
+    clearInterval(lightningLoopId);
+    lightningLoopId = null;
+    nextStrikeAt    = 0;
+  }
+}
+
+function lightningTick() {
+  const active = drivingMode || highIdleMode || testCharging;
+  if (!active) {                               // mode ended mid-interval
+    clearInterval(lightningLoopId);
+    lightningLoopId = null;
+    nextStrikeAt    = 0;
     return;
   }
-  if (lightningTimer) return;   // already scheduled — don't reset the timer
-  // Strike randomly between 10 and 35 seconds from now
-  // Shorter interval in test mode so looping is obvious; longer when real
-  const delay = testCharging && !(drivingMode || highIdleMode)
-    ? 4000  + Math.random() * 8000    // 4–12s  in test mode
-    : 12000 + Math.random() * 23000;  // 12–35s when actually charging
-  lightningTimer = setTimeout(() => {
-    lightningTimer = null;
+  const now      = Date.now();
+  const testOnly = testCharging && !(drivingMode || highIdleMode);
+  if (nextStrikeAt === 0) {
+    // First tick after activation — schedule initial strike
+    nextStrikeAt = now + (testOnly ? 500 : 8000 + Math.random() * 12000);
+    return;
+  }
+  if (now >= nextStrikeAt) {
     strikeLightning();
-    scheduleLightning();        // queue the next strike
-  }, delay);
+    const delay = testOnly
+      ? 4000  + Math.random() * 7000    // 4–11s  in test mode
+      : 12000 + Math.random() * 23000;  // 12–35s when actually charging
+    nextStrikeAt = now + delay;
+  }
 }
 
 function strikeLightning() {
