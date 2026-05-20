@@ -1638,6 +1638,13 @@
       text-align: center;
       line-height: 1.2;
     }
+    #drive-rest-state {
+      font-size: clamp(14px, 3.5vw, 18px);
+      font-weight: 800;
+      color: var(--amber);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
     #drive-rest-meta {
       display: flex;
       flex-direction: column;
@@ -1657,6 +1664,26 @@
     }
     #drive-rest-exit {
       font-size: clamp(11px, 2.8vw, 14px);
+      color: var(--txt2);
+    }
+    #drive-rest-weather {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 2px;
+      padding: 4px 8px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.06);
+    }
+    #drive-rest-weather-icon { display: flex; align-items: center; }
+    #drive-rest-weather-temp {
+      font-size: clamp(13px, 3.2vw, 17px);
+      font-weight: 700;
+      color: var(--txt);
+      font-variant-numeric: tabular-nums;
+    }
+    #drive-rest-weather-cond {
+      font-size: clamp(11px, 2.5vw, 13px);
       color: var(--txt2);
     }
 
@@ -1994,12 +2021,18 @@ safe-buffer/index.js:
     <div id="drive-speed-panel">
       <div id="drive-top-row">
         <div id="drive-rest-box">
+          <div id="drive-rest-state" style="display:none"></div>
           <div id="drive-rest-icon"></div>
           <div id="drive-rest-name">Finding rest stops…</div>
           <div id="drive-rest-meta" style="display:none">
             <span id="drive-rest-dist"></span>
             <span id="drive-rest-time"></span>
             <span id="drive-rest-exit"></span>
+          </div>
+          <div id="drive-rest-weather" style="display:none">
+            <span id="drive-rest-weather-icon"></span>
+            <span id="drive-rest-weather-temp"></span>
+            <span id="drive-rest-weather-cond"></span>
           </div>
         </div>
         <div id="drive-speed-box">
@@ -2800,6 +2833,10 @@ const LUCIDE_PATHS = {
   pencil:           `<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>`,
   'trash-2':        `<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>`,
   'grip-vertical':  `<circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/>`,
+  cloud:            `<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>`,
+  'cloud-rain':     `<path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 14.9"/><line x1="16" x2="16" y1="19" y2="21"/><line x1="8" x2="8" y1="19" y2="21"/><line x1="12" x2="12" y1="17" y2="23"/>`,
+  'cloud-drizzle':  `<path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 14.9"/><line x1="8" x2="8" y1="19" y2="21"/><line x1="8" x2="8" y1="13" y2="15"/><line x1="16" x2="16" y1="19" y2="21"/><line x1="16" x2="16" y1="13" y2="15"/><line x1="12" x2="12" y1="21" y2="23"/><line x1="12" x2="12" y1="15" y2="17"/>`,
+  'cloud-lightning':`<path d="M6 16.326A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 .5 8.973"/><path d="m13 12-3 5h4l-3 5"/>`,
   navigation:       `<polygon points="3 11 22 2 13 21 11 13 3 11"/>`,
   'map-pin':        `<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>`,
   search:           `<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>`,
@@ -3517,16 +3554,14 @@ function enterDrivingMode(manual = false) {
     if (pumpState) pumpState.textContent = 'Off';
   }
 
-  // 3. Save rope light state and turn off
+  // 3. Save rope light state and turn off (always send — JS state may lag physical state)
   preRopeOn     = ropeOn;
   preRopeColor  = ropeActiveColor;
   preRopeEffect = ropeActiveEffect;
-  if (ropeOn) {
-    ropeOn = false;
-    document.getElementById('ropeRow').classList.remove('on');
-    document.getElementById('ropeIcon').setAttribute('stroke', 'var(--txt2)');
-    if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', 'off');
-  }
+  ropeOn = false;
+  document.getElementById('ropeRow').classList.remove('on');
+  document.getElementById('ropeIcon').setAttribute('stroke', 'var(--txt2)');
+  if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', 'off');
 
   // 4. Retract awning (G12 stops at limit switch if already retracted)
   if (mqttClient?.connected) mqttClient.publish('van/motor/awning-retract', 'on');
@@ -3562,15 +3597,21 @@ function exitDrivingMode() {
   if (pumpBtn)   pumpBtn.classList.add('active');
   if (pumpState) pumpState.textContent = 'On';
 
-  // Restore rope lights to pre-drive state
+  // Restore rope lights to pre-drive state (always direct — never use toggle)
   if (preRopeOn) {
     if (preRopeEffect === 'cycle') {
       setRopeEffect('cycle');
     } else if (preRopeColor) {
       setRopeColor(preRopeColor);
     } else {
-      toggleRopeLight(); // just turn on
+      ropeOn = true;
+      document.getElementById('ropeRow').classList.add('on');
+      document.getElementById('ropeIcon').setAttribute('stroke', 'var(--amber)');
+      if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', 'on');
     }
+  } else {
+    // Were off before — make sure they stay off
+    if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', 'off');
   }
 
   // Show "Arrived?" toast if any lights were on before driving
@@ -3977,9 +4018,16 @@ function setRestStopUI(icon, name, distMi, timeMin, exitStr) {
   }
 }
 
+function clearRestStopState() {
+  const el = document.getElementById('drive-rest-state');
+  if (el) el.style.display = 'none';
+}
+
 async function updateRestStop() {
   if (!lastGPSLat || !lastGPSLng) return;
   setRestStopUI('loading', 'Searching ahead…', null, null, null);
+  clearRestStopWeather();
+  clearRestStopState();
   try {
     // Search 80km radius for rest areas, service areas, truck stops
     const r = 80000;
@@ -4016,6 +4064,8 @@ out center;`;
 
     if (!candidates.length) {
       setRestStopUI('rest', 'No rest stops found ahead', null, null, null);
+      clearRestStopWeather();
+      clearRestStopState();
       return;
     }
     candidates.sort((a, b) => a.distM - b.distM);
@@ -4026,9 +4076,78 @@ out center;`;
     const exitStr  = best.ref ? 'Exit ' + best.ref : '';
     const displayName = best.name || 'Rest Area';
     setRestStopUI('rest', displayName, distMi, timeMin, exitStr);
+    fetchRestStopWeather(best.lat, best.lng);
+    fetchRestStopState(best.lat, best.lng);
   } catch(e) {
     setRestStopUI('rest', 'Rest stops unavailable', null, null, null);
+    clearRestStopWeather();
+    clearRestStopState();
   }
+}
+
+function clearRestStopWeather() {
+  const el = document.getElementById('drive-rest-weather');
+  if (el) el.style.display = 'none';
+}
+
+async function fetchRestStopWeather(lat, lng) {
+  clearRestStopWeather();
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code&temperature_unit=fahrenheit&forecast_days=1&timezone=auto`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const temp = Math.round(data.current?.temperature_2m);
+    const code = data.current?.weather_code;
+    if (temp == null || code == null) return;
+    const { label, icon } = wmoCondition(code);
+    const weatherEl  = document.getElementById('drive-rest-weather');
+    const iconEl     = document.getElementById('drive-rest-weather-icon');
+    const tempEl     = document.getElementById('drive-rest-weather-temp');
+    const condEl     = document.getElementById('drive-rest-weather-cond');
+    if (!weatherEl) return;
+    iconEl.innerHTML = lucideIcon(icon, 14, 2);
+    tempEl.textContent = temp + '°F';
+    condEl.textContent = label;
+    weatherEl.style.display = 'flex';
+  } catch(e) { /* silently skip */ }
+}
+
+async function fetchRestStopState(lat, lng) {
+  clearRestStopState();
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=5&addressdetails=1`;
+    const resp = await fetch(url, {
+      headers: { 'Accept-Language': 'en', 'User-Agent': 'GoGoVan/1.0' },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    // ISO3166-2-lvl4 looks like "US-NY" — strip the country prefix
+    const iso  = data.address?.['ISO3166-2-lvl4'] || '';
+    const abbr = iso.includes('-') ? iso.split('-')[1] : '';
+    const full = data.address?.state || '';
+    const display = abbr || full;
+    if (!display) return;
+    const el = document.getElementById('drive-rest-state');
+    if (!el) return;
+    el.textContent = display;
+    el.style.display = '';
+  } catch(e) { /* silently skip */ }
+}
+
+function wmoCondition(code) {
+  if (code === 0)                    return { label: 'Clear',        icon: 'sun' };
+  if (code <= 2)                     return { label: 'Mostly clear',  icon: 'sun' };
+  if (code === 3)                    return { label: 'Overcast',      icon: 'cloud' };
+  if (code <= 48)                    return { label: 'Foggy',         icon: 'cloud' };
+  if (code <= 57)                    return { label: 'Drizzle',       icon: 'cloud-drizzle' };
+  if (code <= 67)                    return { label: 'Rain',          icon: 'cloud-rain' };
+  if (code <= 77)                    return { label: 'Snow',          icon: 'snowflake' };
+  if (code <= 82)                    return { label: 'Rain showers',  icon: 'cloud-rain' };
+  if (code <= 86)                    return { label: 'Snow showers',  icon: 'snowflake' };
+  if (code <= 99)                    return { label: 'Thunderstorm',  icon: 'cloud-lightning' };
+  return { label: 'Unknown', icon: 'cloud' };
 }
 
 function calcBearing(lat1, lng1, lat2, lng2) {
