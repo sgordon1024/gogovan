@@ -559,109 +559,103 @@
       margin: 0 0 8px;
     }
 
-    .scenes-scroll {
-      display: flex;
+    .scenes-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       gap: 8px;
-      overflow-x: auto;
-      padding: 4px 2px 6px;
-      scrollbar-width: none;
-      -webkit-overflow-scrolling: touch;
-      align-items: center;
     }
 
-    .scenes-scroll::-webkit-scrollbar { display: none; }
-
-    .scene-chip {
+    .scene-tile {
+      position: relative;
       display: flex;
+      flex-direction: column;
       align-items: center;
-      padding: 11px 16px;
-      min-height: 44px;
+      justify-content: center;
+      gap: 7px;
+      padding: 16px 8px;
+      min-height: 76px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 22px;
-      font-size: 14px;
-      font-weight: 600;
+      border-radius: 14px;
       color: var(--txt2);
-      white-space: nowrap;
       cursor: pointer;
-      flex-shrink: 0;
-      position: relative;
-      transition: all 0.2s;
+      transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.1s;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
     }
 
-    .scene-chip.active {
+    .scene-tile.active {
       background: var(--amber-dim);
       border-color: var(--amber);
       color: var(--amber);
     }
 
-    .scene-chip:active { transform: scale(0.95); }
-    .scene-move-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: none;
-      border: none;
-      color: inherit;
-      padding: 0;
-      width: 32px;
-      align-self: stretch;
-      cursor: pointer;
-      opacity: 0.55;
-      flex-shrink: 0;
-      -webkit-tap-highlight-color: transparent;
-      transition: opacity 0.15s;
+    .scene-tile:active { transform: scale(0.96); }
+
+    .scene-tile-name {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1;
     }
-    .scene-move-btn:active { opacity: 1; transform: scale(0.85); }
-    .scene-move-btn:disabled { opacity: 0.15; pointer-events: none; }
 
-
-    .scene-add-btn {
-      width: 44px;
-      height: 44px;
-      background: var(--surface2);
-      border: 1.5px dashed var(--border);
+    /* Small dot in the corner of the active tile when lights have drifted */
+    .scene-dirty-dot {
+      position: absolute;
+      top: 9px;
+      right: 9px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
-      font-size: 20px;
-      color: var(--txt2);
-      cursor: pointer;
-      flex-shrink: 0;
+      background: var(--amber);
+      box-shadow: 0 0 0 2px var(--amber-dim);
+    }
+
+    .scene-add-tile {
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 6px;
+      min-height: 76px;
+      background: transparent;
+      border: 1.5px dashed var(--border);
+      border-radius: 14px;
+      color: var(--txt2);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
       -webkit-tap-highlight-color: transparent;
       transition: all 0.2s;
     }
 
+    /* New scene input spans both grid columns */
     .scene-name-input-wrap {
+      grid-column: 1 / -1;
       display: flex;
       align-items: center;
-      gap: 6px;
-      flex-shrink: 0;
+      gap: 8px;
     }
 
     .scene-name-input {
-      width: 120px;
-      padding: 6px 10px;
+      flex: 1;
+      padding: 10px 14px;
       background: var(--surface2);
       border: 1px solid var(--amber);
-      border-radius: 16px;
+      border-radius: 12px;
       color: var(--txt);
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 500;
       outline: none;
       -webkit-appearance: none;
     }
 
     .scene-save-btn {
-      padding: 6px 12px;
+      padding: 10px 16px;
       background: var(--amber-dim);
       border: 1px solid var(--amber);
-      border-radius: 16px;
+      border-radius: 12px;
       color: var(--amber);
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 600;
       cursor: pointer;
       white-space: nowrap;
@@ -1447,6 +1441,14 @@
         0 0 48px rgba(255,255,255,0.15);
     }
 
+    @keyframes speed-blink {
+      0%,  49% { opacity: 1; }
+      50%, 99% { opacity: 0.08; }
+    }
+    #drive-speed-number.blinking {
+      animation: speed-blink 0.45s steps(1) infinite;
+    }
+
     #drive-speed-unit {
       font-size: 14px;
       font-weight: 700;
@@ -1847,10 +1849,9 @@ safe-buffer/index.js:
   <div id="tab-lights" class="tab-panel" hidden>
     <div class="section-label-row">
       <span class="section-label">Lights</span>
-      <button class="toggle-switch" id="masterBtn" onclick="toggleAllLights()" aria-label="All lights"></button>
     </div>
     <div class="scenes-wrap">
-      <div class="scenes-scroll" id="scenesScroll"></div>
+      <div class="scenes-grid" id="scenesScroll"></div>
     </div>
     <div class="card">
       <div id="lightsList"></div>
@@ -2336,11 +2337,6 @@ function renderLights() {
     if (gi < LIGHT_GROUPS.length - 1) html += `<div class="group-divider"></div>`;
   });
   document.getElementById('lightsList').innerHTML = html;
-  updateMasterBtn();
-}
-
-function updateMasterBtn() {
-  document.getElementById('masterBtn').classList.toggle('on', allLights().some(l => l.on));
 }
 
 function toggleLight(id) {
@@ -2364,7 +2360,6 @@ function dimLightUI(id, value) {
   row.querySelector('.dim-slider').style.setProperty('--pct', v + '%');
   row.classList.toggle('on', v > 0);
   row.querySelector('.dim-pct').textContent = v > 0 ? v + '%' : '—';
-  updateMasterBtn();
   const group = LIGHT_GROUPS.find(g => g.lights.some(x => x.id === id));
   if (group) {
     const anyOn = group.lights.some(l => l.on);
@@ -2399,15 +2394,6 @@ function toggleGroup(groupId) {
   markSceneDirty();
 }
 
-function toggleAllLights() {
-  const anyOn = allLights().some(l => l.on);
-  LIGHT_GROUPS.forEach(g => g.lights.forEach(l => {
-    l.on = !anyOn; l.level = !anyOn ? 80 : 0;
-    publishLight(l.id, l.on ? '80' : 'off');
-  }));
-  renderLights();
-  markSceneDirty();
-}
 
 // ── Lucide icons ─────────────────────────────────
 const LUCIDE_PATHS = {
@@ -2500,66 +2486,52 @@ function renderScenes() {
   if (!wrap) return;
   wrap.innerHTML = '';
 
-  scenes.forEach((scene, si) => {
-    const chip = document.createElement('button');
+  scenes.forEach(scene => {
     const isActive = scene.id === lastAppliedSceneId;
-    const showSave = isActive && sceneIsDirty;
-    chip.className = 'scene-chip' + (isActive ? ' active' : '');
+    const isDirty  = isActive && sceneIsDirty;
 
-    // ← move left
-    const leftBtn = document.createElement('button');
-    leftBtn.className = 'scene-move-btn';
-    leftBtn.innerHTML = lucideIcon('chevron-left', 17);
-    leftBtn.disabled = si === 0;
-    leftBtn.addEventListener('click', e => { e.stopPropagation(); moveSceneLeft(scene.id); });
-    chip.appendChild(leftBtn);
+    const tile = document.createElement('button');
+    tile.className = 'scene-tile' + (isActive ? ' active' : '');
 
     const iconEl = document.createElement('span');
-    iconEl.style.cssText = 'display:flex;align-items:center;margin-right:6px;margin-left:4px;';
-    iconEl.innerHTML = lucideIcon(scene.icon || 'star', 14);
-    const inner = document.createElement('span');
-    inner.style.cssText = 'display:inline-grid;';
-    const normalSpan = document.createElement('span');
-    normalSpan.textContent = scene.name;
-    normalSpan.style.cssText = 'grid-area:1/1;' + (showSave ? 'visibility:hidden;' : '');
-    const saveSpan = document.createElement('span');
-    saveSpan.textContent = 'Save';
-    saveSpan.style.cssText = 'grid-area:1/1;' + (!showSave ? 'visibility:hidden;' : '');
-    inner.appendChild(normalSpan);
-    inner.appendChild(saveSpan);
-    chip.appendChild(iconEl);
-    chip.appendChild(inner);
+    iconEl.innerHTML = lucideIcon(scene.icon || 'star', 22);
+    tile.appendChild(iconEl);
 
-    // → move right
-    const rightBtn = document.createElement('button');
-    rightBtn.className = 'scene-move-btn';
-    rightBtn.innerHTML = lucideIcon('chevron-right', 17);
-    rightBtn.disabled = si === scenes.length - 1;
-    rightBtn.addEventListener('click', e => { e.stopPropagation(); moveSceneRight(scene.id); });
-    chip.appendChild(rightBtn);
+    const nameEl = document.createElement('span');
+    nameEl.className = 'scene-tile-name';
+    nameEl.textContent = scene.name;
+    tile.appendChild(nameEl);
 
-    // Long-press to delete with confirmation
+    // Amber dot = unsaved changes; tapping the active tile will save them
+    if (isDirty) {
+      const dot = document.createElement('span');
+      dot.className = 'scene-dirty-dot';
+      dot.title = 'Tap to save changes';
+      tile.appendChild(dot);
+    }
+
+    // Long-press to delete
     let pressTimer;
-    chip.addEventListener('touchstart', () => {
+    tile.addEventListener('touchstart', () => {
       pressTimer = setTimeout(() => {
         if (confirm(`Delete "${scene.name}"?`)) deleteScene(scene.id);
       }, 600);
     }, { passive: true });
-    chip.addEventListener('touchend',  () => clearTimeout(pressTimer));
-    chip.addEventListener('touchmove', () => clearTimeout(pressTimer));
+    tile.addEventListener('touchend',  () => clearTimeout(pressTimer));
+    tile.addEventListener('touchmove', () => clearTimeout(pressTimer));
 
-    chip.addEventListener('click', () => {
-      if (scene.id === lastAppliedSceneId && sceneIsDirty) saveToScene(scene.id);
+    tile.addEventListener('click', () => {
+      if (isActive && sceneIsDirty) saveToScene(scene.id);
       else applyScene(scene.id);
     });
-    wrap.appendChild(chip);
+    wrap.appendChild(tile);
   });
 
-  const addBtn = document.createElement('button');
-  addBtn.className = 'scene-add-btn';
-  addBtn.innerHTML = lucideIcon('plus', 18);
-  addBtn.addEventListener('click', promptNewScene);
-  wrap.appendChild(addBtn);
+  const addTile = document.createElement('button');
+  addTile.className = 'scene-add-tile';
+  addTile.innerHTML = lucideIcon('plus', 20);
+  addTile.addEventListener('click', promptNewScene);
+  wrap.appendChild(addTile);
 }
 
 function applyScene(id) {
@@ -2609,17 +2581,16 @@ function deleteScene(id) {
 }
 
 function promptNewScene() {
-  const scroll = document.getElementById('scenesScroll');
-  const addBtn = scroll.querySelector('.scene-add-btn');
-  if (addBtn) addBtn.style.display = 'none';
+  const grid = document.getElementById('scenesScroll');
+  // Replace the + tile with a full-width input that spans both columns
+  const addTile = grid.querySelector('.scene-add-tile');
+  if (addTile) addTile.remove();
 
   const wrapper = document.createElement('div');
   wrapper.className = 'scene-name-input-wrap';
-  wrapper.innerHTML = `<input class="scene-name-input" id="sceneNameInput" placeholder="Name…" maxlength="20">
+  wrapper.innerHTML = `<input class="scene-name-input" id="sceneNameInput" placeholder="Scene name…" maxlength="20">
     <button class="scene-save-btn" id="sceneSaveBtn">Save</button>`;
-  scroll.appendChild(wrapper);
-
-  setTimeout(() => scroll.scrollLeft = scroll.scrollWidth, 30);
+  grid.appendChild(wrapper);
 
   const input = document.getElementById('sceneNameInput');
   input.focus();
@@ -3047,16 +3018,41 @@ function refreshModeChip() {
   if (speedEl) {
     const speedVal = (drivingMode && currentSpeedMph != null) ? Math.round(currentSpeedMph) : null;
     speedEl.textContent = speedVal != null ? speedVal : '—';
-    // Interpolate color white → red from 0 → 90 mph
-    if (speedVal != null && speedVal > 0) {
-      const ratio = Math.min(speedVal / 90, 1);
-      const gb = Math.round(255 * (1 - ratio));
-      const col = `rgb(255,${gb},${gb})`;
+    // Multi-stop color ramp: black → white → yellow → orange → red → red+blink
+    if (speedVal != null) {
+      const stops = [
+        { v:  0, r:   0, g:   0, b:   0 },   // stopped  — black
+        { v: 30, r: 255, g: 255, b: 255 },   // cruising — white
+        { v: 70, r: 255, g: 255, b: 140 },   // highway  — light yellow
+        { v: 80, r: 255, g:  80, b:   5 },   // fast     — red/orange
+        { v: 90, r: 255, g:   0, b:   0 },   // too fast — red
+      ];
+      let r, g, b;
+      if (speedVal <= stops[0].v) {
+        ({ r, g, b } = stops[0]);
+      } else if (speedVal >= stops[stops.length - 1].v) {
+        ({ r, g, b } = stops[stops.length - 1]);
+      } else {
+        for (let i = 1; i < stops.length; i++) {
+          if (speedVal <= stops[i].v) {
+            const t = (speedVal - stops[i-1].v) / (stops[i].v - stops[i-1].v);
+            r = Math.round(stops[i-1].r + t * (stops[i].r - stops[i-1].r));
+            g = Math.round(stops[i-1].g + t * (stops[i].g - stops[i-1].g));
+            b = Math.round(stops[i-1].b + t * (stops[i].b - stops[i-1].b));
+            break;
+          }
+        }
+      }
+      const col = `rgb(${r},${g},${b})`;
       speedEl.style.color = col;
-      speedEl.style.textShadow = `0 0 8px ${col}, 0 0 24px rgba(255,${gb},${gb},0.5), 0 0 48px rgba(255,${gb},${gb},0.2)`;
+      speedEl.style.textShadow = r === 0 && g === 0 && b === 0
+        ? 'none'
+        : `0 0 8px ${col}, 0 0 24px rgba(${r},${g},${b},0.5), 0 0 48px rgba(${r},${g},${b},0.2)`;
+      speedEl.classList.toggle('blinking', speedVal >= 90);
     } else {
       speedEl.style.color = '';
       speedEl.style.textShadow = '';
+      speedEl.classList.remove('blinking');
     }
   }
 
