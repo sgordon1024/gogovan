@@ -46,7 +46,7 @@
     body {
       max-width: 430px;
       margin: 0 auto;
-      padding: 0 0 calc(49px + env(safe-area-inset-bottom) + 24px);
+      padding: 0 0 calc(59px + env(safe-area-inset-bottom) + 24px);
       min-width: 320px;
     }
 
@@ -289,8 +289,8 @@
     }
 
     .section-label-solo {
-      padding: 0 28px;
-      margin: 24px 0 8px;
+      padding: 0 16px;
+      margin: 16px 0 8px;
       display: block;
     }
 
@@ -298,9 +298,8 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 24px;
-      margin: 24px 0 8px;
-      min-height: 44px;
+      padding: 0 16px;
+      margin: 16px 0 8px;
     }
 
     .section-label-row.mt { margin-top: 16px; }
@@ -313,7 +312,7 @@
       transform: translateX(-50%);
       width: 100%;
       max-width: 100%;
-      height: calc(49px + env(safe-area-inset-bottom));
+      height: calc(59px + env(safe-area-inset-bottom));
       padding-bottom: env(safe-area-inset-bottom);
       background: var(--surface);
       border-top: 1px solid var(--border);
@@ -328,19 +327,19 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 3px;
+      gap: 4px;
       background: transparent;
       border: none;
       cursor: pointer;
       color: var(--txt2);
-      min-height: 49px;
+      min-height: 59px;
       -webkit-tap-highlight-color: transparent;
       transition: color 0.15s;
     }
 
     .tab-btn.active { color: var(--amber); }
-    .tab-icon { font-size: 20px; line-height: 1; display: flex; align-items: center; justify-content: center; }
-    .tab-label { font-size: 10px; font-weight: 600; letter-spacing: 0.3px; }
+    .tab-icon { font-size: 24px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+    .tab-label { font-size: 12px; font-weight: 600; letter-spacing: 0.3px; }
 
     .tab-panel { padding: 16px 0 0; }
 
@@ -357,15 +356,6 @@
     /* ── Battery hero ─────────────────────────────── */
     .batt-hero-area {
       padding: 20px 20px 14px;
-    }
-
-    .batt-hero-label {
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      color: var(--txt2);
-      margin-bottom: 8px;
     }
 
     .batt-hero-soc {
@@ -434,6 +424,71 @@
     .power-strip-4 .power-value { font-size: clamp(13px,3.5vw,18px) !important; }
     .power-strip-4 .power-label,
     .power-strip-4 .power-sub   { font-size: 11px; }
+
+    /* ── Battery lightning animation ─────────────────── */
+    #battCard { position: relative; }
+
+    #batt-bolt {
+      position: absolute;
+      top: 50%;
+      right: 16px;
+      transform: translateY(-50%);
+      width: 54px;
+      height: 54px;
+      fill: #ffffff;
+      opacity: 0;
+      pointer-events: none;
+      filter: drop-shadow(0 0 6px rgba(255,255,255,0.9))
+              drop-shadow(0 0 18px rgba(79,195,247,0.8))
+              drop-shadow(0 0 36px rgba(79,195,247,0.4));
+    }
+
+    body.driving #batt-bolt {
+      width: 80px;
+      height: 80px;
+      right: 22px;
+      top: 44%;
+    }
+
+    #batt-flash {
+      position: absolute;
+      inset: 0;
+      background: #ffffff;
+      opacity: 0;
+      pointer-events: none;
+      border-radius: var(--radius);
+    }
+
+    @keyframes bolt-strike {
+      /* 3-stroke pattern — bright → gap → medium → gap → dim → out */
+      0%   { opacity: 0; }
+      4%   { opacity: 1; }
+      11%  { opacity: 0.02; }
+      18%  { opacity: 0.88; }
+      27%  { opacity: 0.02; }
+      33%  { opacity: 0.62; }
+      48%  { opacity: 0; }
+      100% { opacity: 0; }
+    }
+
+    @keyframes card-strike {
+      0%   { opacity: 0; }
+      4%   { opacity: 0.20; }
+      11%  { opacity: 0; }
+      18%  { opacity: 0.14; }
+      27%  { opacity: 0; }
+      33%  { opacity: 0.08; }
+      48%  { opacity: 0; }
+      100% { opacity: 0; }
+    }
+
+    #batt-bolt.bolt-flash {
+      animation: bolt-strike 0.9s ease-out forwards;
+    }
+
+    #batt-flash.card-flash {
+      animation: card-strike 0.9s ease-out forwards;
+    }
 
     /* ── Scenes ───────────────────────────────────── */
     .scenes-wrap {
@@ -717,6 +772,37 @@
     }
 
     .light-row.on .dim-pct { color: var(--amber); }
+
+    /* ── Rope lights ──────────────────────────────── */
+    .rope-palette { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px 14px 14px; }
+    .rope-color-btn {
+      width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent;
+      cursor: pointer; transition: transform 0.15s, border-color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .rope-color-btn:active { transform: scale(0.85); }
+    .rope-color-btn.active { border-color: var(--amber); }
+    .rope-effects { padding: 0 14px 14px; }
+    .rope-effect-btn {
+      width: 100%; height: 36px; border-radius: 18px; border: none;
+      cursor: pointer; font-size: 13px; font-weight: 600; letter-spacing: 0.3px;
+      color: #000;
+      background: linear-gradient(90deg, #ff2222, #ff7700, #ffee00, #22cc44, #00eeff, #2244ff, #8822ff);
+      transition: opacity 0.15s, transform 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .rope-effect-btn:active { transform: scale(0.97); opacity: 0.85; }
+    .rope-effect-btn.active { box-shadow: 0 0 0 2px var(--amber), 0 0 14px rgba(255,160,64,0.3); }
+
+    .rope-slider-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 4px 14px;
+    }
+    .rope-slider-row svg { flex-shrink: 0; opacity: 0.6; }
+    .rope-slider-row .dim-slider { flex: 1; }
+    .rope-slider-row .dim-pct { font-size: 13px; font-weight: 600; color: var(--txt2); width: 34px; text-align: right; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+    .rope-slider-row.speed-row { opacity: 0.4; transition: opacity 0.2s; }
+    .rope-slider-row.speed-row.active { opacity: 1; }
 
     /* ── Climate ──────────────────────────────────── */
     .climate-card {
@@ -1228,6 +1314,12 @@
       padding-right: 0;
     }
 
+    body.driving #tab-climate {
+      padding-left: 0;
+      padding-right: 0;
+      overflow-y: auto;
+    }
+
     body.driving .section-label-solo {
       padding: 20px 16px 8px;
       margin: 0;
@@ -1590,11 +1682,15 @@ safe-buffer/index.js:
     </div>
 
     <div id="drive-power-detail">
-    <div class="card">
+    <span class="section-label section-label-solo">Battery</span>
+    <div class="card" id="battCard">
       <div class="batt-hero-area">
-        <div class="batt-hero-label">Battery</div>
         <div class="batt-hero-soc" id="battPct"><span class="skel">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
         <div class="batt-hero-voltage" id="battSub"><span class="skel">&nbsp;&nbsp;&nbsp;</span></div>
+        <!-- charging lightning bolt — visible only when animating -->
+        <svg id="batt-bolt" aria-hidden="true" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M13 2L4 13h7l-2 9 11-11h-7z"/>
+        </svg>
       </div>
       <div class="batt-bar-track">
         <div class="batt-bar-fill" id="battBar"></div>
@@ -1621,6 +1717,8 @@ safe-buffer/index.js:
           <div class="power-sub" id="battTTESub">to 10% SOC</div>
         </div>
       </div>
+      <!-- card-wide flash overlay for lightning effect -->
+      <div id="batt-flash" aria-hidden="true"></div>
     </div>
 
     <div class="card" id="drive-mode-card">
@@ -1637,9 +1735,7 @@ safe-buffer/index.js:
     </div><!-- /#drive-power-detail -->
 
     <div id="inverter-section">
-    <div class="section-label-row mt">
-      <span class="section-label">Inverter</span>
-    </div>
+    <span class="section-label section-label-solo">Inverter</span>
     <div class="card">
       <div class="inverter-card">
         <div class="inv-shore-row">
@@ -1680,6 +1776,59 @@ safe-buffer/index.js:
     </div>
     <div class="card">
       <div id="lightsList"></div>
+    </div>
+    <span class="section-label section-label-solo">Rope Lights</span>
+    <div class="card">
+      <div class="light-row" id="ropeRow">
+        <button class="light-toggle" id="ropeToggle" onclick="toggleRopeLight()" aria-label="Rope lights">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--txt2)" stroke-width="2.5" stroke-linecap="round" id="ropeIcon">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+        </button>
+        <span class="light-name">Rope Lights</span>
+      </div>
+      <div class="rope-palette">
+        <button class="rope-color-btn" id="ropeRed"    onclick="setRopeColor('red')"    style="background:#ff2222" title="Red"></button>
+        <button class="rope-color-btn" id="ropeOrange" onclick="setRopeColor('orange')" style="background:#ff7700" title="Orange"></button>
+        <button class="rope-color-btn" id="ropeAmber"  onclick="setRopeColor('amber')"  style="background:#ffaa00" title="Amber"></button>
+        <button class="rope-color-btn" id="ropeYellow" onclick="setRopeColor('yellow')" style="background:#ffee00" title="Yellow"></button>
+        <button class="rope-color-btn" id="ropeLime"   onclick="setRopeColor('lime')"   style="background:#88ff22" title="Lime"></button>
+        <button class="rope-color-btn" id="ropeGreen"  onclick="setRopeColor('green')"  style="background:#22cc44" title="Green"></button>
+        <button class="rope-color-btn" id="ropeTeal"   onclick="setRopeColor('teal')"   style="background:#00bbaa" title="Teal"></button>
+        <button class="rope-color-btn" id="ropeCyan"   onclick="setRopeColor('cyan')"   style="background:#00eeff" title="Cyan"></button>
+        <button class="rope-color-btn" id="ropeSky"    onclick="setRopeColor('sky')"    style="background:#44aaff" title="Sky Blue"></button>
+        <button class="rope-color-btn" id="ropeBlue"   onclick="setRopeColor('blue')"   style="background:#2244ff" title="Blue"></button>
+        <button class="rope-color-btn" id="ropeNavy"   onclick="setRopeColor('navy')"   style="background:#112288" title="Navy"></button>
+        <button class="rope-color-btn" id="ropePurple" onclick="setRopeColor('purple')" style="background:#8822ff" title="Purple"></button>
+        <button class="rope-color-btn" id="ropePink"   onclick="setRopeColor('pink')"   style="background:#ff44aa" title="Pink"></button>
+        <button class="rope-color-btn" id="ropeWhite"  onclick="setRopeColor('white')"  style="background:#ffffff" title="White"></button>
+      </div>
+      <div class="rope-slider-row" style="padding-top:8px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--txt2)" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/>
+          <line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/>
+          <line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.78" y2="4.22"/>
+        </svg>
+        <input type="range" class="dim-slider" id="ropeBrightness" min="1" max="100" value="100"
+          oninput="setRopeBrightness(this.value)" style="--pct:100%">
+        <span class="dim-pct" id="ropeBrightPct">100%</span>
+      </div>
+      <div class="rope-slider-row speed-row" id="ropeSpeedRow">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--txt2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+        <input type="range" class="dim-slider" id="ropeSpeed" min="1" max="10" value="5"
+          oninput="setRopeSpeed(this.value)" style="--pct:44%">
+        <span class="dim-pct" id="ropeSpeedPct">5</span>
+      </div>
+      <div class="rope-effects">
+        <button class="rope-effect-btn" id="ropeEffectCycle" onclick="setRopeEffect('cycle')">✦ Color Cycle</button>
+      </div>
     </div>
   </div>
 
@@ -1930,6 +2079,10 @@ safe-buffer/index.js:
     <button class="drive-nav-btn" id="driveNavInternet" onclick="switchDriveTab('internet')">
       <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg>
       Internet
+    </button>
+    <button class="drive-nav-btn" id="driveNavClimate" onclick="switchDriveTab('climate')">
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="22"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></svg>
+      Climate
     </button>
   </nav>
 
@@ -2470,6 +2623,64 @@ function updateAcFanUI() {
   });
 }
 
+// ── Rope lights ───────────────────────────────────
+let ropeOn = false;
+let ropeActiveColor = null;
+let ropeActiveEffect = null;
+
+function toggleRopeLight() {
+  ropeOn = !ropeOn;
+  document.getElementById('ropeRow').classList.toggle('on', ropeOn);
+  document.getElementById('ropeIcon').setAttribute('stroke', ropeOn ? 'var(--amber)' : 'var(--txt2)');
+  if (!ropeOn) {
+    document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.rope-effect-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('ropeSpeedRow').classList.remove('active');
+    ropeActiveColor = null;
+    ropeActiveEffect = null;
+  }
+  if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', ropeOn ? 'on' : 'off');
+}
+
+function setRopeColor(color) {
+  ropeOn = true;
+  document.getElementById('ropeRow').classList.add('on');
+  document.getElementById('ropeIcon').setAttribute('stroke', 'var(--amber)');
+  document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.rope-effect-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('rope' + color.charAt(0).toUpperCase() + color.slice(1)).classList.add('active');
+  ropeActiveColor = color;
+  ropeActiveEffect = null;
+  if (mqttClient?.connected) mqttClient.publish('van/rope-light/color', color);
+}
+
+function setRopeEffect(effect) {
+  ropeOn = true;
+  document.getElementById('ropeRow').classList.add('on');
+  document.getElementById('ropeIcon').setAttribute('stroke', 'var(--amber)');
+  document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.rope-effect-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('ropeEffect' + effect.charAt(0).toUpperCase() + effect.slice(1)).classList.add('active');
+  document.getElementById('ropeSpeedRow').classList.add('active');
+  ropeActiveColor = null;
+  ropeActiveEffect = effect;
+  if (mqttClient?.connected) mqttClient.publish('van/rope-light/effect', effect);
+}
+
+function setRopeBrightness(val) {
+  const pct = Math.round(val);
+  document.getElementById('ropeBrightPct').textContent = pct + '%';
+  document.getElementById('ropeBrightness').style.setProperty('--pct', pct + '%');
+  if (mqttClient?.connected) mqttClient.publish('van/rope-light/brightness', String(pct));
+}
+
+function setRopeSpeed(val) {
+  document.getElementById('ropeSpeedPct').textContent = val;
+  const pct = ((val - 1) / 9 * 100).toFixed(0) + '%';
+  document.getElementById('ropeSpeed').style.setProperty('--pct', pct);
+  if (mqttClient?.connected) mqttClient.publish('van/rope-light/speed', String(val));
+}
+
 // ── Shore power ───────────────────────────────────
 let shoreConnected = false;
 function updateShoreUI(connected) {
@@ -2537,14 +2748,18 @@ function adjustInputAmps(delta) {
 }
 
 // ── Driving Mode ─────────────────────────────────
-let drivingMode     = false;
-let highIdleMode    = false;
-let drivingTimer    = null;
+let drivingMode             = false;
+let highIdleMode            = false;
+let lightningLoopId         = null;   // setInterval handle
+let nextStrikeAt            = 0;      // timestamp of next planned strike
+let drivingTimer            = null;
+let driveModeManuallyPaused = false; // true after manual OFF; cleared only by manual ON
 let currentSpeedMph = null;
 let currentSolarW   = 0;
 let preDriveTab     = 'power';
 let preDriveLights  = [];   // [{id, level}] lights that were on before driving
 let pumpWasOn       = false; // was pump on before driving
+let predriveRope    = null;  // {color, effect, brightness, speed} if rope was on before driving
 let arrivedToastTimer = null;
 
 const DRIVE_SPEED_MPH  = 5;    // mph to consider driving
@@ -2582,7 +2797,7 @@ function onGPSUpdate(pos) {
   updateDriveModeToggle();
 
   if (currentSpeedMph >= DRIVE_SPEED_MPH) {
-    if (!drivingMode && !drivingTimer)
+    if (!drivingMode && !drivingTimer && !driveModeManuallyPaused)
       drivingTimer = setTimeout(enterDrivingMode, DRIVE_CONFIRM_MS);
   } else {
     if (drivingTimer) { clearTimeout(drivingTimer); drivingTimer = null; }
@@ -2608,6 +2823,12 @@ function enterDrivingMode() {
     if (l.on) preDriveLights.push({ id: l.id, level: l.level });
   }));
   pumpWasOn = pumpOn;
+  predriveRope = ropeOn ? {
+    color:      ropeActiveColor,
+    effect:     ropeActiveEffect,
+    brightness: document.getElementById('ropeBrightness')?.value ?? 100,
+    speed:      document.getElementById('ropeSpeed')?.value ?? 5,
+  } : null;
 
   // 1. Turn off all lights
   LIGHT_GROUPS.forEach(g => g.lights.forEach(l => {
@@ -2624,7 +2845,23 @@ function enterDrivingMode() {
     if (pumpState) pumpState.textContent = 'Off';
   }
 
-  // 3. Retract awning (G12 stops at limit switch if already retracted)
+  // 3. Turn off AC
+  setAcMode('off');
+
+  // 4. Turn off rope lights
+  if (ropeOn) {
+    ropeOn = false;
+    document.getElementById('ropeRow')?.classList.remove('on');
+    document.getElementById('ropeIcon')?.setAttribute('stroke', 'var(--txt2)');
+    document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.rope-effect-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('ropeSpeedRow')?.classList.remove('active');
+    ropeActiveColor = null;
+    ropeActiveEffect = null;
+    if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', 'off');
+  }
+
+  // 4. Retract awning (G12 stops at limit switch if already retracted)
   if (mqttClient?.connected) mqttClient.publish('van/motor/awning-retract', 'on');
 
   // 4. Lock UI to speed/internet only
@@ -2654,6 +2891,26 @@ function exitDrivingMode() {
   const pumpState = document.getElementById('pumpState');
   if (pumpBtn)   pumpBtn.classList.add('active');
   if (pumpState) pumpState.textContent = 'On';
+
+  // Restore rope lights if they were on before driving
+  if (predriveRope) {
+    const r = predriveRope;
+    predriveRope = null;
+    const brightnessEl = document.getElementById('ropeBrightness');
+    const speedEl      = document.getElementById('ropeSpeed');
+    if (brightnessEl) { brightnessEl.value = r.brightness; setRopeBrightness(r.brightness); }
+    if (speedEl)      { speedEl.value = r.speed; setRopeSpeed(r.speed); }
+    if (r.effect) {
+      setRopeEffect(r.effect);
+    } else if (r.color) {
+      setRopeColor(r.color);
+    } else {
+      ropeOn = true;
+      document.getElementById('ropeRow')?.classList.add('on');
+      document.getElementById('ropeIcon')?.setAttribute('stroke', 'var(--amber)');
+      if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', 'on');
+    }
+  }
 
   // Show "Arrived?" toast if any lights were on before driving
   if (preDriveLights.length > 0) showArrivedToast();
@@ -2687,16 +2944,20 @@ function restorePreDriveLights() {
 }
 
 function switchDriveTab(name) {
-  switchTab(name === 'speed' ? 'power' : 'internet');
+  const tabMap = { speed: 'power', internet: 'internet', climate: 'climate' };
+  switchTab(tabMap[name] ?? 'power');
   document.getElementById('driveNavSpeed').classList.toggle('active', name === 'speed');
   document.getElementById('driveNavInternet').classList.toggle('active', name === 'internet');
+  document.getElementById('driveNavClimate').classList.toggle('active', name === 'climate');
 }
 
 function toggleDriveMode() {
   if (drivingMode) {
+    driveModeManuallyPaused = true;
     currentSpeedMph = currentSpeedMph ?? 0;
     exitDrivingMode();
   } else {
+    driveModeManuallyPaused = false;
     if (drivingTimer) { clearTimeout(drivingTimer); drivingTimer = null; }
     if (currentSpeedMph == null) currentSpeedMph = 0;
     enterDrivingMode();
@@ -2710,6 +2971,8 @@ function updateDriveModeToggle() {
   btn.classList.toggle('on', drivingMode);
   if (drivingMode) {
     sub.textContent = 'On · controls locked';
+  } else if (driveModeManuallyPaused && currentSpeedMph != null && currentSpeedMph >= DRIVE_SPEED_MPH) {
+    sub.textContent = 'Paused · tap to resume';
   } else if (currentSpeedMph != null) {
     sub.textContent = 'Auto · GPS active';
   } else {
@@ -2786,6 +3049,51 @@ function refreshModeChip() {
     chip.className = 'mode-chip';
   }
   applyStatusBar();
+  scheduleLightning();
+}
+
+// ── Charging lightning bolt ────────────────────────
+function scheduleLightning() {
+  const active = drivingMode || highIdleMode;
+  if (active && !lightningLoopId) {
+    nextStrikeAt = 0;
+    lightningLoopId = setInterval(lightningTick, 500);
+  } else if (!active && lightningLoopId) {
+    clearInterval(lightningLoopId);
+    lightningLoopId = null;
+    nextStrikeAt    = 0;
+  }
+}
+
+function lightningTick() {
+  const active = drivingMode || highIdleMode;
+  if (!active) {
+    clearInterval(lightningLoopId);
+    lightningLoopId = null;
+    nextStrikeAt    = 0;
+    return;
+  }
+  const now = Date.now();
+  if (nextStrikeAt === 0) {
+    nextStrikeAt = now + 8000 + Math.random() * 12000;
+    return;
+  }
+  if (now >= nextStrikeAt) {
+    strikeLightning();
+    nextStrikeAt = now + 12000 + Math.random() * 23000;
+  }
+}
+
+function strikeLightning() {
+  const bolt  = document.getElementById('batt-bolt');
+  const flash = document.getElementById('batt-flash');
+  if (!bolt || !flash) return;
+  bolt.classList.remove('bolt-flash');
+  flash.classList.remove('card-flash');
+  requestAnimationFrame(() => {
+    bolt.classList.add('bolt-flash');
+    flash.classList.add('card-flash');
+  });
 }
 
 // ── Internet / Network switching ──────────────────

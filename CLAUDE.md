@@ -44,6 +44,7 @@ Pi CAN HAT (Waveshare 2-CH CAN HAT+)
 **Pi services (all auto-start on boot):**
 - `can1-setup` — brings up can1 at 250kbps
 - `can-bridge` — `can-bridge.py` MQTT↔CAN bridge
+- `rope-light` — `rope-light.py` BLE↔MQTT bridge for interior rope lights
 - `gogovan-web` — `python3 -m http.server 80` (port 80, runs as root)
 - `nginx` — serves HTTPS on port 443 via Tailscale cert; proxies `/mqtt` WebSocket to mosquitto:9001
 
@@ -103,6 +104,7 @@ Adding the dashboard to iPhone home screen (Safari → Share → Add to Home Scr
 |---|---|---|
 | `index.html` | Pi: `/home/sgordon1024/index.html` | Dashboard UI (single-file, ~479KB incl. bundled mqtt.js) |
 | `can-bridge.py` | Pi: `/home/sgordon1024/can-bridge.py` | MQTT subscriber → CAN sender + CAN listener → MQTT publisher |
+| `rope-light.py` | Pi: `/home/sgordon1024/rope-light.py` | BLE↔MQTT bridge for rope lights (bleak + paho-mqtt) |
 | `deploy-to-pi.sh` | Dev: project root | Deploys index.html + can-bridge.py to Pi via Tailscale |
 | `pi-setup/setup-speedtest.sh` | Dev only | Deploys `run-speedtest.py` + systemd timer to Pi; run once |
 | `run-speedtest.py` | Pi: `/home/sgordon1024/run-speedtest.py` | Runs `speedtest-cli --json --secure`, publishes result to MQTT |
@@ -112,6 +114,8 @@ Adding the dashboard to iPhone home screen (Safari → Share → Add to Home Scr
 ./deploy-to-pi.sh
 ```
 Uses Tailscale IP (`100.98.52.107`) so it works from any network — GoGoVan, T-Mobile hotspot, home Wi-Fi, etc.
+
+**IMPORTANT: Always run `./deploy-to-pi.sh` immediately after every change to `index.html`.** The user reviews changes live on the dashboard — if you don't deploy right away, they can't see what you did.
 
 ---
 
@@ -230,6 +234,11 @@ When AC mode is **off**, the Firefly LCD always displays fan as "Auto" regardles
 | `van/ac/mode` | Dashboard → Bridge | `cool`, `off` |
 | `van/ac/fan` | Dashboard → Bridge | `high`, `low`, `auto` |
 | `van/ac/setpoint` | Dashboard → Bridge | `up`, `down` |
+| `van/rope-light/power` | Dashboard → rope-light.py | `on`, `off` |
+| `van/rope-light/color` | Dashboard → rope-light.py | `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `teal`, `cyan`, `sky`, `blue`, `navy`, `purple`, `pink`, `white` |
+| `van/rope-light/brightness` | Dashboard → rope-light.py | `1`–`100` |
+| `van/rope-light/effect` | Dashboard → rope-light.py | `cycle` (software color cycling) |
+| `van/rope-light/speed` | Dashboard → rope-light.py | `1`–`10` (cycle speed) |
 
 | Topic (publish, retained) | Direction | Payload |
 |---|---|---|
@@ -335,6 +344,64 @@ With a bridge configured to forward Victron telemetry from Cerbo at 192.168.12.1
 
 ---
 
+## Rope Lights (BLE)
+
+Interior accent LED rope lights, controlled via Bluetooth LE. The `rope-light` systemd service runs `rope-light.py` on the Pi, which connects to the controller via BLE and bridges commands from MQTT.
+
+**BLE controller:**
+- MAC address: `92:18:11:00:F7:24`
+- GATT write characteristic: `0000ffd9`
+- Protocol:
+  - ON: `cc 23 33`
+  - OFF: `cc 24 33`
+  - Color: `56 [B] [R] [G] [W] f0 aa` (note: byte order is B-R-G-W, not R-G-B)
+  - Brightness and speed are software-side in `rope-light.py`; color cycle (`effect=cycle`) is implemented as a timed loop in the service
+
+**BLE connectivity note:** The BLE connection drops periodically and requires reconnection. As of this writing, animation command bytes are still being reverse-engineered via BLE sweeps on the Pi. The dashboard UI uses `van/rope-light/effect` → `cycle` for color cycling, which is currently implemented in software (not a native device animation mode). Native animation modes may be unlockable once the full BLE command set is mapped.
+
+**Dashboard UI:** Located at the bottom of the Lights tab. Controls: power toggle, 14-color palette, brightness slider (1–100%), speed slider (1–10, for cycle), Color Cycle effect button.
+
+---
+
+## Drive Mode
+
+Drive mode activates automatically when GPS speed stays above 5 mph for 4 consecutive seconds. It can also be toggled manually via the Drive Mode card.
+
+### What happens on enter
+1. All G12 lights turned off (state saved to `preDriveLights`)
+2. Water pump turned off (`pumpWasOn` saved)
+3. AC turned off via `setAcMode('off')`
+4. Rope lights turned off (state saved to `predriveRope`: color, effect, brightness, speed)
+5. Awning retracted (G12 stops at limit switch if already retracted)
+6. UI locked to drive layout: Speed and Internet tabs via bottom drive nav; Climate tab also accessible via drive nav
+
+### What happens on exit (parked — speed drops below 2 mph)
+1. Water pump always restored to ON
+2. Rope lights restored to exact pre-drive state: color or effect re-published, brightness/speed re-applied
+3. "Arrived?" toast shown if any G12 lights were on before driving — user taps to restore them (pump is always restored silently, rope lights are always restored silently)
+
+### Manual override (session-level pause)
+- Tapping the Drive Mode toggle while driving calls `exitDrivingMode()` and sets `driveModeManuallyPaused = true`
+- While paused, GPS speed updates will **not** re-trigger auto-entry even if speed remains above threshold
+- Subtitle shows "Paused · tap to resume" while moving with auto paused
+- Tapping the toggle again calls `enterDrivingMode()` and clears `driveModeManuallyPaused = false`, restoring normal auto-detection
+- Flag is session-only (not persisted); resets on page reload
+
+### Drive nav tabs
+The bottom nav in drive mode has three buttons:
+- **Speed** → shows speedometer + battery/power panels
+- **Internet** → shows carrier selector + speed test
+- **Climate** → shows the full climate card (AC mode, fan, setpoint) — allows climate control without exiting drive mode
+
+### Key constants
+```javascript
+DRIVE_SPEED_MPH  = 5     // enter threshold
+STOP_SPEED_MPH   = 2     // exit threshold
+DRIVE_CONFIRM_MS = 4000  // must hold above threshold before activating
+```
+
+---
+
 ## Key Decisions & Why
 
 **Why Pi controls CAN instead of Cerbo:**  
@@ -381,3 +448,15 @@ The Dynamic Island on iPhone 14 Pro and later sits ~59px from the top, so a fixe
 
 **Why Avahi is restricted to `uap0`:**  
 Without this restriction, Avahi advertises `vanpi.local` on all interfaces. When the Pi is connected to Starlink via wlan0, clients on GoGoVan (uap0) receive mDNS responses with the wlan0 IP (e.g. 192.168.1.43), which is on a different subnet and unreachable. Restricting to uap0 ensures the advertised IP is always 192.168.4.1.
+
+**Why drive mode manual toggle sets a `driveModeManuallyPaused` flag instead of just calling exit:**  
+Without the flag, `onGPSUpdate` would immediately re-trigger `enterDrivingMode` after 4 seconds since the van is still moving. The flag blocks auto-re-entry for the rest of the browser session. Only a manual tap to re-enable clears it. This matches the expected UX: if you turn it off while driving, you mean it.
+
+**Why rope lights use a separate `rope-light.py` service instead of `can-bridge.py`:**  
+The rope lights are BLE, not RV-C CAN. They use a completely different protocol stack (bleak for BLE vs. python-can). Keeping them in a separate service means a BLE reconnect loop doesn't affect CAN bus control, and the two services can restart independently.
+
+**Why rope light state is saved/restored on drive mode enter/exit (unlike AC):**  
+Rope lights are ambient accent lighting — if they were on when you started driving, you almost certainly want them back when you park. AC is different: arriving at camp doesn't mean you immediately want cooling; the user will choose to turn it on. So AC is turned off on drive enter but not restored on exit, while rope lights are always silently restored.
+
+**Why the rope light BLE byte order is B-R-G-W (not R-G-B):**  
+Discovered by sniffing BLE commands while setting known colors. The controller's `56` color command places Blue in byte[1], Red in byte[2], Green in byte[3], White in byte[4] — unusual but confirmed empirically.
