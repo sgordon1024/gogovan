@@ -357,6 +357,7 @@
     /* ── Battery hero ─────────────────────────────── */
     .batt-hero-area {
       padding: 20px 20px 14px;
+      position: relative;
     }
 
     .batt-hero-label {
@@ -395,6 +396,66 @@
       background: linear-gradient(90deg, rgba(79,195,247,0.55) 0%, #4FC3F7 100%);
       transition: width 1.5s ease;
       min-width: 3px;
+    }
+
+    /* ── Battery lightning animation ─────────────────── */
+    #battCard { position: relative; }
+
+    #batt-bolt {
+      position: absolute;
+      top: 50%;
+      right: 16px;
+      transform: translateY(-50%);
+      width: 54px;
+      height: 54px;
+      fill: #ffffff;
+      opacity: 0;
+      pointer-events: none;
+      filter: drop-shadow(0 0 6px rgba(255,255,255,0.9))
+              drop-shadow(0 0 18px rgba(79,195,247,0.8))
+              drop-shadow(0 0 36px rgba(79,195,247,0.4));
+    }
+
+    body.driving #batt-bolt {
+      width: 80px;
+      height: 80px;
+      right: 22px;
+      top: 44%;
+    }
+
+    #batt-flash {
+      position: absolute;
+      inset: 0;
+      background: #ffffff;
+      opacity: 0;
+      pointer-events: none;
+      border-radius: var(--radius);
+    }
+
+    @keyframes bolt-strike {
+      0%   { opacity: 0; }
+      5%   { opacity: 0.95; }
+      15%  { opacity: 0.03; }
+      24%  { opacity: 0.80; }
+      42%  { opacity: 0; }
+      100% { opacity: 0; }
+    }
+
+    @keyframes card-strike {
+      0%   { opacity: 0; }
+      5%   { opacity: 0.18; }
+      15%  { opacity: 0; }
+      24%  { opacity: 0.10; }
+      42%  { opacity: 0; }
+      100% { opacity: 0; }
+    }
+
+    #batt-bolt.bolt-flash {
+      animation: bolt-strike 0.65s ease-out forwards;
+    }
+
+    #batt-flash.card-flash {
+      animation: card-strike 0.65s ease-out forwards;
     }
 
     .power-strip-3, .power-strip-4 {
@@ -1621,11 +1682,15 @@ safe-buffer/index.js:
     </div>
 
     <div id="drive-power-detail">
-    <div class="card">
+    <div class="card" id="battCard">
       <div class="batt-hero-area">
         <div class="batt-hero-label">Battery</div>
         <div class="batt-hero-soc" id="battPct"><span class="skel">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
         <div class="batt-hero-voltage" id="battSub"><span class="skel">&nbsp;&nbsp;&nbsp;</span></div>
+        <!-- charging lightning bolt — visible only when animating -->
+        <svg id="batt-bolt" aria-hidden="true" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M13 2L4 13h7l-2 9 11-11h-7z"/>
+        </svg>
       </div>
       <div class="batt-bar-track">
         <div class="batt-bar-fill" id="battBar"></div>
@@ -1652,6 +1717,8 @@ safe-buffer/index.js:
           <div class="power-sub" id="battTTESub">to 10% SOC</div>
         </div>
       </div>
+      <!-- card-wide flash overlay for lightning effect -->
+      <div id="batt-flash" aria-hidden="true"></div>
     </div>
 
     <div class="card" id="drive-mode-card">
@@ -2685,6 +2752,7 @@ function adjustInputAmps(delta) {
 // ── Driving Mode ─────────────────────────────────
 let drivingMode     = false;
 let highIdleMode    = false;
+let lightningTimer  = null;
 let drivingTimer    = null;
 let currentSpeedMph = null;
 let currentSolarW   = 0;
@@ -2932,6 +3000,36 @@ function refreshModeChip() {
     chip.className = 'mode-chip';
   }
   applyStatusBar();
+  scheduleLightning();
+}
+
+// ── Charging lightning bolt ────────────────────────
+function scheduleLightning() {
+  if (!(drivingMode || highIdleMode)) {
+    clearTimeout(lightningTimer);
+    lightningTimer = null;
+    return;
+  }
+  if (lightningTimer) return;   // already scheduled — don't reset the timer
+  // Strike randomly between 10 and 35 seconds from now
+  const delay = 10000 + Math.random() * 25000;
+  lightningTimer = setTimeout(() => {
+    lightningTimer = null;
+    strikeLightning();
+    scheduleLightning();        // queue the next strike
+  }, delay);
+}
+
+function strikeLightning() {
+  const bolt  = document.getElementById('batt-bolt');
+  const flash = document.getElementById('batt-flash');
+  if (!bolt || !flash) return;
+  // Restart the animations cleanly
+  bolt.classList.remove('bolt-flash');
+  flash.classList.remove('card-flash');
+  void bolt.offsetWidth;        // force reflow so animation restarts
+  bolt.classList.add('bolt-flash');
+  flash.classList.add('card-flash');
 }
 
 // ── Internet / Network switching ──────────────────
