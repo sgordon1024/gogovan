@@ -161,7 +161,7 @@
     }
     .offline-banner {
       position: fixed;
-      top: 20px;
+      top: calc(env(safe-area-inset-top) + 8px);
       left: 50%;
       width: calc(100vw - 32px);
       max-width: 398px;
@@ -179,11 +179,14 @@
       justify-content: center;
       gap: 6px;
       transform: translateX(-50%) translateY(calc(-100% - 30px));
+      visibility: hidden;
     }
     .offline-banner.visible {
+      visibility: visible;
       animation: banner-in 0.55s cubic-bezier(0.22,1,0.36,1) forwards;
     }
     .offline-banner.hiding {
+      visibility: visible;
       animation: banner-out 0.22s ease-in forwards;
     }
     .offline-banner-close {
@@ -1934,7 +1937,7 @@
 
     #ptr-indicator {
       position: fixed;
-      top: 0;
+      top: env(safe-area-inset-top);
       left: 50%;
       transform: translateX(-50%) translateY(-60px);
       width: 44px;
@@ -2327,7 +2330,7 @@ safe-buffer/index.js:
     <div class="scenes-wrap">
       <div class="scenes-grid" id="scenesScroll"></div>
     </div>
-    <div class="card">
+    <div class="card" style="padding-bottom:12px">
       <div id="lightsList"></div>
     </div>
     <span class="section-label section-label-solo" style="margin-top:16px">Rope Lights</span>
@@ -2361,7 +2364,7 @@ safe-buffer/index.js:
         <button class="rope-color-btn" id="ropeWhite"  onclick="setRopeColor('white')"  style="background:#ffffff" title="White"></button>
         <button class="rope-color-btn" id="ropeEffectCycle" onclick="setRopeEffect('cycle')" style="background:conic-gradient(from 0deg,hsl(0,100%,55%) 0deg,hsl(45,100%,55%) 45deg,hsl(90,100%,45%) 90deg,hsl(150,100%,45%) 135deg,hsl(180,100%,50%) 180deg,hsl(210,100%,55%) 225deg,hsl(270,100%,60%) 270deg,hsl(300,100%,55%) 315deg,hsl(360,100%,55%) 360deg)" title="Color Cycle"></button>
       </div>
-      <div class="rope-slider-row" style="padding-top:8px">
+      <div class="rope-slider-row" style="padding-top:8px;padding-bottom:4px">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--txt2)" stroke-width="2" stroke-linecap="round">
           <circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/>
           <line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/>
@@ -2372,7 +2375,7 @@ safe-buffer/index.js:
           oninput="setRopeBrightness(this.value)" style="--pct:100%">
         <span class="dim-pct" id="ropeBrightPct">100%</span>
       </div>
-      <div class="rope-slider-row speed-row" id="ropeSpeedRow">
+      <div class="rope-slider-row speed-row" id="ropeSpeedRow" style="padding-bottom:12px">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--txt2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
         </svg>
@@ -2900,6 +2903,7 @@ function publishLight(id, onOff) {
   const key = LIGHT_MQTT_KEY[id];
   if (!key || !mqttClient || !mqttClient.connected) return;
   mqttClient.publish(`van/light/${key}`, onOff);
+  mqttClient.publish(`van/status/light/${key}`, onOff, { retain: true, qos: 0 });
   console.log(`MQTT → van/light/${key}: ${onOff}`);
 }
 
@@ -3184,6 +3188,8 @@ function loadScenes() {
 
 function saveScenes() {
   localStorage.setItem('scenes', JSON.stringify(scenes));
+  if (mqttClient?.connected)
+    mqttClient.publish('van/status/scenes', JSON.stringify(scenes), { retain: true, qos: 0 });
 }
 
 function moveSceneLeft(id) {
@@ -3490,11 +3496,17 @@ function applyScene(id) {
       speedEl.style.setProperty('--pct', ((speed - 1) / 9 * 100).toFixed(0) + '%');
       document.getElementById('ropeSpeedPct').textContent = speed;
     }
-    if (mqttClient?.connected) mqttClient.publish('van/rope-light/brightness', String(bright));
+    if (mqttClient?.connected) {
+      mqttClient.publish('van/rope-light/brightness', String(bright));
+      mqttClient.publish('van/status/rope-light/brightness', String(bright), { retain: true, qos: 0 });
+    }
     if (r.on) {
       if (r.effect) {
         setRopeEffect(r.effect);
-        if (mqttClient?.connected) mqttClient.publish('van/rope-light/speed', String(speed));
+        if (mqttClient?.connected) {
+          mqttClient.publish('van/rope-light/speed', String(speed));
+          mqttClient.publish('van/status/rope-light/speed', String(speed), { retain: true, qos: 0 });
+        }
       } else if (r.color) {
         setRopeColor(r.color);
       } else if (!ropeOn) {
@@ -3506,6 +3518,8 @@ function applyScene(id) {
   }
   lastAppliedSceneId = id;
   sceneIsDirty = false;
+  if (mqttClient?.connected)
+    mqttClient.publish('van/status/scene/active', id, { retain: true, qos: 0 });
   renderLights();
   renderScenes();
 }
@@ -3608,7 +3622,11 @@ function acTempUp() {
     document.getElementById('climateSet').textContent = climateSet;
     localStorage.setItem('acSetpoint', climateSet);
   }
-  if (mqttClient?.connected) mqttClient.publish('van/ac/setpoint', 'up');
+  if (mqttClient?.connected) {
+    mqttClient.publish('van/ac/setpoint', 'up');
+    if (climateSet !== null)
+      mqttClient.publish('van/status/ac/setpoint', String(climateSet), { retain: true, qos: 0 });
+  }
 }
 
 function acTempDown() {
@@ -3617,19 +3635,29 @@ function acTempDown() {
     document.getElementById('climateSet').textContent = climateSet;
     localStorage.setItem('acSetpoint', climateSet);
   }
-  if (mqttClient?.connected) mqttClient.publish('van/ac/setpoint', 'down');
+  if (mqttClient?.connected) {
+    mqttClient.publish('van/ac/setpoint', 'down');
+    if (climateSet !== null)
+      mqttClient.publish('van/status/ac/setpoint', String(climateSet), { retain: true, qos: 0 });
+  }
 }
 
 function setAcMode(mode) {
   acMode = mode;
   updateAcModeUI();
-  if (mqttClient?.connected) mqttClient.publish('van/ac/mode', mode);
+  if (mqttClient?.connected) {
+    mqttClient.publish('van/ac/mode', mode);
+    mqttClient.publish('van/status/ac/mode', mode, { retain: true, qos: 0 });
+  }
 }
 
 function setAcFan(speed) {
   acFan = speed;
   updateAcFanUI();
-  if (mqttClient?.connected) mqttClient.publish('van/ac/fan', speed);
+  if (mqttClient?.connected) {
+    mqttClient.publish('van/ac/fan', speed);
+    mqttClient.publish('van/status/ac/fan', speed, { retain: true, qos: 0 });
+  }
 }
 
 function updateAcModeUI() {
@@ -3675,16 +3703,22 @@ function togglePump() {
   pumpOn = !pumpOn;
   document.getElementById('pumpBtn').classList.toggle('active', pumpOn);
   document.getElementById('pumpState').textContent = pumpOn ? 'Running' : 'Off';
-  if (mqttClient?.connected) mqttClient.publish('van/light/pump', pumpOn ? 'on' : 'off');
-  console.log(`MQTT → van/light/pump: ${pumpOn ? 'on' : 'off'}`);
+  if (mqttClient?.connected) {
+    mqttClient.publish('van/light/pump', pumpOn ? 'on' : 'off');
+    mqttClient.publish('van/status/light/pump', pumpOn ? 'on' : 'off', { retain: true, qos: 0 });
+    console.log(`MQTT → van/light/pump: ${pumpOn ? 'on' : 'off'}`);
+  }
 }
 
 function toggleTankHeater() {
   tankHeatOn = !tankHeatOn;
   document.getElementById('tankHeatBtn').classList.toggle('active', tankHeatOn);
   document.getElementById('tankHeatState').textContent = tankHeatOn ? 'On' : 'Off';
-  if (mqttClient?.connected) mqttClient.publish('van/light/tank-heater', tankHeatOn ? 'on' : 'off');
-  console.log(`MQTT → van/light/tank-heater: ${tankHeatOn ? 'on' : 'off'}`);
+  if (mqttClient?.connected) {
+    mqttClient.publish('van/light/tank-heater', tankHeatOn ? 'on' : 'off');
+    mqttClient.publish('van/status/light/tank-heater', tankHeatOn ? 'on' : 'off', { retain: true, qos: 0 });
+    console.log(`MQTT → van/light/tank-heater: ${tankHeatOn ? 'on' : 'off'}`);
+  }
 }
 
 // ── Rope lights ───────────────────────────────────
@@ -3704,7 +3738,10 @@ function ropeOff() {
   ropeOn = false;
   document.getElementById('ropeRow').classList.remove('on');
   document.getElementById('ropeIcon').setAttribute('stroke', 'var(--txt2)');
-  if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', 'off');
+  if (mqttClient?.connected) {
+    mqttClient.publish('van/rope-light/power', 'off');
+    mqttClient.publish('van/status/rope-light/power', 'off', { retain: true, qos: 0 });
+  }
 }
 
 function toggleRopeLight() {
@@ -3717,7 +3754,10 @@ function toggleRopeLight() {
     ropeActiveColor = null;
     ropeActiveEffect = null;
   }
-  if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', ropeOn ? 'on' : 'off');
+  if (mqttClient?.connected) {
+    mqttClient.publish('van/rope-light/power', ropeOn ? 'on' : 'off');
+    mqttClient.publish('van/status/rope-light/power', ropeOn ? 'on' : 'off', { retain: true, qos: 0 });
+  }
   markSceneDirty();
 }
 
@@ -3733,7 +3773,12 @@ function setRopeColor(color) {
   document.getElementById('rope' + color.charAt(0).toUpperCase() + color.slice(1)).classList.add('active');
   ropeActiveColor = color;
   ropeActiveEffect = null;
-  if (mqttClient?.connected) mqttClient.publish('van/rope-light/color', color);
+  if (mqttClient?.connected) {
+    mqttClient.publish('van/rope-light/color', color);
+    mqttClient.publish('van/status/rope-light/power',  'on',    { retain: true, qos: 0 });
+    mqttClient.publish('van/status/rope-light/color',  color,   { retain: true, qos: 0 });
+    mqttClient.publish('van/status/rope-light/effect', '',      { retain: true, qos: 0 });
+  }
   markSceneDirty();
 }
 
@@ -3746,7 +3791,12 @@ function setRopeEffect(effect) {
   document.getElementById('ropeSpeedRow').classList.add('active');
   ropeActiveColor = null;
   ropeActiveEffect = effect;
-  if (mqttClient?.connected) mqttClient.publish('van/rope-light/effect', effect);
+  if (mqttClient?.connected) {
+    mqttClient.publish('van/rope-light/effect', effect);
+    mqttClient.publish('van/status/rope-light/power',  'on',    { retain: true, qos: 0 });
+    mqttClient.publish('van/status/rope-light/effect', effect,  { retain: true, qos: 0 });
+    mqttClient.publish('van/status/rope-light/color',  '',      { retain: true, qos: 0 });
+  }
   markSceneDirty();
 }
 
@@ -3755,7 +3805,10 @@ function setRopeBrightness(val) {
   ropeActiveBrightness = pct;
   document.getElementById('ropeBrightPct').textContent = pct + '%';
   document.getElementById('ropeBrightness').style.setProperty('--pct', pct + '%');
-  if (mqttClient?.connected) mqttClient.publish('van/rope-light/brightness', String(pct));
+  if (mqttClient?.connected) {
+    mqttClient.publish('van/rope-light/brightness', String(pct));
+    mqttClient.publish('van/status/rope-light/brightness', String(pct), { retain: true, qos: 0 });
+  }
   markSceneDirty();
 }
 
@@ -3764,7 +3817,10 @@ function setRopeSpeed(val) {
   document.getElementById('ropeSpeedPct').textContent = val;
   const pct = ((val - 1) / 9 * 100).toFixed(0) + '%';
   document.getElementById('ropeSpeed').style.setProperty('--pct', pct);
-  if (mqttClient?.connected) mqttClient.publish('van/rope-light/speed', String(val));
+  if (mqttClient?.connected) {
+    mqttClient.publish('van/rope-light/speed', String(val));
+    mqttClient.publish('van/status/rope-light/speed', String(val), { retain: true, qos: 0 });
+  }
   markSceneDirty();
 }
 
@@ -3985,8 +4041,8 @@ function exitDrivingMode() {
     if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', 'off');
   }
 
-  // Show "Arrived?" toast if any lights were on before driving
-  if (preDriveLights.length > 0) showArrivedToast();
+  // Show "Arrived?" toast if any lights or rope lights were on before driving
+  if (preDriveLights.length > 0 || preRopeOn) showArrivedToast();
 }
 
 function showArrivedToast() {
@@ -4004,6 +4060,7 @@ function dismissArrivedToast() {
 }
 
 function restorePreDriveLights() {
+  // Restore G12 lights
   preDriveLights.forEach(({ id, level }) => {
     const light = LIGHT_GROUPS.flatMap(g => g.lights).find(l => l.id === id);
     if (!light) return;
@@ -4012,6 +4069,37 @@ function restorePreDriveLights() {
     publishLight(id, String(level));
   });
   preDriveLights = [];
+
+  // Restore rope lights (re-apply in case the silent restore at exit didn't land)
+  ropeActiveBrightness = preRopeBrightness;
+  ropeActiveSpeed      = preRopeSpeed;
+  const brightEl = document.getElementById('ropeBrightness');
+  if (brightEl) {
+    brightEl.value = preRopeBrightness;
+    brightEl.style.setProperty('--pct', preRopeBrightness + '%');
+    document.getElementById('ropeBrightPct').textContent = preRopeBrightness + '%';
+  }
+  const speedEl = document.getElementById('ropeSpeed');
+  if (speedEl) {
+    speedEl.value = preRopeSpeed;
+    speedEl.style.setProperty('--pct', ((preRopeSpeed - 1) / 9 * 100).toFixed(0) + '%');
+    document.getElementById('ropeSpeedPct').textContent = preRopeSpeed;
+  }
+  if (mqttClient?.connected) mqttClient.publish('van/rope-light/brightness', String(preRopeBrightness));
+  if (preRopeOn) {
+    if (preRopeEffect === 'cycle') {
+      setRopeEffect('cycle');
+      if (mqttClient?.connected) mqttClient.publish('van/rope-light/speed', String(preRopeSpeed));
+    } else if (preRopeColor) {
+      setRopeColor(preRopeColor);
+    } else {
+      ropeOn = true;
+      document.getElementById('ropeRow').classList.add('on');
+      document.getElementById('ropeIcon').setAttribute('stroke', 'var(--amber)');
+      if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', 'on');
+    }
+  }
+
   renderLights();
   dismissArrivedToast();
 }
@@ -5290,7 +5378,19 @@ function connectMQTT() {
     client.subscribe(`N/${PORTAL_ID}/#`);
     client.subscribe('van/status/light/+');
     client.subscribe('van/status/ac/+');
+    client.subscribe('van/status/rope-light/+');
+    client.subscribe('van/status/scene/+');
+    client.subscribe('van/status/scenes');
     client.subscribe('van/status/network/+');
+    // Bootstrap: wait for any retained van/status/scenes to arrive + merge,
+    // then publish our local scenes so other instances pick them up.
+    if (!connectMQTT._scenesBootstrapped) {
+      connectMQTT._scenesBootstrapped = true;
+      setTimeout(() => {
+        if (mqttClient?.connected)
+          mqttClient.publish('van/status/scenes', JSON.stringify(scenes), { retain: true, qos: 0 });
+      }, 1500);
+    }
     client.subscribe('van/status/starlink/+');
     // Request immediately — don't wait for sub callbacks (fragile, caused blank panels)
     requestInverterData();
@@ -5357,6 +5457,101 @@ function connectMQTT() {
         if (!isNaN(t)) {
           document.getElementById('climateActual').textContent = t + '°';
         }
+      }
+      return;
+    }
+
+    if (topic.startsWith('van/status/rope-light/')) {
+      const key = topic.split('/')[3];
+      const val = msg.toString().trim();
+      if (key === 'power') {
+        const newOn = val === 'on';
+        if (newOn !== ropeOn) {
+          ropeOn = newOn;
+          document.getElementById('ropeRow').classList.toggle('on', ropeOn);
+          document.getElementById('ropeIcon').setAttribute('stroke', ropeOn ? 'var(--amber)' : 'var(--txt2)');
+          if (!ropeOn) {
+            document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('ropeSpeedRow').classList.remove('active');
+            ropeActiveColor = null;
+            ropeActiveEffect = null;
+          }
+        }
+      } else if (key === 'color' && val) {
+        if (val !== ropeActiveColor) {
+          ropeOn = true;
+          ropeActiveColor = val;
+          ropeActiveEffect = null;
+          document.getElementById('ropeRow').classList.add('on');
+          document.getElementById('ropeIcon').setAttribute('stroke', 'var(--amber)');
+          document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
+          const colorBtn = document.getElementById('rope' + val.charAt(0).toUpperCase() + val.slice(1));
+          if (colorBtn) colorBtn.classList.add('active');
+          document.getElementById('ropeSpeedRow').classList.remove('active');
+        }
+      } else if (key === 'effect' && val) {
+        if (val !== ropeActiveEffect) {
+          ropeOn = true;
+          ropeActiveEffect = val;
+          ropeActiveColor = null;
+          document.getElementById('ropeRow').classList.add('on');
+          document.getElementById('ropeIcon').setAttribute('stroke', 'var(--amber)');
+          document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
+          const effectBtn = document.getElementById('ropeEffect' + val.charAt(0).toUpperCase() + val.slice(1));
+          if (effectBtn) effectBtn.classList.add('active');
+          document.getElementById('ropeSpeedRow').classList.add('active');
+        }
+      } else if (key === 'brightness') {
+        const pct = parseInt(val);
+        if (!isNaN(pct) && pct !== ropeActiveBrightness) {
+          ropeActiveBrightness = pct;
+          document.getElementById('ropeBrightPct').textContent = pct + '%';
+          document.getElementById('ropeBrightness').value = pct;
+          document.getElementById('ropeBrightness').style.setProperty('--pct', pct + '%');
+        }
+      } else if (key === 'speed') {
+        const spd = parseInt(val);
+        if (!isNaN(spd) && spd !== ropeActiveSpeed) {
+          ropeActiveSpeed = spd;
+          document.getElementById('ropeSpeedPct').textContent = spd;
+          document.getElementById('ropeSpeed').value = spd;
+          document.getElementById('ropeSpeed').style.setProperty('--pct', ((spd - 1) / 9 * 100).toFixed(0) + '%');
+        }
+      }
+      return;
+    }
+
+    if (topic === 'van/status/scenes') {
+      try {
+        const mqttScenes = JSON.parse(msg.toString());
+        if (!Array.isArray(mqttScenes)) return;
+        // Merge: use MQTT as base, append any local-only scenes (by ID)
+        const merged = mqttScenes.map(migrateScene);
+        let added = false;
+        scenes.forEach(local => {
+          if (!merged.find(m => m.id === local.id)) {
+            merged.push(local);
+            added = true;
+          }
+        });
+        scenes = merged;
+        localStorage.setItem('scenes', JSON.stringify(scenes));
+        if (added) {
+          // Re-publish merged set so other instances get our local-only scenes
+          mqttClient.publish('van/status/scenes', JSON.stringify(scenes), { retain: true, qos: 0 });
+        }
+        renderScenes();
+      } catch {}
+      return;
+    }
+
+    if (topic === 'van/status/scene/active') {
+      const id = msg.toString().trim();
+      // Only update if this instance didn't just set it (avoid re-triggering applyScene)
+      if (id && id !== lastAppliedSceneId && scenes.find(s => s.id === id)) {
+        lastAppliedSceneId = id;
+        sceneIsDirty = false;
+        renderScenes();
       }
       return;
     }
