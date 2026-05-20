@@ -1623,8 +1623,13 @@
       gap: 6px;
     }
     #drive-rest-icon {
-      font-size: clamp(28px, 7vw, 40px);
-      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #drive-rest-icon svg {
+      width: clamp(28px, 7vw, 40px);
+      height: clamp(28px, 7vw, 40px);
     }
     #drive-rest-name {
       font-size: clamp(13px, 3.5vw, 18px);
@@ -1957,7 +1962,7 @@ safe-buffer/index.js:
 
   <header>
     <div id="modeChip" class="mode-chip">
-      <span id="modeChipIcon">🚗</span>
+      <span id="modeChipIcon"></span>
       <span id="modeChipLabel">Driving</span>
     </div>
   </header>
@@ -1989,7 +1994,7 @@ safe-buffer/index.js:
     <div id="drive-speed-panel">
       <div id="drive-top-row">
         <div id="drive-rest-box">
-          <div id="drive-rest-icon">🛑</div>
+          <div id="drive-rest-icon"></div>
           <div id="drive-rest-name">Finding rest stops…</div>
           <div id="drive-rest-meta" style="display:none">
             <span id="drive-rest-dist"></span>
@@ -2160,8 +2165,8 @@ safe-buffer/index.js:
         <span class="dim-pct" id="ropeSpeedPct">5</span>
       </div>
       <div class="rope-effects">
-        <button class="rope-effect-btn" id="ropeEffectCycle" onclick="setRopeEffect('cycle')">✦ Color Cycle</button>
-        <button class="rope-effect-btn rope-off-btn" onclick="ropeOff()">✕ Off</button>
+        <button class="rope-effect-btn" id="ropeEffectCycle" onclick="setRopeEffect('cycle')"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M21 2v6h-6"/><path d="M21 13a9 9 0 1 1-3-7.7L21 8"/></svg> Color Cycle</button>
+        <button class="rope-effect-btn rope-off-btn" onclick="ropeOff()"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" x2="12" y1="2" y2="12"/></svg> Off</button>
       </div>
     </div>
   </div>
@@ -2491,7 +2496,7 @@ function renderThemePicker() {
         el.onclick = () => { applyTheme(t.id); };
         const canDelete = !isDark && t.id !== activeTheme;
         el.innerHTML = `
-          ${canDelete ? `<div class="swatch-delete" title="Remove">✕</div>` : ''}
+          ${canDelete ? `<div class="swatch-delete" title="Remove"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></div>` : ''}
           <div class="swatch-circle" style="background:${t.bg};">
             <div class="swatch-check"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
             <div style="position:absolute;bottom:7px;right:7px;width:13px;height:13px;border-radius:50%;background:${t.accent};"></div>
@@ -2795,6 +2800,13 @@ const LUCIDE_PATHS = {
   pencil:           `<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>`,
   'trash-2':        `<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>`,
   'grip-vertical':  `<circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/>`,
+  navigation:       `<polygon points="3 11 22 2 13 21 11 13 3 11"/>`,
+  'map-pin':        `<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>`,
+  search:           `<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>`,
+  coffee:           `<path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" x2="6" y1="2" y2="4"/><line x1="10" x2="10" y1="2" y2="4"/><line x1="14" x2="14" y1="2" y2="4"/>`,
+  'rotate-cw':      `<path d="M21 2v6h-6"/><path d="M21 13a9 9 0 1 1-3-7.7L21 8"/>`,
+  power:            `<path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" x2="12" y1="2" y2="12"/>`,
+  x:                `<path d="M18 6 6 18"/><path d="m6 6 12 12"/>`,
 };
 function lucideIcon(name, size = 16, sw = 2) {
   const p = LUCIDE_PATHS[name] || LUCIDE_PATHS.star;
@@ -3410,6 +3422,7 @@ function adjustInputAmps(delta) {
 
 // ── Driving Mode ─────────────────────────────────
 let drivingMode     = false;
+let manualDriveMode = false;  // true = user toggled on manually; skip auto-exit
 let highIdleMode    = false;
 let lightningLoopId = null;   // setInterval handle
 let nextStrikeAt    = 0;      // timestamp of next planned strike
@@ -3465,7 +3478,7 @@ function onGPSUpdate(pos) {
       drivingTimer = setTimeout(enterDrivingMode, DRIVE_CONFIRM_MS);
   } else {
     if (drivingTimer) { clearTimeout(drivingTimer); drivingTimer = null; }
-    if (drivingMode && currentSpeedMph < STOP_SPEED_MPH) exitDrivingMode();
+    if (drivingMode && !manualDriveMode && currentSpeedMph < STOP_SPEED_MPH) exitDrivingMode();
   }
   refreshModeChip();
 }
@@ -3477,9 +3490,10 @@ function onGPSError(err) {
   refreshModeChip();
 }
 
-function enterDrivingMode() {
+function enterDrivingMode(manual = false) {
   drivingMode  = true;
   drivingTimer = null;
+  if (manual) manualDriveMode = true;
 
   // Save pre-drive state for restore on exit
   preDriveLights = [];
@@ -3531,7 +3545,8 @@ function enterDrivingMode() {
 }
 
 function exitDrivingMode() {
-  drivingMode = false;
+  drivingMode     = false;
+  manualDriveMode = false;
   document.body.classList.remove('driving');
   stopRestStopUpdates();
   switchTab(preDriveTab);
@@ -3602,7 +3617,7 @@ function toggleDriveMode() {
   } else {
     if (drivingTimer) { clearTimeout(drivingTimer); drivingTimer = null; }
     if (currentSpeedMph == null) currentSpeedMph = 0;
-    enterDrivingMode();
+    enterDrivingMode(true);
   }
 }
 
@@ -3702,7 +3717,7 @@ function refreshModeChip() {
     // Speed shown in panel — chip hidden by CSS in driving mode
     chip.style.display = 'flex';
     chip.className = 'mode-chip driving';
-    icon.textContent  = '🚗';
+    icon.innerHTML  = lucideIcon('navigation', 13, 2);
     label.textContent = (currentSpeedMph != null)
       ? Math.round(currentSpeedMph) + ' mph'
       : 'Driving';
@@ -3933,7 +3948,7 @@ function startRestStopUpdates() {
 }
 function stopRestStopUpdates() {
   if (restStopInterval) { clearInterval(restStopInterval); restStopInterval = null; }
-  setRestStopUI('rest', 'Finding rest stops…', null, null, null);
+  setRestStopUI('loading', 'Finding rest stops…', null, null, null);
 }
 
 function setRestStopUI(icon, name, distMi, timeMin, exitStr) {
@@ -3944,7 +3959,10 @@ function setRestStopUI(icon, name, distMi, timeMin, exitStr) {
   const timeEl = document.getElementById('drive-rest-time');
   const exitEl = document.getElementById('drive-rest-exit');
   if (!iconEl) return;
-  iconEl.textContent = icon === 'rest' ? '🛑' : icon === 'loading' ? '🔍' : '📍';
+  iconEl.innerHTML = lucideIcon(
+    icon === 'rest' ? 'coffee' : icon === 'loading' ? 'search' : 'map-pin',
+    36, 1.5
+  );
   nameEl.textContent = name;
   if (distMi != null) {
     metaEl.style.display = 'flex';
