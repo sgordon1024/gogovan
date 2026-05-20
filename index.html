@@ -401,33 +401,6 @@
     /* ── Battery lightning animation ─────────────────── */
     #battCard { position: relative; }
 
-    .batt-hero-label-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 8px;
-    }
-    .batt-hero-label-row .batt-hero-label { margin-bottom: 0; }
-
-    #chargingTestBtn {
-      background: none;
-      border: 1px solid transparent;
-      font-size: 13px;
-      line-height: 1;
-      padding: 2px 5px;
-      border-radius: 6px;
-      cursor: pointer;
-      color: var(--txt2);
-      opacity: 0.35;
-      transition: opacity 0.15s, border-color 0.15s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    #chargingTestBtn:hover  { opacity: 0.65; }
-    #chargingTestBtn.active {
-      opacity: 1;
-      color: #4FC3F7;
-      border-color: rgba(79,195,247,0.4);
-    }
 
     #batt-bolt {
       position: absolute;
@@ -1780,10 +1753,7 @@ safe-buffer/index.js:
     <div id="drive-power-detail">
     <div class="card" id="battCard">
       <div class="batt-hero-area">
-        <div class="batt-hero-label-row">
-          <div class="batt-hero-label">Battery</div>
-          <button id="chargingTestBtn" onclick="toggleChargingTest()" title="Test charging animation">⚡</button>
-        </div>
+        <div class="batt-hero-label">Battery</div>
         <div class="batt-hero-soc" id="battPct" onclick="startPuzzles()" style="cursor:pointer"><span class="skel">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
         <div class="batt-hero-voltage" id="battSub"><span class="skel">&nbsp;&nbsp;&nbsp;</span></div>
         <!-- charging lightning bolt — visible only when animating -->
@@ -2859,7 +2829,6 @@ function adjustInputAmps(delta) {
 // ── Driving Mode ─────────────────────────────────
 let drivingMode     = false;
 let highIdleMode    = false;
-let testCharging    = false;
 let lightningLoopId = null;   // setInterval handle
 let nextStrikeAt    = 0;      // timestamp of next planned strike
 let drivingTimer    = null;
@@ -3113,17 +3082,10 @@ function refreshModeChip() {
 }
 
 // ── Charging lightning bolt ────────────────────────
-function toggleChargingTest() {
-  testCharging = !testCharging;
-  document.getElementById('chargingTestBtn').classList.toggle('active', testCharging);
-  scheduleLightning();
-  if (testCharging) strikeLightning();   // immediate preview on enable
-}
-
 function scheduleLightning() {
-  const active = drivingMode || highIdleMode || testCharging;
+  const active = drivingMode || highIdleMode;
   if (active && !lightningLoopId) {
-    nextStrikeAt = 0;                          // reset so tick schedules first strike
+    nextStrikeAt = 0;
     lightningLoopId = setInterval(lightningTick, 500);
   } else if (!active && lightningLoopId) {
     clearInterval(lightningLoopId);
@@ -3133,26 +3095,21 @@ function scheduleLightning() {
 }
 
 function lightningTick() {
-  const active = drivingMode || highIdleMode || testCharging;
-  if (!active) {                               // mode ended mid-interval
+  const active = drivingMode || highIdleMode;
+  if (!active) {
     clearInterval(lightningLoopId);
     lightningLoopId = null;
     nextStrikeAt    = 0;
     return;
   }
-  const now      = Date.now();
-  const testOnly = testCharging && !(drivingMode || highIdleMode);
+  const now = Date.now();
   if (nextStrikeAt === 0) {
-    // First tick after activation — schedule initial strike
-    nextStrikeAt = now + (testOnly ? 500 : 8000 + Math.random() * 12000);
+    nextStrikeAt = now + 8000 + Math.random() * 12000;
     return;
   }
   if (now >= nextStrikeAt) {
     strikeLightning();
-    const delay = testOnly
-      ? 2000  + Math.random() * 2000    // 2–4s   in test mode  (obvious loop)
-      : 12000 + Math.random() * 23000;  // 12–35s when actually charging
-    nextStrikeAt = now + delay;
+    nextStrikeAt = now + 12000 + Math.random() * 23000;
   }
 }
 
