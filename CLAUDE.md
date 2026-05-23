@@ -31,7 +31,8 @@ Pi CAN HAT (Waveshare 2-CH CAN HAT+)
 
 | Device | Address | Notes |
 |---|---|---|
-| Raspberry Pi 4 | 192.168.4.1 (GoGoVan) / 100.98.52.107 (Tailscale) | Dashboard host, SSH: sgordon1024 / windows |
+| Raspberry Pi 4 | 192.168.8.106 (Apple Pi LAN) / 100.98.52.107 (Tailscale) | Dashboard host, SSH: sgordon1024 / windows |
+| GL.iNet GL-MT3000 (Beryl AX) | 192.168.8.1 | Travel router, SSID: Apple Pi, admin: http://192.168.8.1 |
 | Victron Cerbo GX | 192.168.12.140 | VRM Portal ID: 48e7da875e6c |
 | Firefly G12 controller | SA=0x9B | Controls lights, HVAC, awning, pump, tank heater |
 | G12 LCD ("Bed Wall") | SA=0x9F | Touchscreen panel, Bluetooth to VegaTouch Mira |
@@ -51,22 +52,29 @@ Pi CAN HAT (Waveshare 2-CH CAN HAT+)
 
 ## Pi Network / Routing
 
-The Pi acts as a Wi-Fi hotspot and travel router:
+The Pi no longer acts as a hotspot. A **GL.iNet GL-MT3000 (Beryl AX)** travel router handles the hotspot and upstream WAN. The Pi connects to the GL.iNet via ethernet (`eth0`).
 
 | Interface | IP | Purpose |
 |---|---|---|
-| `uap0` | 192.168.4.1/24 | GoGoVan hotspot (hostapd) |
-| `wlan0` | DHCP (upstream) | WAN: T-Mobile / Starlink / campground Wi-Fi |
+| `eth0` | 192.168.8.106/24 (DHCP from GL.iNet) | LAN: connected to GL.iNet router |
+| `wlan0` | 192.168.12.122/24 (T-Mobile subnet) | Used only to reach Cerbo GX for MQTT bridge |
 
-- **hostapd** creates the `GoGoVan` SSID on `uap0`
-- **dnsmasq** provides DHCP (192.168.4.2–50) to clients on `uap0`; Cerbo GX has a static lease: `dhcp-host=26:d7:db:55:a4:3f,192.168.4.25`
-- **iptables NAT** (MASQUERADE on wlan0) routes client traffic through wlan0
-- **IP forwarding** enabled persistently: `/etc/sysctl.d/99-ipforward.conf` → `net.ipv4.ip_forward=1`
-- **Avahi mDNS** restricted to `allow-interfaces=uap0` in `/etc/avahi/avahi-daemon.conf` — prevents `vanpi.local` from resolving to the wlan0 IP (192.168.1.x) instead of 192.168.4.1
+**GL.iNet router (Apple Pi network):**
+- SSID: `Apple Pi` — this is the main network for phones, MacBook, and all van clients
+- Admin panel: `http://192.168.8.1`
+- Handles DHCP, NAT, and WAN failover between T-Mobile and Starlink (WiFi Blaster)
+- Pi's ethernet MAC gets a stable DHCP lease at `192.168.8.106`
 
-**Cerbo GX MQTT access — important:** The Cerbo GX does **not** expose port 1883 on its GoGoVan client interface (`192.168.4.25`). It only exposes MQTT on the T-Mobile subnet where both the Pi and Cerbo connect as clients of the T-Mobile MiFi. On T-Mobile: Pi is `192.168.12.122` (wlan0), Cerbo is `192.168.12.140`. The mosquitto bridge must use `192.168.12.140:1883`. If upstream switches to Starlink or campground Wi-Fi, the Cerbo may get a different IP and the bridge will drop — check `mosquitto_sub -h localhost -t 'N/c0619ab5dcfb/#' -C 1 -W 5` to confirm data is flowing.
+**Disabled on Pi (no longer used):**
+- `hostapd` — masked (`systemctl mask hostapd`); GoGoVan SSID is gone
+- `dnsmasq` — disabled; GL.iNet handles all DHCP/DNS for clients
+- `wifi-watchdog` — disabled; was installed to restart brcmfmac but removed after root cause (loose power connector) was found
 
-**GoGoVan Wi-Fi password:** `1234567890`
+**Avahi mDNS** now restricted to `allow-interfaces=eth0` in `/etc/avahi/avahi-daemon.conf` — `vanpi.local` resolves to `192.168.8.106` on the Apple Pi network.
+
+**Cerbo GX MQTT access — important:** The Cerbo GX does **not** expose port 1883 on the Apple Pi network. It only exposes MQTT on the T-Mobile subnet where both the Pi and Cerbo connect as clients of the T-Mobile MiFi. On T-Mobile: Pi is `192.168.12.122` (wlan0), Cerbo is `192.168.12.140`. The mosquitto bridge must use `192.168.12.140:1883`. If upstream switches to Starlink or campground Wi-Fi, the Cerbo may get a different IP and the bridge will drop — check `mosquitto_sub -h localhost -t 'N/c0619ab5dcfb/#' -C 1 -W 5` to confirm data is flowing.
+
+**Apple Pi Wi-Fi password:** (set in GL.iNet admin panel)
 
 ---
 
@@ -74,13 +82,13 @@ The Pi acts as a Wi-Fi hotspot and travel router:
 
 | Context | URL |
 |---|---|
-| On GoGoVan network | http://vanpi.local |
+| On Apple Pi network (local) | http://vanpi.local or http://192.168.8.106 |
 | Via Tailscale (HTTP) | http://100.98.52.107 |
 | Via Tailscale (HTTPS) | https://vanpi.tail27a0b4.ts.net |
 
-**Use the HTTPS URL whenever GPS/speedometer is needed** — iOS Safari blocks the Geolocation API on plain HTTP pages (reports as "permission denied" regardless of what the user taps). The HTTPS URL uses a Tailscale-issued Let's Encrypt cert served by nginx on the Pi.
+**Use the HTTPS URL whenever GPS/speedometer is needed** — iOS Safari blocks the Geolocation API on plain HTTP pages (reports as "permission denied" regardless of what the user taps). The HTTPS URL uses a Tailscale-issued Let's Encrypt cert served by nginx on the Pi. Requires Tailscale running on the client device.
 
-**Arc browser cannot access local HTTP (http://vanpi.local or http://192.168.4.1) — Arc blocks private IP HTTP requests internally.** Use Safari, or the Tailscale URL in any browser.
+**Arc browser cannot access local HTTP (http://vanpi.local or http://192.168.8.106) — Arc blocks private IP HTTP requests internally.** Use Safari, or the Tailscale URL in any browser.
 
 Adding the dashboard to iPhone home screen (Safari → Share → Add to Home Screen) is the recommended approach — it opens in a full-screen Safari webview.
 
@@ -95,7 +103,8 @@ Adding the dashboard to iPhone home screen (Safari → Share → Add to Home Scr
 | iPhone (iphone-15-pro-max) | 100.102.31.31 |
 
 - Key expiry disabled on Pi in Tailscale admin panel (no re-auth needed)
-- Tailscale CLI on Mac: `/Applications/Tailscale.app/Contents/MacOS/Tailscale`
+- Tailscale is **not installed on the MacBook** — use SSH via Apple Pi LAN (192.168.8.106) or install Tailscale on Mac for remote access
+- iPhone has Tailscale installed; must be connected to use the HTTPS URL
 
 ---
 
