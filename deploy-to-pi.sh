@@ -1,6 +1,6 @@
 #!/bin/bash
-# Deploy updated can-bridge.py and index.html to GoGoVan Pi
-# Dashboard URLs: http://vanpi.local  (on GoGoVan) | http://100.98.52.107 (via Tailscale)
+# Deploy updated files to GoGoVan Pi
+# Dashboard URLs: http://vanpi.local  (on Apple Pi) | http://100.98.52.107 (via Tailscale)
 
 PASS="windows"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -22,13 +22,13 @@ if sshpass -p "$PASS" ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "sgord
 elif sshpass -p "$PASS" ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "sgordon1024@vanpi.local" "echo ok" &>/dev/null; then
   PI="sgordon1024@vanpi.local"
   echo "→ Using local network (vanpi.local)"
-elif sshpass -p "$PASS" ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "sgordon1024@192.168.4.1" "echo ok" &>/dev/null; then
-  PI="sgordon1024@192.168.4.1"
-  echo "→ Using local IP (192.168.4.1)"
+elif sshpass -p "$PASS" ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "sgordon1024@192.168.8.106" "echo ok" &>/dev/null; then
+  PI="sgordon1024@192.168.8.106"
+  echo "→ Using Apple Pi LAN (192.168.8.106)"
 else
   echo "ERROR: Cannot reach Pi via Tailscale or local network."
-  echo "  - Via Tailscale: make sure Tailscale is running on this machine"
-  echo "  - Via GoGoVan Wi-Fi: connect to GoGoVan network first"
+  echo "  - Via Tailscale: connect iPhone to Tailscale first"
+  echo "  - Via Apple Pi Wi-Fi: connect to Apple Pi network first"
   exit 1
 fi
 
@@ -52,11 +52,15 @@ sshpass -p "$PASS" scp "$ROPE_SRC" "$PI:~/rope-light.py" || { echo "FAILED: rope
 echo "=== Restarting rope-light service ==="
 sshpass -p "$PASS" ssh "$PI" 'echo windows | sudo -S systemctl restart rope-light && echo "rope-light restarted"' || echo "WARNING: rope-light restart failed"
 
-echo "=== Verifying can-bridge is running ==="
-sleep 3
-sshpass -p "$PASS" ssh "$PI" 'sudo systemctl status can-bridge --no-pager -l | head -20'
+echo "=== Copying starlink-bridge.py ==="
+STARLINK_SRC="$DIR/starlink-bridge.py"; [ -f "$STARLINK_SRC" ] || STARLINK_SRC="$SCRIPT_DIR/starlink-bridge.py"
+sshpass -p "$PASS" scp "$STARLINK_SRC" "$PI:~/starlink-bridge.py" || { echo "FAILED: starlink-bridge.py copy"; exit 1; }
 
-echo "=== Checking subscription in logs ==="
-sshpass -p "$PASS" ssh "$PI" 'sudo journalctl -u can-bridge -n 20 --no-pager'
+echo "=== Restarting starlink-bridge service ==="
+sshpass -p "$PASS" ssh "$PI" 'echo windows | sudo -S systemctl restart starlink-bridge && echo "starlink-bridge restarted"' || echo "WARNING: starlink-bridge restart failed"
+
+echo "=== Verifying services ==="
+sleep 3
+sshpass -p "$PASS" ssh "$PI" 'sudo systemctl is-active can-bridge starlink-bridge rope-light'
 
 echo "=== DONE ==="

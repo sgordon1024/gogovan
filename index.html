@@ -2552,18 +2552,18 @@ safe-buffer/index.js:
       </div>
       <!-- Threshold slider — only active when auto is on -->
       <div class="starlink-thresh-row disabled" id="starlinkThreshRow">
-        <span class="thresh-label">Switch on below</span>
+        <span class="thresh-label">Switch when below</span>
         <div class="thresh-slider-wrap">
-          <span class="thresh-end-label">0</span>
+          <span class="thresh-end-label">1</span>
           <input type="range" class="dim-slider" id="threshSlider"
-            min="0" max="100" value="35" style="--pct:35%"
+            min="1" max="25" value="5" style="--pct:20%"
             oninput="onThreshInput(this)" onchange="onThreshChange(this)"
-            aria-label="T-Mobile signal threshold">
-          <span class="thresh-end-label">100</span>
+            aria-label="T-Mobile speed threshold (Mbps)">
+          <span class="thresh-end-label">25</span>
         </div>
-        <span class="thresh-val-label" id="threshVal">35</span>
+        <span class="thresh-val-label" id="threshVal">5</span><span style="font-size:11px;color:var(--txt2);margin-left:2px">Mbps</span>
       </div>
-      <div class="net-hint" style="padding:0 16px 14px;text-align:left">When on, Starlink powers up if T-Mobile signal drops below <span id="threshHintVal">35</span>.</div>
+      <div class="net-hint" style="padding:0 16px 14px;text-align:left">When on, Starlink powers up if T-Mobile speed drops below <span id="threshHintVal">5</span> Mbps.</div>
     </div>
   </div>
 
@@ -5040,7 +5040,7 @@ function renderStatsList(data) {
 // ── Starlink power control ────────────────────────
 let starlinkOn        = null;   // true / false / null (unknown)
 let starlinkAuto      = false;
-let starlinkThreshold = 35;     // T-Mobile signal level below which Starlink auto-switches on
+let starlinkThreshold = 5;      // T-Mobile speed (Mbps) below which Starlink auto-switches on
 let starlinkQualityDismissed = false;
 let starlinkQualityLast = 'unknown';
 
@@ -5086,14 +5086,18 @@ function updateStarlinkAuto(on) {
 function updateStarlinkThreshold(val) {
   starlinkThreshold = val;
   const el = document.getElementById('threshSlider');
-  if (el) { el.value = val; el.style.setProperty('--pct', val + '%'); }
+  if (el) {
+    el.value = val;
+    // slider range is 1–25 Mbps
+    el.style.setProperty('--pct', ((val - 1) / 24 * 100).toFixed(1) + '%');
+  }
   document.getElementById('threshVal').textContent = val;
   document.getElementById('threshHintVal').textContent = val;
 }
 
 function onThreshInput(el) {
   const val = parseInt(el.value);
-  el.style.setProperty('--pct', val + '%');
+  el.style.setProperty('--pct', ((val - 1) / 24 * 100).toFixed(1) + '%');
   document.getElementById('threshVal').textContent = val;
   document.getElementById('threshHintVal').textContent = val;
 }
