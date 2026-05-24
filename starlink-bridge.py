@@ -61,6 +61,7 @@ DEFAULT_SPEED_THRESH    = 5      # Mbps: switch to Starlink if T-Mobile below th
 STARLINK_BOOT_SECS      = 60     # wait after powering plug before connecting repeater
 TMOBILE_CHECK_INTERVAL  = 1800   # 30 min: how often to test T-Mobile while on Starlink
 QUALITY_CHECK_INTERVAL  = 300    # 5 min: ping quality check when on Starlink
+REPEATER_CHECK_INTERVAL = 120    # 2 min: watchdog — reconnect repeater if it drops
 
 # States
 STATE_TMOBILE            = "tmobile"
@@ -74,9 +75,10 @@ starlink_power     = None
 auto_mode          = True    # on by default (overwritten from disk in on_connect)
 speed_threshold    = DEFAULT_SPEED_THRESH
 plug_address       = None
-switch_lock        = threading.Lock()
-last_tmobile_check = 0.0
-last_quality_check = 0.0
+switch_lock          = threading.Lock()
+last_tmobile_check   = 0.0
+last_quality_check   = 0.0
+last_repeater_check  = 0.0
 mqtt_client_ref    = None
 startup_complete   = False   # blocks speedtest handler until startup sets real state
 pending_speedtest  = None    # stores speedtest message received during startup
@@ -423,13 +425,42 @@ def switch_to_tmobile(force_off: bool = False):
 
 # ── Monitor loop ───────────────────────────────────────────────────────────
 
+def router_repeater_reconnect_if_needed():
+    """
+    Watchdog: if the GL.iNet repeater has dropped, reconnect to whichever
+    network matches the current state (T-Mobile or WiFi Blaster).
+    Only runs when we're not mid-switch.
+    """
+    if switch_lock.locked():
+        return
+    if state not in (STATE_TMOBILE, STATE_STARLINK):
+        return
+    status = router_repeater_status()
+    if status is None:
+        return  # SSH failed — don't act on missing data
+    if status.get("state_s") == "connected":
+        return  # all good
+    expected_ssid = STARLINK_SSID if state == STATE_STARLINK else TMOBILE_SSID
+    print(f"Watchdog: repeater dropped (state={status.get('state_s')!r}), "
+          f"reconnecting to {expected_ssid!r}...")
+    if router_repeater_connect(expected_ssid, WIFI_PASSWORD):
+        print(f"✓ Watchdog: reconnected to {expected_ssid!r}")
+    else:
+        print(f"✗ Watchdog: reconnect to {expected_ssid!r} failed")
+
+
 def monitor_loop(client):
-    global last_tmobile_check, last_quality_check
+    global last_tmobile_check, last_quality_check, last_repeater_check
 
     while True:
         time.sleep(30)
         try:
             now = time.time()
+
+            # Repeater watchdog — runs every 2 min regardless of upstream state
+            if now - last_repeater_check >= REPEATER_CHECK_INTERVAL:
+                last_repeater_check = now
+                router_repeater_reconnect_if_needed()
 
             if state == STATE_STARLINK:
                 # T-Mobile speed check every 30 min to decide when to switch back.
@@ -529,10 +560,20 @@ def _startup(client):
         print("Starting in Starlink state")
 
     else:
-        # On T-Mobile (or unknown) — run immediate speed test
+        # On T-Mobile (or unknown) — ensure repeater is connected first
         state = STATE_TMOBILE
         write_upstream_file("tmobile")
         client.publish("van/status/network/upstream", "tmobile", retain=True)
+
+        if upstream == "unknown":
+            # Repeater disconnected (router rebooted, or WiFi Blaster was selected but
+            # Starlink dish is off). Reconnect to T-Mobile before running speed test.
+            print("GL.iNet repeater not connected — reconnecting to T-Mobile...")
+            if router_repeater_connect(TMOBILE_SSID, WIFI_PASSWORD):
+                print("✓ Repeater reconnected to T-Mobile")
+            else:
+                print("✗ Repeater reconnect to T-Mobile failed — speed test may fail")
+
         print("Starting in T-Mobile state — running immediate speed test...")
 
         if auto_mode:
