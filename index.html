@@ -456,54 +456,112 @@
       animation: card-strike 0.9s ease-out forwards;
     }
 
-    /* ── 100% emoji puzzle overlay ───────────────────── */
-    #puzzle-overlay {
+    /* ── 100% full charge coin overlay ───────────────────── */
+    #coin-overlay {
       position: absolute;
       inset: 0;
-      background: rgba(11, 11, 22, 0.97);
+      background: rgba(8, 8, 18, 0.96);
       border-radius: var(--radius);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 10px;
+      gap: 14px;
       z-index: 20;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
-      animation: puzzle-in 0.35s cubic-bezier(0.34,1.56,0.64,1);
+      animation: coin-overlay-in 0.55s cubic-bezier(0.34,1.56,0.64,1);
     }
-    @keyframes puzzle-in {
-      from { opacity: 0; transform: scale(0.88); }
+    @keyframes coin-overlay-in {
+      from { opacity: 0; transform: scale(0.5); }
       to   { opacity: 1; transform: scale(1); }
     }
-    #puzzle-progress {
+    #coin-3d {
+      perspective: 500px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #coin-inner {
+      position: relative;
+      display: inline-block;
+      animation: coin-spin 2.2s linear infinite;
+    }
+    #coin-gold {
+      display: block;
+      font-size: 80px;
+      font-weight: 900;
+      font-family: -apple-system, 'SF Pro Display', system-ui, sans-serif;
+      letter-spacing: -4px;
+      line-height: 1;
+      white-space: nowrap;
+      user-select: none;
+      position: relative;
+      background: linear-gradient(170deg,
+        #fffde0 0%,
+        #ffe44d 10%,
+        #ffc300 26%,
+        #c47000 46%,
+        #e09000 56%,
+        #ffc300 72%,
+        #ffe44d 86%,
+        #fffde0 100%
+      );
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow:
+        0 2px 0 rgba(140, 70, 0, 0.9),
+        0 4px 0 rgba(90, 40, 0, 0.7),
+        0 8px 14px rgba(0, 0, 0, 0.85);
+    }
+    #coin-gold::after {
+      content: '100%';
+      position: absolute;
+      top: 0; left: 0;
+      font-size: inherit;
+      font-weight: inherit;
+      font-family: inherit;
+      letter-spacing: inherit;
+      line-height: inherit;
+      white-space: inherit;
+      background: linear-gradient(
+        110deg,
+        transparent 22%,
+        rgba(255,255,255,0.95) 50%,
+        rgba(255,255,200,0.4) 60%,
+        transparent 76%
+      );
+      background-size: 300% 100%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: coin-shine 2.2s linear infinite;
+      pointer-events: none;
+    }
+    @keyframes coin-spin {
+      0%   { transform: rotateY(0deg); }
+      100% { transform: rotateY(360deg); }
+    }
+    @keyframes coin-shine {
+      0%   { background-position: 120% 0; }
+      15%  { background-position: 120% 0; }
+      30%  { background-position: -80% 0; }
+      44%  { background-position: -200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    #coin-label {
       font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 1px;
+      font-weight: 700;
+      letter-spacing: 3px;
       text-transform: uppercase;
-      color: var(--txt2);
+      color: #ffc300;
+      opacity: 0.72;
     }
-    #puzzle-emoji {
-      font-size: 44px;
-      line-height: 1.1;
-      letter-spacing: 6px;
-      text-align: center;
-    }
-    #puzzle-answer {
-      font-size: 19px;
-      font-weight: 800;
-      color: var(--green);
-      text-align: center;
-      letter-spacing: -0.3px;
-      animation: pop-in 0.25s cubic-bezier(0.34,1.56,0.64,1);
-    }
-    @keyframes pop-in {
-      from { opacity: 0; transform: scale(0.7); }
-      to   { opacity: 1; transform: scale(1); }
-    }
-    #puzzle-hint {
-      font-size: 12px;
-      color: var(--txt2);
+    #coin-dismiss {
+      font-size: 11px;
+      color: rgba(255,255,255,0.22);
+      letter-spacing: 0.3px;
       margin-top: 2px;
     }
 
@@ -2208,8 +2266,8 @@ safe-buffer/index.js:
   <div id="starlinkQualityBanner" class="starlink-quality-banner" hidden>
     <svg class="starlink-quality-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
     <div class="starlink-quality-body">
-      <div class="starlink-quality-title">Starlink may be obstructed</div>
-      <div class="starlink-quality-sub">High latency detected — the dish may have a blocked sky view.</div>
+      <div class="starlink-quality-title">Starlink connection quality is poor</div>
+      <div class="starlink-quality-sub">High latency or packet loss detected. Could be dish placement, weak signal between routers, or a temporary Starlink blip.</div>
     </div>
     <button class="starlink-quality-dismiss" onclick="dismissQualityBanner()" aria-label="Dismiss">
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
@@ -2266,12 +2324,15 @@ safe-buffer/index.js:
       </div>
       <!-- card-wide flash overlay for lightning effect -->
       <div id="batt-flash" aria-hidden="true"></div>
-      <!-- 100% emoji puzzle overlay -->
-      <div id="puzzle-overlay" hidden onclick="puzzleTap()">
-        <div id="puzzle-progress">1 / 10</div>
-        <div id="puzzle-emoji">🦁 👑</div>
-        <div id="puzzle-answer" hidden></div>
-        <div id="puzzle-hint">tap to reveal</div>
+      <!-- 100% full charge coin -->
+      <div id="coin-overlay" hidden onclick="closeCoin()">
+        <div id="coin-3d">
+          <div id="coin-inner">
+            <span id="coin-gold">100%</span>
+          </div>
+        </div>
+        <div id="coin-label">Fully Charged</div>
+        <div id="coin-dismiss">tap to dismiss</div>
       </div>
     </div>
 
@@ -2335,8 +2396,8 @@ safe-buffer/index.js:
     </div>
     <span class="section-label section-label-solo" style="margin-top:16px">Rope Lights</span>
     <div class="card">
-      <div class="light-row" id="ropeRow">
-        <button class="light-toggle" id="ropeToggle" onclick="toggleRopeLight()" aria-label="Rope lights">
+      <div class="light-row" id="ropeRow" onclick="toggleRopeLight()">
+        <span class="light-toggle" aria-hidden="true">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--txt2)" stroke-width="2.5" stroke-linecap="round" id="ropeIcon">
             <circle cx="12" cy="12" r="5"/>
             <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
@@ -2344,7 +2405,7 @@ safe-buffer/index.js:
             <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
             <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
           </svg>
-        </button>
+        </span>
         <span class="light-name">Rope Lights</span>
       </div>
       <div class="rope-palette">
@@ -2563,7 +2624,8 @@ safe-buffer/index.js:
         </div>
         <span class="thresh-val-label" id="threshVal">5</span><span style="font-size:11px;color:var(--txt2);margin-left:2px">Mbps</span>
       </div>
-      <div class="net-hint" style="padding:0 16px 14px;text-align:left">When on, Starlink powers up if T-Mobile speed drops below <span id="threshHintVal">5</span> Mbps.</div>
+      <div class="net-hint" id="starlinkAutoHint" style="padding:0 16px 14px;text-align:left">When on, Starlink powers up if T-Mobile speed drops below <span id="threshHintVal">5</span> Mbps.</div>
+      <div class="net-hint" id="starlinkManualHint" style="padding:0 16px 14px;text-align:left" hidden>Auto-switch off — the power button controls the dish directly. No automatic switching or loops.</div>
     </div>
   </div>
 
@@ -4310,158 +4372,29 @@ function strikeLightning() {
   });
 }
 
-// ── 100% emoji puzzle ─────────────────────────────
-// Seeded LCG PRNG (Lehmer) — deterministic daily shuffle
-function seededRng(seed) {
-  let s = seed >>> 0;
-  return () => { s = Math.imul(1664525, s) + 1013904223 >>> 0; return s / 0x100000000; };
-}
-function dailySeed() {
-  const d = new Date();
-  return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
-}
-function shuffleSeeded(arr, rng) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-// Puzzle types: 'puzzle' = guess the emoji, 'joke' = Q&A joke, 'compliment'
-const PUZZLE_POOL = [
-  { t:'puzzle', e:'🦁 👑',         a:'Lion King' },
-  { t:'puzzle', e:'🐢 🍕',         a:'Ninja Turtles' },
-  { t:'puzzle', e:'🌮 🔔',         a:'Taco Bell' },
-  { t:'puzzle', e:'🕷️ 🕸️',        a:'Spider-Man' },
-  { t:'puzzle', e:'🐻 🍯',         a:'Winnie the Pooh' },
-  { t:'puzzle', e:'❄️ 👸',         a:'Frozen' },
-  { t:'puzzle', e:'🍌 🍞',         a:'Banana Bread' },
-  { t:'puzzle', e:'🎸 ⭐',         a:'Rock Star' },
-  { t:'puzzle', e:'🍎 📱',         a:'Apple iPhone' },
-  { t:'puzzle', e:'☀️ 🕶️',        a:'Summer Vibes' },
-  { t:'puzzle', e:'🦇 🧛',         a:'Dracula' },
-  { t:'puzzle', e:'🎵 👻',         a:'Ghostbusters' },
-  { t:'puzzle', e:'🐉 ♟️',         a:'Game of Thrones' },
-  { t:'puzzle', e:'🏝️ 🤠',         a:'Cowboy on a Beach' },
-  { t:'puzzle', e:'🐝 🎬',         a:'Bee Movie' },
-  { t:'puzzle', e:'🍕 🔺',         a:'Pizza Hut' },
-  { t:'puzzle', e:'🦊 🔵',         a:'Firefox' },
-  { t:'puzzle', e:'🐦 𝕏',          a:'Twitter / X' },
-  { t:'puzzle', e:'🦄 🌈',         a:'Magic!' },
-  { t:'puzzle', e:'🧙 💍',         a:'Lord of the Rings' },
-];
-
-const JOKE_POOL = [
-  { t:'joke', e:'Why did the battery go to therapy?', a:'It had too many issues with charging! 😄' },
-  { t:'joke', e:"Why don't scientists trust atoms?", a:'Because they make up everything! 😂' },
-  { t:'joke', e:'What do you call a van with no wheels?', a:'A living room! 🚐💀' },
-  { t:'joke', e:'How does the moon cut his hair?', a:'Eclipse it! 🌙✂️' },
-  { t:'joke', e:'Why did the solar panel break up with the grid?', a:"It wanted to be off with someone else! ☀️💔" },
-  { t:'joke', e:'What did one power cell say to the other?', a:'You electric me! ⚡😍' },
-  { t:'joke', e:'Why is the van always calm?', a:'Because it has good suspension! 🚐😌' },
-  { t:'joke', e:'What do you call cheese that isn\'t yours?', a:'Nacho cheese! 🧀' },
-  { t:'joke', e:'Why did the camper go to school?', a:"Because it wanted to go further! 🎒🚐" },
-  { t:'joke', e:"I'm reading a book about anti-gravity.", a:"It's impossible to put down! 📚🪐" },
-];
-
-const COMPLIMENT_POOL = [
-  { t:'compliment', e:'You\'re basically a solar-powered superhero. ☀️🦸', a:'Seriously. You live off the sun. That\'s incredible.' },
-  { t:'compliment', e:'Most people dream of van life. You\'re living it. 🌅', a:'Every sunrise out your window is earned.' },
-  { t:'compliment', e:'You\'re 100% charged and so is your vibe. 🔋✨', a:'Top tier energy. Always.' },
-  { t:'compliment', e:'Adventuring on your own terms. 🗺️🚐', a:'That takes guts. You\'ve got them.' },
-  { t:'compliment', e:'You make "fully charged" look effortless. 💯⚡', a:'Peak performance. Peak person.' },
-  { t:'compliment', e:'The van has good energy because you brought yours. 🌟', a:'Mood is contagious — keep spreading it.' },
-  { t:'compliment', e:'You turned a Sprinter into a spaceship. 🚀', a:'Engineering, design, vibes — all yours.' },
-  { t:'compliment', e:'100% battery. 100% you. 💪🔋', a:'Both fully loaded and ready to roll.' },
-  { t:'compliment', e:'You built something people only Pinterest about. 📌', a:'That\'s the real flex.' },
-  { t:'compliment', e:'GoGoVan is basically your superpower. ⚡🚐', a:'Fully charged and fully awesome.' },
-];
-
-// Always end with these two
-const PUZZLE_FINALE = [
-  { t:'puzzle', e:'🚐 ⚡', a:"That's you! 🎉" },
-  { t:'compliment', e:'🔋 💯', a:'FULL CHARGE!! 🎊' },
-];
-
-let puzzleList  = [];
-let puzzleIdx   = 0;
-let puzzlePhase = 'hidden';   // 'question' | 'answer' | 'hidden'
-let puzzleTimer = null;
-let lastSocFull = false;
+// ── 100% full charge coin ─────────────────────────────
+let lastSocFull  = false;
+let coinTimer    = null;
 
 function checkBattFull(pct) {
   if (pct >= 100 && !lastSocFull) {
     lastSocFull = true;
-    startPuzzles();
+    showCoin();
   } else if (pct < 100) {
     lastSocFull = false;
   }
 }
 
-function startPuzzles() {
-  const rng = seededRng(dailySeed());
-  const puzzles    = shuffleSeeded(PUZZLE_POOL, rng).slice(0, 3);
-  const jokes      = shuffleSeeded(JOKE_POOL, rng).slice(0, 2);
-  const compliments = shuffleSeeded(COMPLIMENT_POOL, rng).slice(0, 3);
-  const mixed      = shuffleSeeded([...puzzles, ...jokes, ...compliments], rng);
-  puzzleList  = [...mixed, ...PUZZLE_FINALE];
-  puzzleIdx   = 0;
-  showPuzzle();
+function showCoin() {
+  const overlay = document.getElementById('coin-overlay');
+  overlay.hidden = false;
+  clearTimeout(coinTimer);
+  coinTimer = setTimeout(closeCoin, 5000);
 }
 
-function showPuzzle() {
-  if (puzzleIdx >= puzzleList.length) { closePuzzle(); return; }
-  const p    = puzzleList[puzzleIdx];
-  const over = document.getElementById('puzzle-overlay');
-  const em   = document.getElementById('puzzle-emoji');
-  const ans  = document.getElementById('puzzle-answer');
-  const hint = document.getElementById('puzzle-hint');
-  const prog = document.getElementById('puzzle-progress');
-  // Reset
-  ans.hidden      = true;
-  ans.textContent = p.a;
-  prog.textContent = `${puzzleIdx + 1} / ${puzzleList.length}`;
-
-  if (p.t === 'joke') {
-    em.textContent   = p.e;           // question text
-    hint.textContent = 'tap for punchline';
-  } else if (p.t === 'compliment') {
-    em.textContent   = p.e;
-    hint.textContent = 'tap to read more';
-  } else {
-    em.textContent   = p.e;           // emojis
-    hint.textContent = 'tap to reveal';
-  }
-  // Restart overlay animation by briefly removing it
-  over.hidden = true;
-  requestAnimationFrame(() => {
-    over.hidden = false;
-    puzzlePhase = 'question';
-  });
-  clearTimeout(puzzleTimer);
-}
-
-function puzzleTap() {
-  clearTimeout(puzzleTimer);
-  if (puzzlePhase === 'question') {
-    const ans  = document.getElementById('puzzle-answer');
-    const hint = document.getElementById('puzzle-hint');
-    ans.hidden       = false;
-    hint.textContent = puzzleIdx < puzzleList.length - 1 ? 'tap for next →' : 'tap to close';
-    puzzlePhase      = 'answer';
-    puzzleTimer      = setTimeout(() => { puzzleIdx++; showPuzzle(); }, 3500);
-  } else if (puzzlePhase === 'answer') {
-    puzzleIdx++;
-    showPuzzle();
-  }
-}
-
-function closePuzzle() {
-  document.getElementById('puzzle-overlay').hidden = true;
-  puzzlePhase = 'hidden';
-  clearTimeout(puzzleTimer);
+function closeCoin() {
+  clearTimeout(coinTimer);
+  document.getElementById('coin-overlay').hidden = true;
 }
 
 
@@ -4860,7 +4793,7 @@ function switchNetwork(target) {
   btnT.classList.add('switching');
   btnS.classList.add('switching');
   document.getElementById('netStatusLabel').textContent = 'Switching…';
-  document.getElementById('netStatusSub').textContent   = 'Please wait ~10 seconds';
+  document.getElementById('netStatusSub').textContent   = target === 'starlink' ? 'May take ~1 minute' : 'Please wait…';
   mqttClient.publish('van/network/upstream', target);
 }
 
@@ -5044,6 +4977,13 @@ let starlinkThreshold = 5;      // T-Mobile speed (Mbps) below which Starlink au
 let starlinkQualityDismissed = false;
 let starlinkQualityLast = 'unknown';
 
+function starlinkSubLabel() {
+  if (!starlinkAuto) {
+    return starlinkOn ? 'Manual · dish powered on' : 'Manual · tap to power on';
+  }
+  return starlinkOn ? 'Plug is powered on' : 'Plug is powered off';
+}
+
 function updateStarlinkPower(state) {
   starlinkOn = (state === 'on');
   const btn   = document.getElementById('starlinkToggleBtn');
@@ -5051,7 +4991,7 @@ function updateStarlinkPower(state) {
   const sub   = document.getElementById('starlinkPowerSub');
   btn.classList.toggle('on', starlinkOn);
   label.textContent = starlinkOn ? 'Starlink On' : 'Starlink Off';
-  sub.textContent   = starlinkOn ? 'Plug is powered on' : 'Plug is powered off';
+  sub.textContent   = starlinkSubLabel();
 }
 
 function updateTmobileSignal(sig) {
@@ -5081,6 +5021,11 @@ function updateStarlinkAuto(on) {
   starlinkAuto = on;
   document.getElementById('starlinkAutoBtn').classList.toggle('on', on);
   document.getElementById('starlinkThreshRow').classList.toggle('disabled', !on);
+  document.getElementById('starlinkAutoHint').hidden   = !on;
+  document.getElementById('starlinkManualHint').hidden = on;
+  // Re-render power sub-label so it reflects manual vs auto mode
+  const sub = document.getElementById('starlinkPowerSub');
+  if (sub) sub.textContent = starlinkSubLabel();
 }
 
 function updateStarlinkThreshold(val) {

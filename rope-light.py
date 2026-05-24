@@ -127,7 +127,12 @@ def on_message(mqttc, userdata, msg):
     payload = msg.payload.decode().strip().lower()
 
     if topic == "van/rope-light/power":
-        loop.call_soon_threadsafe(queue.put_nowait, CMD_ON if payload == "on" else CMD_OFF)
+        if payload == "on":
+            loop.call_soon_threadsafe(queue.put_nowait, CMD_ON)
+            color_to_send = last_color if last_color is not None else COLORS['white']
+            loop.call_soon_threadsafe(queue.put_nowait, color_to_send)
+        else:
+            loop.call_soon_threadsafe(queue.put_nowait, CMD_OFF)
 
     elif topic == "van/rope-light/color" and payload in COLORS:
         loop.call_soon_threadsafe(queue.put_nowait, CMD_ON)

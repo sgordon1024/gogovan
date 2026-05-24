@@ -59,6 +59,12 @@ sshpass -p "$PASS" scp "$STARLINK_SRC" "$PI:~/starlink-bridge.py" || { echo "FAI
 echo "=== Restarting starlink-bridge service ==="
 sshpass -p "$PASS" ssh "$PI" 'echo windows | sudo -S systemctl restart starlink-bridge && echo "starlink-bridge restarted"' || echo "WARNING: starlink-bridge restart failed"
 
+echo "=== Copying run-speedtest.py ==="
+SPEEDTEST_SRC="$DIR/run-speedtest.py"; [ -f "$SPEEDTEST_SRC" ] || SPEEDTEST_SRC="$SCRIPT_DIR/run-speedtest.py"
+if [ -f "$SPEEDTEST_SRC" ]; then
+  sshpass -p "$PASS" scp "$SPEEDTEST_SRC" "$PI:~/run-speedtest.py" && chmod +x run-speedtest.py || echo "WARNING: run-speedtest.py copy failed"
+fi
+
 echo "=== Verifying services ==="
 sleep 3
 sshpass -p "$PASS" ssh "$PI" 'sudo systemctl is-active can-bridge starlink-bridge rope-light'

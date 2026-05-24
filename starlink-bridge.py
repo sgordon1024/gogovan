@@ -55,6 +55,7 @@ STARLINK_SSID     = "WiFi Blaster"
 WIFI_PASSWORD     = "1234567890"
 
 THRESH_FILE             = os.path.expanduser("~/.starlink_speed_threshold")
+AUTO_MODE_FILE          = os.path.expanduser("~/.starlink_auto_mode")
 UPSTREAM_FILE           = "/tmp/gogovan_upstream"
 DEFAULT_SPEED_THRESH    = 5      # Mbps: switch to Starlink if T-Mobile below this
 STARLINK_BOOT_SECS      = 60     # wait after powering plug before connecting repeater
@@ -70,7 +71,7 @@ STATE_SWITCHING_TMOBILE  = "switching_to_tmobile"
 # ── State ──────────────────────────────────────────────────────────────────
 state              = STATE_TMOBILE
 starlink_power     = None
-auto_mode          = True    # on by default
+auto_mode          = True    # on by default (overwritten from disk in on_connect)
 speed_threshold    = DEFAULT_SPEED_THRESH
 plug_address       = None
 switch_lock        = threading.Lock()
@@ -79,6 +80,7 @@ last_quality_check = 0.0
 mqtt_client_ref    = None
 startup_complete   = False   # blocks speedtest handler until startup sets real state
 pending_speedtest  = None    # stores speedtest message received during startup
+manual_pause_auto  = False   # set when user manually turns off Starlink; blocks auto-switch
 
 # ── Persistence ────────────────────────────────────────────────────────────
 
@@ -94,6 +96,20 @@ def save_threshold(val: int):
             f.write(str(val))
     except Exception as e:
         print(f"save_threshold error: {e}")
+
+def load_auto_mode() -> bool:
+    """Load persisted auto_mode. Avoids startup race with retained MQTT message."""
+    try:
+        return open(AUTO_MODE_FILE).read().strip().lower() != "off"
+    except Exception:
+        return True   # default: auto on
+
+def save_auto_mode(val: bool):
+    try:
+        with open(AUTO_MODE_FILE, "w") as f:
+            f.write("on" if val else "off")
+    except Exception as e:
+        print(f"save_auto_mode error: {e}")
 
 def write_upstream_file(upstream: str):
     try:
@@ -166,6 +182,14 @@ def find_plug_ip() -> str:
         print(f"find_plug_ip error: {e}")
     return None
 
+def ensure_plug_ip() -> bool:
+    """Return True if plug address is known; re-scan once if not."""
+    global plug_address
+    if plug_address:
+        return True
+    plug_address = find_plug_ip()
+    return plug_address is not None
+
 def make_plug(ip: str):
     d = tinytuya.OutletDevice(
         dev_id=PLUG_DEV_ID,
@@ -226,10 +250,15 @@ def get_wlan0_ip() -> str:
 
 def run_tmobile_speedtest() -> float:
     """
-    Speed test via wlan0 (T-Mobile direct). Does not consume Starlink data.
-    Returns download Mbps or None. Publishes result to MQTT.
+    Background speed test via wlan0 (T-Mobile direct, no Starlink data used).
+    Returns download Mbps or None.
+
+    Intentionally does NOT publish to van/status/network/speedtest — that topic
+    is for user-initiated tests shown in the dashboard. Publishing here caused two
+    problems: (1) the monitor_loop and the on_message handler both saw the result
+    and raced to start a second switch thread; (2) background T-Mobile checks
+    overwrote the dashboard's "Last Test" display while the user was on Starlink.
     """
-    global mqtt_client_ref
     wlan0_ip = get_wlan0_ip()
     if not wlan0_ip:
         print("T-Mobile check: no wlan0 IP")
@@ -243,24 +272,11 @@ def run_tmobile_speedtest() -> float:
         if not r.stdout.strip():
             print("T-Mobile speedtest: empty output (T-Mobile may be down)")
             return None
-        data   = json.loads(r.stdout)
-        dl     = round(data["download"] / 1e6, 1)
-        ul     = round(data["upload"]   / 1e6, 1)
-        ping   = round(data["ping"])
-        server = data.get("server", {}).get("sponsor", "Unknown")
+        data = json.loads(r.stdout)
+        dl   = round(data["download"] / 1e6, 1)
+        ul   = round(data["upload"]   / 1e6, 1)
+        ping = round(data["ping"])
         print(f"T-Mobile via wlan0: ↓{dl} ↑{ul} ping={ping}ms")
-        if mqtt_client_ref:
-            result = {
-                "download":  dl,
-                "upload":    ul,
-                "ping":      ping,
-                "server":    server,
-                "upstream":  "tmobile",
-                "timestamp": data.get("timestamp", ""),
-                "error":     None
-            }
-            mqtt_client_ref.publish(
-                "van/status/network/speedtest", json.dumps(result), retain=True)
         return dl
     except Exception as e:
         print(f"T-Mobile speedtest error: {e}")
@@ -270,7 +286,7 @@ def check_connectivity() -> str:
     try:
         r = subprocess.run(
             ["ping", "-c", "3", "-W", "3", "-q", "8.8.8.8"],
-            capture_output=True, text=True, timeout=QUALITY_CHECK_INTERVAL
+            capture_output=True, text=True, timeout=30
         )
         if r.returncode != 0:
             return "poor"
@@ -289,7 +305,7 @@ def check_connectivity() -> str:
 # ── State transitions ──────────────────────────────────────────────────────
 
 def switch_to_starlink():
-    """Background thread: switch GL.iNet to Starlink and power on plug."""
+    """Background thread: power on Starlink plug and switch GL.iNet to WiFi Blaster."""
     global state
     if not switch_lock.acquire(blocking=False):
         print("switch_to_starlink: switch already in progress")
@@ -298,16 +314,27 @@ def switch_to_starlink():
         print("Switching to Starlink...")
         state = STATE_SWITCHING_STARLINK
 
-        # 1. Power on Starlink plug
-        plug_set(True)
+        # 1. Ensure Tuya plug is reachable (re-scan if not found at startup)
+        if not ensure_plug_ip():
+            print("✗ Cannot switch to Starlink: Tuya plug not found")
+            state = STATE_TMOBILE
+            if mqtt_client_ref:
+                mqtt_client_ref.publish("van/status/starlink/power", "off", retain=True)
+            return
+
+        # 2. Power on Starlink plug; abort if plug_set fails
+        if not plug_set(True):
+            print("✗ Cannot switch to Starlink: plug_set failed")
+            state = STATE_TMOBILE
+            return
         if mqtt_client_ref:
             mqtt_client_ref.publish("van/status/starlink/power", "on", retain=True)
 
-        # 2. Wait for Starlink dish to boot
+        # 3. Wait for Starlink dish to boot
         print(f"Waiting {STARLINK_BOOT_SECS}s for Starlink to boot...")
         time.sleep(STARLINK_BOOT_SECS)
 
-        # 3. Switch GL.iNet to WiFi Blaster
+        # 4. Switch GL.iNet to WiFi Blaster
         print("Switching GL.iNet to WiFi Blaster...")
         if router_repeater_connect(STARLINK_SSID, WIFI_PASSWORD):
             state = STATE_STARLINK
@@ -317,23 +344,33 @@ def switch_to_starlink():
                     "van/status/network/upstream", "starlink", retain=True)
             print("✓ On Starlink")
         else:
-            print("✗ Could not connect to WiFi Blaster — staying on T-Mobile")
+            print("✗ Could not connect to WiFi Blaster — reverting to T-Mobile")
             state = STATE_TMOBILE
-            # Power back off since we couldn't connect
             plug_set(False)
             if mqtt_client_ref:
                 mqtt_client_ref.publish("van/status/starlink/power", "off", retain=True)
     finally:
         switch_lock.release()
 
-def switch_to_tmobile():
-    """Background thread: switch GL.iNet to T-Mobile and power off Starlink."""
+def switch_to_tmobile(force_off: bool = False):
+    """
+    Background thread: switch GL.iNet to T-Mobile and power off Starlink plug.
+
+    force_off=True  — called from a manual "power off" tap. If T-Mobile SSID is
+                      unreachable, still cut the plug (user explicitly wants it off).
+                      Skips the post-switch connectivity check so the user's intent
+                      is never silently reversed.
+    force_off=False — called from auto-switch logic. If T-Mobile has no internet
+                      after connecting, fall back to Starlink automatically.
+    """
     global state
     if not switch_lock.acquire(blocking=False):
         print("switch_to_tmobile: switch already in progress")
         return
+    fallback_to_starlink = False
     try:
-        print("T-Mobile recovered — switching back...")
+        label = "Manual power-off" if force_off else "Switching to T-Mobile"
+        print(f"{label}...")
         state = STATE_SWITCHING_TMOBILE
 
         # 1. Switch GL.iNet to T-Mobile
@@ -352,22 +389,37 @@ def switch_to_tmobile():
                 mqtt_client_ref.publish("van/status/starlink/power", "off", retain=True)
                 mqtt_client_ref.publish(
                     "van/status/starlink/quality", "unknown", retain=True)
-            # Verify T-Mobile actually has usable internet
-            print("Verifying T-Mobile internet...")
-            quality = check_connectivity()
-            if quality == "poor":
-                print("T-Mobile has no internet after switch — switching back to Starlink")
-                state = STATE_TMOBILE   # release lock before recursing
-                switch_lock.release()
-                switch_to_starlink()
-                return
-            print(f"T-Mobile verified: {quality}")
+
+            # 3. Verify internet — only for auto-switch; skip for manual power-off
+            #    (manual_pause_auto ensures no auto-switch fires after this anyway)
+            if not force_off:
+                print("Verifying T-Mobile internet...")
+                quality = check_connectivity()
+                if quality == "poor":
+                    print("T-Mobile has no internet — will switch back to Starlink")
+                    fallback_to_starlink = True
+                else:
+                    print(f"T-Mobile verified: {quality}")
         else:
-            print("✗ Could not connect to T-Mobile — staying on Starlink")
-            state = STATE_STARLINK
+            # T-Mobile SSID unreachable
+            if force_off:
+                # User explicitly wants dish off — honor it even without T-Mobile
+                print("T-Mobile SSID not reachable; force_off=True → cutting plug anyway")
+                plug_set(False)
+                state = STATE_STARLINK   # router still on Starlink config; dish is off
+                if mqtt_client_ref:
+                    mqtt_client_ref.publish("van/status/starlink/power", "off", retain=True)
+            else:
+                print("✗ Could not connect to T-Mobile — staying on Starlink")
+                state = STATE_STARLINK
+                # Correct optimistic UI: dashboard showed "off" but we're still on
+                if mqtt_client_ref:
+                    mqtt_client_ref.publish("van/status/starlink/power", "on", retain=True)
     finally:
-        if switch_lock.locked():
-            switch_lock.release()
+        # Always release lock before spawning the fallback thread (avoids lock race)
+        switch_lock.release()
+        if fallback_to_starlink:
+            threading.Thread(target=switch_to_starlink, daemon=True).start()
 
 # ── Monitor loop ───────────────────────────────────────────────────────────
 
@@ -380,17 +432,23 @@ def monitor_loop(client):
             now = time.time()
 
             if state == STATE_STARLINK:
-                # T-Mobile speed check every 30 min to decide when to switch back
+                # T-Mobile speed check every 30 min to decide when to switch back.
+                # Skipped when auto is off OR when user manually turned off Starlink
+                # (manual_pause_auto) — prevents re-enabling dish the user just silenced.
                 if now - last_tmobile_check >= TMOBILE_CHECK_INTERVAL:
                     last_tmobile_check = now
-                    dl = run_tmobile_speedtest()
-                    if dl is not None and auto_mode and dl >= speed_threshold:
-                        print(f"T-Mobile recovered: {dl} Mbps ≥ {speed_threshold} Mbps → switching back")
-                        t = threading.Thread(target=switch_to_tmobile, daemon=True)
-                        t.start()
+                    if not auto_mode or manual_pause_auto:
+                        print(f"Skipping T-Mobile check (auto={auto_mode}, "
+                              f"manual_pause={manual_pause_auto})")
+                    else:
+                        dl = run_tmobile_speedtest()
+                        if dl is not None and dl >= speed_threshold:
+                            print(f"T-Mobile recovered: {dl} Mbps ≥ {speed_threshold} "
+                                  f"Mbps → switching back")
+                            threading.Thread(target=switch_to_tmobile, daemon=True).start()
 
-                # Quality ping every 5 min
-                if now - last_quality_check >= QUALITY_CHECK_INTERVAL:
+                # Quality ping every 5 min — skip when dish is intentionally off
+                if not manual_pause_auto and now - last_quality_check >= QUALITY_CHECK_INTERVAL:
                     last_quality_check = now
                     quality = check_connectivity()
                     print(f"Starlink quality → {quality}")
@@ -412,6 +470,8 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe("van/status/network/speedtest")
 
     speed_threshold = load_threshold()
+    auto_mode       = load_auto_mode()   # load persisted setting before _startup runs
+    print(f"Loaded settings: threshold={speed_threshold} Mbps, auto={auto_mode}")
 
     # Run startup in background so MQTT loop isn't blocked
     t = threading.Thread(target=_startup, args=(client,), daemon=True)
@@ -458,6 +518,9 @@ def _startup(client):
         state = STATE_STARLINK
         write_upstream_file("starlink")
         client.publish("van/status/network/upstream", "starlink", retain=True)
+        # Clear any stale "poor" quality from before the restart; monitor loop
+        # will run a real check within 5 minutes and publish the accurate result.
+        client.publish("van/status/starlink/quality", "unknown", retain=True)
         # GL.iNet is on WiFi Blaster → Starlink plug must be on
         if starlink_power != "on":
             starlink_power = "on"
@@ -504,26 +567,43 @@ def _startup(client):
 
 
 def on_message(client, userdata, msg):
-    global starlink_power, auto_mode, speed_threshold
+    global starlink_power, auto_mode, speed_threshold, manual_pause_auto
     topic   = msg.topic
     payload = msg.payload.decode().strip()
     lower   = payload.lower()
 
-    # ── Manual plug control ──────────────────────────────────────────────
+    # ── Manual plug / network control ────────────────────────────────────
     if topic == "van/starlink/power":
         print(f"Manual: Starlink → {lower}")
         on = (lower == "on")
         if on:
-            t = threading.Thread(target=switch_to_starlink, daemon=True)
-            t.start()
+            # Turning on: clear manual pause and do the full switch
+            manual_pause_auto = False
+            threading.Thread(target=switch_to_starlink, daemon=True).start()
         else:
-            t = threading.Thread(target=switch_to_tmobile, daemon=True)
-            t.start()
+            # Turning off: set manual pause so auto-switch won't re-enable the dish
+            manual_pause_auto = True
+            if auto_mode:
+                # Auto mode: try to switch to T-Mobile; force plug off if T-Mobile
+                # SSID is unreachable (user's intent must be honored regardless)
+                threading.Thread(
+                    target=lambda: switch_to_tmobile(force_off=True),
+                    daemon=True).start()
+            else:
+                # Manual mode (auto OFF): direct plug control only — no router
+                # switching, no loops, just cut the dish power immediately
+                plug_set(False)
+                if mqtt_client_ref:
+                    mqtt_client_ref.publish(
+                        "van/status/starlink/power", "off", retain=True)
         return
 
     # ── Auto-switch toggle ───────────────────────────────────────────────
     if topic == "van/starlink/auto":
         auto_mode = (lower == "on")
+        if auto_mode:
+            manual_pause_auto = False   # resuming auto clears any manual pause
+        save_auto_mode(auto_mode)
         client.publish("van/status/starlink/auto",
                        "on" if auto_mode else "off", retain=True)
         print(f"Auto-mode → {auto_mode}")
@@ -542,12 +622,14 @@ def on_message(client, userdata, msg):
         return
 
     # ── Speed test result — auto-switch trigger ──────────────────────────
+    # Note: run_tmobile_speedtest() no longer publishes here (would create duplicate
+    # switch threads). This handler only sees results from can-bridge / run-speedtest.py.
     if topic == "van/status/network/speedtest":
         if not startup_complete:
             global pending_speedtest
             pending_speedtest = payload   # replay after startup completes
             return
-        if not auto_mode:
+        if not auto_mode or manual_pause_auto:
             return
         try:
             data     = json.loads(payload)
@@ -556,7 +638,7 @@ def on_message(client, userdata, msg):
             err      = data.get("error")
             if err or dl is None:
                 return
-            # Only act on T-Mobile results (measured via wlan0 or GL.iNet T-Mobile)
+            # Only act on T-Mobile results
             if upstream != "tmobile":
                 return
             # Reject stale results — only act on tests from the last 10 minutes
@@ -567,20 +649,19 @@ def on_message(client, userdata, msg):
                     ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
                     age_min = (datetime.now(timezone.utc) - ts).total_seconds() / 60
                     if age_min > 10:
-                        print(f"Ignoring stale T-Mobile result ({age_min:.0f} min old, {dl} Mbps)")
+                        print(f"Ignoring stale T-Mobile result "
+                              f"({age_min:.0f} min old, {dl} Mbps)")
                         return
                 except Exception:
-                    pass  # if timestamp unparseable, allow through
+                    pass  # unparseable timestamp — allow through
 
             print(f"Speed test: {dl} Mbps via T-Mobile (threshold: {speed_threshold} Mbps)")
             if dl < speed_threshold and state == STATE_TMOBILE:
                 print(f"T-Mobile slow ({dl} Mbps) → switching to Starlink")
-                t = threading.Thread(target=switch_to_starlink, daemon=True)
-                t.start()
+                threading.Thread(target=switch_to_starlink, daemon=True).start()
             elif dl >= speed_threshold and state == STATE_STARLINK:
                 print(f"T-Mobile recovered ({dl} Mbps) → switching back to T-Mobile")
-                t = threading.Thread(target=switch_to_tmobile, daemon=True)
-                t.start()
+                threading.Thread(target=switch_to_tmobile, daemon=True).start()
         except Exception as e:
             print(f"speedtest handler error: {e}")
         return
