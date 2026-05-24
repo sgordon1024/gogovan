@@ -352,11 +352,22 @@ def switch_to_tmobile():
                 mqtt_client_ref.publish("van/status/starlink/power", "off", retain=True)
                 mqtt_client_ref.publish(
                     "van/status/starlink/quality", "unknown", retain=True)
+            # Verify T-Mobile actually has usable internet
+            print("Verifying T-Mobile internet...")
+            quality = check_connectivity()
+            if quality == "poor":
+                print("T-Mobile has no internet after switch — switching back to Starlink")
+                state = STATE_TMOBILE   # release lock before recursing
+                switch_lock.release()
+                switch_to_starlink()
+                return
+            print(f"T-Mobile verified: {quality}")
         else:
             print("✗ Could not connect to T-Mobile — staying on Starlink")
             state = STATE_STARLINK
     finally:
-        switch_lock.release()
+        if switch_lock.locked():
+            switch_lock.release()
 
 # ── Monitor loop ───────────────────────────────────────────────────────────
 
@@ -548,6 +559,19 @@ def on_message(client, userdata, msg):
             # Only act on T-Mobile results (measured via wlan0 or GL.iNet T-Mobile)
             if upstream != "tmobile":
                 return
+            # Reject stale results — only act on tests from the last 10 minutes
+            ts_str = data.get("timestamp", "")
+            if ts_str:
+                try:
+                    from datetime import datetime, timezone
+                    ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                    age_min = (datetime.now(timezone.utc) - ts).total_seconds() / 60
+                    if age_min > 10:
+                        print(f"Ignoring stale T-Mobile result ({age_min:.0f} min old, {dl} Mbps)")
+                        return
+                except Exception:
+                    pass  # if timestamp unparseable, allow through
+
             print(f"Speed test: {dl} Mbps via T-Mobile (threshold: {speed_threshold} Mbps)")
             if dl < speed_threshold and state == STATE_TMOBILE:
                 print(f"T-Mobile slow ({dl} Mbps) → switching to Starlink")

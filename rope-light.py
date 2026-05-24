@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import asyncio, threading
+import asyncio, threading, colorsys
 import paho.mqtt.client as mqtt
 from bleak import BleakClient, BleakScanner
 import subprocess
@@ -45,7 +45,7 @@ CYCLE_SENTINEL = b'__CYCLE__'
 
 # Mutable state shared between threads (GIL makes simple assignments safe)
 brightness  = 1.0   # 0.0–1.0
-cycle_speed = 0.5   # seconds per step (default speed 5/10)
+cycle_speed = 2.0   # hue degrees per second (default speed 5/10 ≈ 3 min full cycle)
 last_color  = None  # last solid color bytes (pre-brightness), for re-send on brightness change
 
 loop  = asyncio.new_event_loop()
@@ -63,26 +63,28 @@ def dim(data):
     return data
 
 async def color_cycle(client):
-    """Cycle through colors with a smooth cross-fade between each pair."""
-    i = 0
+    """Smoothly rotate through the full HSV hue wheel.
+
+    Writes to BLE once per second — stable for the controller and gives
+    imperceptible per-step changes at any normal cycle_speed setting.
+    cycle_speed = hue degrees advanced per second.
+      speed 10 → 5°/s  → ~72s full cycle
+      speed 5  → 2°/s  → ~3 min full cycle  (default)
+      speed 1  → 0.4°/s → ~15 min full cycle
+    """
+    STEP_INTERVAL = 1.0   # 1 Hz — BLE-stable, imperceptible per step
+    hue = 0.0
     while True:
-        a = dim(CYCLE_COLORS[i % len(CYCLE_COLORS)])
-        b = dim(CYCLE_COLORS[(i + 1) % len(CYCLE_COLORS)])
-        # Target ~15 Hz; don't go faster than 67ms per frame
-        step_delay = max(0.067, cycle_speed / 15)
-        steps = max(1, round(cycle_speed / step_delay))
-        for step in range(steps):
-            t = step / steps
-            blended = bytes([
-                0x56,
-                int(a[1] + (b[1] - a[1]) * t),
-                int(a[2] + (b[2] - a[2]) * t),
-                int(a[3] + (b[3] - a[3]) * t),
-                0x00, 0xf0, 0xaa
-            ])
-            await client.write_gatt_char(CHAR_UUID, blended)
-            await asyncio.sleep(step_delay)
-        i += 1
+        r, g, b = colorsys.hsv_to_rgb(hue / 360.0, 1.0, 1.0)
+        # Byte order is B-R-G-W; apply brightness here
+        cmd = bytes([0x56,
+                     int(b * 255 * brightness),
+                     int(r * 255 * brightness),
+                     int(g * 255 * brightness),
+                     0x00, 0xf0, 0xaa])
+        await client.write_gatt_char(CHAR_UUID, cmd)
+        await asyncio.sleep(STEP_INTERVAL)
+        hue = (hue + cycle_speed * STEP_INTERVAL) % 360.0
 
 async def ble_loop():
     global last_color
@@ -148,8 +150,9 @@ def on_message(mqttc, userdata, msg):
     elif topic == "van/rope-light/speed":
         try:
             val = max(1, min(10, int(payload)))
-            # Map 1–10 → 1.5–0.1 seconds per step
-            cycle_speed = round(1.5 / val, 2)
+            # Map 1–10 → 0.4–5.0 hue degrees per second
+            # val=1: 0.4°/s (~15 min cycle)  val=5: 2°/s (~3 min)  val=10: 5°/s (~72s)
+            cycle_speed = round(0.4 + (val - 1) * 0.511, 2)
         except ValueError:
             pass
 
