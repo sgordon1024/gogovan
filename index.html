@@ -1836,17 +1836,17 @@
     }
     #explore-facts-box:active { opacity: 0.75; }
     #explore-facts-place {
-      font-size: clamp(10px, 2.5vw, 13px);
+      font-size: clamp(12px, 3vw, 16px);
       font-weight: 700;
       letter-spacing: 0.8px;
       text-transform: uppercase;
       color: var(--amber);
     }
     #explore-facts-text {
-      font-size: clamp(13px, 3.2vw, 17px);
+      font-size: clamp(20px, 5.5vw, 28px);
       color: var(--txt);
       text-align: center;
-      line-height: 1.45;
+      line-height: 1.4;
       flex: 1;
       display: flex;
       align-items: center;
@@ -1858,8 +1858,10 @@
       width: 100%;
       gap: 8px;
     }
-    #explore-facts-hint { font-size: 11px; color: var(--txt2); }
-    #explore-facts-progress { font-size: 11px; color: var(--txt2); font-variant-numeric: tabular-nums; }
+    #explore-facts-hint { font-size: 13px; color: var(--txt2); }
+    #explore-facts-hint.speaking { color: var(--amber); animation: hint-pulse 1s ease-in-out infinite; }
+    @keyframes hint-pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+    #explore-facts-progress { font-size: 13px; color: var(--txt2); font-variant-numeric: tabular-nums; }
     #drive-rest-weather {
       display: flex;
       align-items: center;
@@ -2755,11 +2757,11 @@ safe-buffer/index.js:
       </div>
     </div>
     <!-- Local facts strip -->
-    <div id="explore-facts-box" onclick="cycleLocalFact()">
+    <div id="explore-facts-box" onclick="tapLocalFact()">
       <div id="explore-facts-place"></div>
       <div id="explore-facts-text">Loading local facts…</div>
       <div id="explore-facts-footer">
-        <span id="explore-facts-hint">tap to cycle</span>
+        <span id="explore-facts-hint">tap to hear</span>
         <span id="explore-facts-progress"></span>
       </div>
     </div>
@@ -4713,13 +4715,47 @@ function showLocalFact() {
   if (placeEl) placeEl.textContent = explorePlace;
   textEl.textContent = localFacts[localFactIdx];
   if (progEl) progEl.textContent = `${localFactIdx + 1} / ${localFacts.length}`;
-  if (hintEl) hintEl.textContent = 'tap to cycle';
+  if (hintEl) { hintEl.textContent = 'tap to hear'; hintEl.classList.remove('speaking'); }
 }
 
-function cycleLocalFact() {
+function tapLocalFact() {
   if (!localFacts.length) return;
-  localFactIdx = (localFactIdx + 1) % localFacts.length;
-  showLocalFact();
+  // If already speaking, stop and cycle to next
+  if (window.speechSynthesis && window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+    localFactIdx = (localFactIdx + 1) % localFacts.length;
+    showLocalFact();
+    return;
+  }
+  speakLocalFact();
+}
+
+function speakLocalFact() {
+  if (!localFacts.length) return;
+  const hintEl = document.getElementById('explore-facts-hint');
+  const text = localFacts[localFactIdx];
+
+  if (!window.speechSynthesis) {
+    // No TTS support — just cycle
+    localFactIdx = (localFactIdx + 1) % localFacts.length;
+    showLocalFact();
+    return;
+  }
+
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.rate  = 0.85;
+  utter.pitch = 1.0;
+
+  utter.onstart = () => {
+    if (hintEl) { hintEl.textContent = '▶ reading…'; hintEl.classList.add('speaking'); }
+  };
+  utter.onend = utter.onerror = () => {
+    localFactIdx = (localFactIdx + 1) % localFacts.length;
+    showLocalFact(); // resets hint to "tap to hear" and removes .speaking
+  };
+
+  window.speechSynthesis.speak(utter);
 }
 
 function wmoCondition(code) {
