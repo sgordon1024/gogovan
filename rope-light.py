@@ -91,41 +91,92 @@ async def color_cycle(client):
         hue = (hue + cycle_speed * STEP_INTERVAL) % 360.0
 
 async def candle_effect(client):
-    """Warm amber candlelight flicker.
-    cycle_speed controls turbulence: low = gentle, high = drafty/gusty."""
+    """Candlelight — visible glow in/out with deep orange/red palette.
+    cycle_speed controls turbulence: low = gentle, high = gusty."""
     import random, math
-    base       = 0.85   # slowly drifting base brightness
-    gust       = 1.0    # multiplier that dips on gusts
-    next_gust  = random.uniform(4, 12)
+
+    DT = 1 / 20   # 20 fps — BLE-stable; same time constants as before
+
+    print("candle_effect started")
+
+    # ── target values ───────────────────────────────────────────────────────
+    tgt_base   = 0.85
+    tgt_gust   = 1.0
+    tgt_warmth = 0.10   # G/R: 0.04=deep red, 0.16=red-orange
+
+    # ── smoothed current values ─────────────────────────────────────────────
+    cur_base   = tgt_base
+    cur_gust   = tgt_gust
+    cur_warmth = tgt_warmth
+
+    # ── micro-flicker (fast flutter on top) ─────────────────────────────────
+    micro       = 0.0
+    tgt_micro   = 0.0
+    micro_count = 0
+    micro_next  = random.randint(2, 4)   # every 100–200 ms at 20 fps
+
+    # ── slow sine sway — the visible "breathing" glow ───────────────────────
+    sway_t = random.uniform(0, 6.28)
+
+    # ── gust scheduler ──────────────────────────────────────────────────────
+    next_gust_in = random.uniform(1.0, 4.0)
+
+    frame = 0
 
     while True:
-        dt = random.uniform(0.05, 0.10)   # irregular timing adds realism
+        frame        += 1
+        next_gust_in -= DT
+        sway_t        = (sway_t + DT * 0.38) % (2 * math.pi)   # ~16-s sway
 
-        # Slowly drift base (mean-revert toward 0.85)
-        base += random.gauss(0, 0.025)
-        base  = 0.85 + 0.55 * (base - 0.85)
-        base  = max(0.50, min(1.0, base))
+        # ── base drifts wide every ~0.3 s (every 6 frames @ 20 fps) ────────
+        if frame % 6 == 0:
+            tgt_base += random.gauss(0, 0.055)
+            tgt_base  = 0.82 + 0.45 * (tgt_base - 0.82)
+            tgt_base  = max(0.30, min(1.0, tgt_base))
 
-        # Occasional gust — frequency and depth scale with cycle_speed
-        next_gust -= dt
-        gust_prob  = 0.3 + cycle_speed * 0.07   # more gusts at high speed
-        gust_depth = 0.2 + cycle_speed * 0.06   # deeper dips at high speed
-        if next_gust <= 0:
-            gust       = random.uniform(max(0.15, 1.0 - gust_depth), 0.65)
-            next_gust  = random.uniform(max(1.5, 8 - cycle_speed * 0.6),
-                                        max(3.0, 18 - cycle_speed * 1.5))
+        # ── gusts: deep, frequent ────────────────────────────────────────────
+        gust_depth = 0.65 + cycle_speed * 0.07
+        if next_gust_in <= 0:
+            tgt_gust     = random.uniform(max(0.12, 1.0 - gust_depth), 0.60)
+            next_gust_in = random.uniform(max(0.8, 4 - cycle_speed * 0.35),
+                                          max(2.0, 10 - cycle_speed * 0.9))
         else:
-            gust = min(1.0, gust + random.uniform(0.03, 0.09))
+            tgt_gust = min(1.0, tgt_gust + DT * 0.20)
 
-        level = base * gust
-        level = max(0.12, min(1.0, level))
+        # ── warmth drifts in red → red-orange band every ~0.5 s ─────────────
+        if frame % 10 == 0:
+            tgt_warmth += random.gauss(0, 0.008)
+            tgt_warmth  = max(0.04, min(0.16, tgt_warmth))
 
-        # Warm amber: full red, variable green (more G = yellower, less G = orange)
+        # ── micro-flicker every 2–4 frames (100–200 ms) ─────────────────────
+        micro_count += 1
+        if micro_count >= micro_next:
+            tgt_micro   = random.gauss(0, 0.08)
+            micro_next  = random.randint(2, 4)
+            micro_count = 0
+
+        # ── exponential smoothing ─────────────────────────────────────────────
+        cur_base   += (tgt_base   - cur_base)   * 0.054
+        cur_warmth += (tgt_warmth - cur_warmth) * 0.030
+
+        # Asymmetric gust: sharp dip, slow dreamy recovery
+        if tgt_gust < cur_gust:
+            cur_gust += (tgt_gust - cur_gust) * 0.30   # ~0.15 s snap down
+        else:
+            cur_gust += (tgt_gust - cur_gust) * 0.022  # ~2.3 s float up
+
+        micro += (tgt_micro - micro) * 0.45
+
+        # ── compose level ─────────────────────────────────────────────────────
+        # Sway amplitude ±18% gives clearly visible slow breathing
+        sway  = 0.18 * math.sin(sway_t) + 0.06 * math.sin(sway_t * 1.7 + 0.8)
+        level = max(0.08, min(1.0, cur_base * cur_gust + sway + micro))
+
         r = int(0xff * level * brightness)
-        g = int(random.uniform(0.24, 0.50) * 0xff * level * brightness)
-        b = 0   # no blue in a candle flame
+        g = int(cur_warmth * 0xff * level * brightness)
+        b = 0
         await client.write_gatt_char(CHAR_UUID, bytes([0x56, b, r, g, 0x00, 0xf0, 0xaa]))
-        await asyncio.sleep(dt)
+        await asyncio.sleep(DT)
 
 
 async def breathe_effect(client):
