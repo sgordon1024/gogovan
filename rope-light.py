@@ -41,7 +41,11 @@ CYCLE_COLORS = [
     c(0xff, 0xdd, 0x00),  # pink
 ]
 
-CYCLE_SENTINEL = b'__CYCLE__'
+CYCLE_SENTINEL   = b'__CYCLE__'
+CANDLE_SENTINEL  = b'__CANDLE__'
+BREATHE_SENTINEL = b'__BREATHE__'
+AURORA_SENTINEL  = b'__AURORA__'
+STROBE_SENTINEL  = b'__STROBE__'
 
 # Mutable state shared between threads (GIL makes simple assignments safe)
 brightness  = 1.0   # 0.0–1.0
@@ -86,6 +90,109 @@ async def color_cycle(client):
         await asyncio.sleep(STEP_INTERVAL)
         hue = (hue + cycle_speed * STEP_INTERVAL) % 360.0
 
+async def candle_effect(client):
+    """Warm amber candlelight flicker.
+    cycle_speed controls turbulence: low = gentle, high = drafty/gusty."""
+    import random, math
+    base       = 0.85   # slowly drifting base brightness
+    gust       = 1.0    # multiplier that dips on gusts
+    next_gust  = random.uniform(4, 12)
+
+    while True:
+        dt = random.uniform(0.05, 0.10)   # irregular timing adds realism
+
+        # Slowly drift base (mean-revert toward 0.85)
+        base += random.gauss(0, 0.025)
+        base  = 0.85 + 0.55 * (base - 0.85)
+        base  = max(0.50, min(1.0, base))
+
+        # Occasional gust — frequency and depth scale with cycle_speed
+        next_gust -= dt
+        gust_prob  = 0.3 + cycle_speed * 0.07   # more gusts at high speed
+        gust_depth = 0.2 + cycle_speed * 0.06   # deeper dips at high speed
+        if next_gust <= 0:
+            gust       = random.uniform(max(0.15, 1.0 - gust_depth), 0.65)
+            next_gust  = random.uniform(max(1.5, 8 - cycle_speed * 0.6),
+                                        max(3.0, 18 - cycle_speed * 1.5))
+        else:
+            gust = min(1.0, gust + random.uniform(0.03, 0.09))
+
+        level = base * gust
+        level = max(0.12, min(1.0, level))
+
+        # Warm amber: full red, variable green (more G = yellower, less G = orange)
+        r = int(0xff * level * brightness)
+        g = int(random.uniform(0.24, 0.50) * 0xff * level * brightness)
+        b = 0   # no blue in a candle flame
+        await client.write_gatt_char(CHAR_UUID, bytes([0x56, b, r, g, 0x00, 0xf0, 0xaa]))
+        await asyncio.sleep(dt)
+
+
+async def breathe_effect(client):
+    """Slow sine-wave pulse on the current color. ~6 second cycle."""
+    import math
+    t = 0.0
+    while True:
+        level = 0.54 + 0.46 * math.sin(t - math.pi / 2)   # 0.08 → 1.0
+        color = last_color if last_color is not None else COLORS['white']
+        if len(color) == 7 and color[0] == 0x56:
+            cmd = bytes([0x56,
+                         int(color[1] * level * brightness),
+                         int(color[2] * level * brightness),
+                         int(color[3] * level * brightness),
+                         int(color[4] * level * brightness),
+                         0xf0, 0xaa])
+        else:
+            v   = int(0xff * level * brightness)
+            cmd = bytes([0x56, v, v, v, 0x00, 0xf0, 0xaa])
+        await client.write_gatt_char(CHAR_UUID, cmd)
+        t = (t + 0.08) % (2 * math.pi)   # full cycle ≈ 6.3 s at ~12 Hz
+        await asyncio.sleep(0.08)
+
+
+async def aurora_effect(client):
+    """Dreamy slow sweep through northern-lights colors (green → teal → blue → purple)."""
+    import math, colorsys
+    t = 0.0
+    while True:
+        # Two overlapping sine waves for organic, non-repeating motion
+        hue = 200 + 75 * math.sin(t) + 18 * math.sin(t * 2.1 + 1.2)
+        sat = 0.72 + 0.18 * math.sin(t * 0.6 + 0.9)
+        val = (0.55 + 0.28 * math.sin(t * 0.4 + 2.1)) * brightness
+        r, g, b = colorsys.hsv_to_rgb(hue / 360.0, sat, val)
+        cmd = bytes([0x56,
+                     int(b * 255),
+                     int(r * 255),
+                     int(g * 255),
+                     0x00, 0xf0, 0xaa])
+        await client.write_gatt_char(CHAR_UUID, cmd)
+        t += 0.05
+        await asyncio.sleep(0.18)   # ~6 Hz — slow and dreamy, full hue sweep ≈ 25 s
+
+
+async def strobe_effect(client):
+    """On/off flash. cycle_speed 1–10 maps to ~1–12 Hz."""
+    while True:
+        hz          = 1.0 + (cycle_speed - 1) * 11.0 / 9.0
+        half_period = max(0.04, 0.5 / hz)
+        color = last_color if last_color is not None else COLORS['white']
+        if len(color) == 7 and color[0] == 0x56:
+            on_cmd = bytes([0x56,
+                            int(color[1] * brightness),
+                            int(color[2] * brightness),
+                            int(color[3] * brightness),
+                            int(color[4] * brightness),
+                            0xf0, 0xaa])
+        else:
+            v      = int(0xff * brightness)
+            on_cmd = bytes([0x56, v, v, v, 0x00, 0xf0, 0xaa])
+        off_cmd = bytes([0x56, 0x00, 0x00, 0x00, 0x00, 0xf0, 0xaa])
+        await client.write_gatt_char(CHAR_UUID, on_cmd)
+        await asyncio.sleep(half_period)
+        await client.write_gatt_char(CHAR_UUID, off_cmd)
+        await asyncio.sleep(half_period)
+
+
 async def ble_loop():
     global last_color
     cycle_task = None
@@ -106,8 +213,16 @@ async def ble_loop():
                         if cycle_task and not cycle_task.done():
                             cycle_task.cancel()
                             cycle_task = None
-                        if data == CYCLE_SENTINEL:
+                        if   data == CYCLE_SENTINEL:
                             cycle_task = asyncio.create_task(color_cycle(client))
+                        elif data == CANDLE_SENTINEL:
+                            cycle_task = asyncio.create_task(candle_effect(client))
+                        elif data == BREATHE_SENTINEL:
+                            cycle_task = asyncio.create_task(breathe_effect(client))
+                        elif data == AURORA_SENTINEL:
+                            cycle_task = asyncio.create_task(aurora_effect(client))
+                        elif data == STROBE_SENTINEL:
+                            cycle_task = asyncio.create_task(strobe_effect(client))
                         else:
                             if len(data) == 7 and data[0] == 0x56:
                                 last_color = data  # track for brightness re-send
@@ -138,9 +253,17 @@ def on_message(mqttc, userdata, msg):
         loop.call_soon_threadsafe(queue.put_nowait, CMD_ON)
         loop.call_soon_threadsafe(queue.put_nowait, COLORS[payload])
 
-    elif topic == "van/rope-light/effect" and payload == "cycle":
-        loop.call_soon_threadsafe(queue.put_nowait, CMD_ON)
-        loop.call_soon_threadsafe(queue.put_nowait, CYCLE_SENTINEL)
+    elif topic == "van/rope-light/effect":
+        _sentinels = {
+            'cycle':   CYCLE_SENTINEL,
+            'candle':  CANDLE_SENTINEL,
+            'breathe': BREATHE_SENTINEL,
+            'aurora':  AURORA_SENTINEL,
+            'strobe':  STROBE_SENTINEL,
+        }
+        if payload in _sentinels:
+            loop.call_soon_threadsafe(queue.put_nowait, CMD_ON)
+            loop.call_soon_threadsafe(queue.put_nowait, _sentinels[payload])
 
     elif topic == "van/rope-light/brightness":
         try:
