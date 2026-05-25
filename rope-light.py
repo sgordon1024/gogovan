@@ -48,9 +48,10 @@ AURORA_SENTINEL  = b'__AURORA__'
 STROBE_SENTINEL  = b'__STROBE__'
 
 # Mutable state shared between threads (GIL makes simple assignments safe)
-brightness  = 1.0   # 0.0–1.0
-cycle_speed = 2.0   # hue degrees per second (default speed 5/10 ≈ 3 min full cycle)
-last_color  = None  # last solid color bytes (pre-brightness), for re-send on brightness change
+brightness    = 1.0    # 0.0–1.0
+cycle_speed   = 2.0    # hue degrees per second (default speed 5/10 ≈ 3 min full cycle)
+last_color    = None   # last solid color bytes (pre-brightness), for re-send on brightness change
+effect_active = False  # True when a software effect is running (effects read brightness directly)
 
 loop  = asyncio.new_event_loop()
 queue = asyncio.Queue()
@@ -95,7 +96,7 @@ async def candle_effect(client):
     cycle_speed controls turbulence: low = gentle, high = gusty."""
     import random, math
 
-    DT = 1 / 20   # 20 fps — BLE-stable; same time constants as before
+    DT = 1 / 30   # 30 fps
 
     print("candle_effect started")
 
@@ -119,17 +120,17 @@ async def candle_effect(client):
     sway_t = random.uniform(0, 6.28)
 
     # ── gust scheduler ──────────────────────────────────────────────────────
-    next_gust_in = random.uniform(1.0, 4.0)
+    next_gust_in = random.uniform(0.3, 1.5)
 
     frame = 0
 
     while True:
         frame        += 1
         next_gust_in -= DT
-        sway_t        = (sway_t + DT * 0.38) % (2 * math.pi)   # ~16-s sway
+        sway_t        = (sway_t + DT * 1.2) % (2 * math.pi)   # ~5-s sway
 
-        # ── base drifts wide every ~0.3 s (every 6 frames @ 20 fps) ────────
-        if frame % 6 == 0:
+        # ── base drifts wide every ~0.13 s (every 4 frames @ 30 fps) ───────
+        if frame % 4 == 0:
             tgt_base += random.gauss(0, 0.055)
             tgt_base  = 0.82 + 0.45 * (tgt_base - 0.82)
             tgt_base  = max(0.30, min(1.0, tgt_base))
@@ -138,34 +139,34 @@ async def candle_effect(client):
         gust_depth = 0.65 + cycle_speed * 0.07
         if next_gust_in <= 0:
             tgt_gust     = random.uniform(max(0.12, 1.0 - gust_depth), 0.60)
-            next_gust_in = random.uniform(max(0.8, 4 - cycle_speed * 0.35),
-                                          max(2.0, 10 - cycle_speed * 0.9))
+            next_gust_in = random.uniform(max(0.3, 1.5 - cycle_speed * 0.1),
+                                          max(0.8, 3.5 - cycle_speed * 0.3))
         else:
             tgt_gust = min(1.0, tgt_gust + DT * 0.20)
 
         # ── warmth drifts in red → red-orange band every ~0.5 s ─────────────
-        if frame % 10 == 0:
+        if frame % 15 == 0:
             tgt_warmth += random.gauss(0, 0.008)
             tgt_warmth  = max(0.04, min(0.16, tgt_warmth))
 
-        # ── micro-flicker every 2–4 frames (100–200 ms) ─────────────────────
+        # ── micro-flicker every 3–6 frames (100–200 ms) ─────────────────────
         micro_count += 1
         if micro_count >= micro_next:
             tgt_micro   = random.gauss(0, 0.08)
-            micro_next  = random.randint(2, 4)
+            micro_next  = random.randint(3, 6)
             micro_count = 0
 
-        # ── exponential smoothing ─────────────────────────────────────────────
-        cur_base   += (tgt_base   - cur_base)   * 0.054
-        cur_warmth += (tgt_warmth - cur_warmth) * 0.030
+        # ── exponential smoothing (α scaled for 30 fps, same time constants) ─
+        cur_base   += (tgt_base   - cur_base)   * 0.036
+        cur_warmth += (tgt_warmth - cur_warmth) * 0.020
 
         # Asymmetric gust: sharp dip, slow dreamy recovery
         if tgt_gust < cur_gust:
-            cur_gust += (tgt_gust - cur_gust) * 0.30   # ~0.15 s snap down
+            cur_gust += (tgt_gust - cur_gust) * 0.28   # fast dip
         else:
-            cur_gust += (tgt_gust - cur_gust) * 0.022  # ~2.3 s float up
+            cur_gust += (tgt_gust - cur_gust) * 0.035  # ~0.9 s recovery
 
-        micro += (tgt_micro - micro) * 0.45
+        micro += (tgt_micro - micro) * 0.30
 
         # ── compose level ─────────────────────────────────────────────────────
         # Sway amplitude ±18% gives clearly visible slow breathing
@@ -288,7 +289,7 @@ async def ble_loop():
             await asyncio.sleep(5)
 
 def on_message(mqttc, userdata, msg):
-    global brightness, cycle_speed, last_color
+    global brightness, cycle_speed, last_color, effect_active
     topic   = msg.topic
     payload = msg.payload.decode().strip().lower()
 
@@ -301,6 +302,7 @@ def on_message(mqttc, userdata, msg):
             loop.call_soon_threadsafe(queue.put_nowait, CMD_OFF)
 
     elif topic == "van/rope-light/color" and payload in COLORS:
+        effect_active = False
         loop.call_soon_threadsafe(queue.put_nowait, CMD_ON)
         loop.call_soon_threadsafe(queue.put_nowait, COLORS[payload])
 
@@ -313,6 +315,7 @@ def on_message(mqttc, userdata, msg):
             'strobe':  STROBE_SENTINEL,
         }
         if payload in _sentinels:
+            effect_active = True
             loop.call_soon_threadsafe(queue.put_nowait, CMD_ON)
             loop.call_soon_threadsafe(queue.put_nowait, _sentinels[payload])
 
@@ -320,8 +323,9 @@ def on_message(mqttc, userdata, msg):
         try:
             val = max(1, min(100, int(payload)))
             brightness = val / 100.0
-            # Re-send current solid color at new brightness (if not in cycle)
-            if last_color:
+            # Only re-send solid color if no effect is running —
+            # effects read the brightness global directly each frame
+            if last_color and not effect_active:
                 loop.call_soon_threadsafe(queue.put_nowait, last_color)
         except ValueError:
             pass

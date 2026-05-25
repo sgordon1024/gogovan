@@ -4093,8 +4093,9 @@ function exitDrivingMode() {
   }
   if (mqttClient?.connected) mqttClient.publish('van/rope-light/brightness', String(preRopeBrightness));
   if (preRopeOn) {
-    if (preRopeEffect === 'cycle') {
-      setRopeEffect('cycle');
+    if (preRopeEffect) {
+      // Restore any effect (cycle, candle, breathe, aurora, strobe)
+      setRopeEffect(preRopeEffect);
       if (mqttClient?.connected) mqttClient.publish('van/rope-light/speed', String(preRopeSpeed));
     } else if (preRopeColor) {
       setRopeColor(preRopeColor);
@@ -4653,55 +4654,123 @@ async function fetchExploreWeather(lat, lng) {
 }
 
 async function fetchLocalFacts(lat, lng) {
-  const placeEl   = document.getElementById('explore-facts-place');
-  const textEl    = document.getElementById('explore-facts-text');
-  const progEl    = document.getElementById('explore-facts-progress');
+  const placeEl = document.getElementById('explore-facts-place');
+  const textEl  = document.getElementById('explore-facts-text');
+  const progEl  = document.getElementById('explore-facts-progress');
   if (textEl) textEl.textContent = 'Loading local facts…';
   if (placeEl) placeEl.textContent = '';
   if (progEl) progEl.textContent = '';
   try {
-    // Step 1: reverse geocode to get place name
-    const geoUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=10&addressdetails=1`;
-    const geoResp = await fetch(geoUrl, {
-      headers: { 'Accept-Language': 'en', 'User-Agent': 'GoGoVan/1.0' },
-      signal: AbortSignal.timeout(8000)
-    });
+    // Step 1: reverse geocode
+    const geoResp = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=10&addressdetails=1`,
+      { headers: { 'Accept-Language': 'en', 'User-Agent': 'GoGoVan/1.0' }, signal: AbortSignal.timeout(8000) }
+    );
     if (!geoResp.ok) throw new Error('geo fail');
-    const geo = await geoResp.json();
+    const geo    = await geoResp.json();
     const city   = geo.address?.city || geo.address?.town || geo.address?.village || geo.address?.hamlet || '';
     const county = geo.address?.county || '';
     const state  = geo.address?.state || '';
-
-    // Try city first, then county, then state
     const candidates = [city, county, state].filter(Boolean);
-    let extract = '';
-    let usedPlace = '';
-    for (const place of candidates) {
-      const wikiUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(place)}`;
+
+    // Helper: fetch Wikipedia summary for a search term
+    async function wikiSummary(term) {
       try {
-        const wResp = await fetch(wikiUrl, { signal: AbortSignal.timeout(8000) });
-        if (!wResp.ok) continue;
-        const wData = await wResp.json();
-        if (wData.extract && wData.extract.length > 100) {
-          extract   = wData.extract;
-          usedPlace = wData.title || place;
-          break;
-        }
-      } catch(e) { continue; }
+        const r = await fetch(
+          `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(term)}`,
+          { signal: AbortSignal.timeout(6000) }
+        );
+        if (!r.ok) return null;
+        const d = await r.json();
+        return (d.extract?.length > 80) ? d : null;
+      } catch(e) { return null; }
     }
 
-    if (!extract) {
+    // Helper: score a sentence for how interesting it is to a traveler
+    function scoreSentence(s) {
+      let score = 0;
+      const sl = s.toLowerCase();
+      if (/\b(1[4-9]\d\d|20[0-2]\d)\b/.test(s)) score += 3;           // has a year
+      for (const w of ['first', 'only', 'largest', 'smallest', 'tallest', 'oldest', 'longest',
+                        'famous', 'known for', 'notable', 'record', 'birthplace', 'named after',
+                        'founded', 'established', 'home to', 'historic', 'landmark', 'capital',
+                        'population', 'inhabitants', 'ghost town', 'battle', 'war', 'disaster',
+                        'discovery', 'invention', 'murder', 'outlaw', 'legend', 'rumored']) {
+        if (sl.includes(w)) score += 2;
+      }
+      if (/\b\d[\d,]+\b/.test(s)) score += 1;                          // contains a number
+      // Penalise boring "X is a city/town/county in Y state" openers
+      if (/^[\w\s,']+is (a|an|the) (city|town|village|unincorporated|hamlet|county|borough|township|state|municipality)/i.test(s)) score -= 4;
+      if (s.length < 55 || s.length > 290) score -= 1;
+      return score;
+    }
+
+    // Helper: pull scored sentences out of a Wikipedia extract
+    function extractFacts(extract, max = 4) {
+      return extract
+        .replace(/\n+/g, ' ')
+        .split(/(?<=[.!?])\s+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 50)
+        .map(s => ({ text: s, score: scoreSentence(s) }))
+        .filter(f => f.score > -1)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, max);
+    }
+
+    let allFacts  = [];
+    let usedPlace = '';
+
+    // Step 2: main place articles (city → county → state)
+    for (const place of candidates) {
+      const data = await wikiSummary(place);
+      if (!data) continue;
+      usedPlace = data.title || place;
+      allFacts.push(...extractFacts(data.extract, 4));
+      if (allFacts.length >= 4) break;
+    }
+
+    // Step 3: "History of [city]" often has richer historical facts
+    if (city) {
+      const histData = await wikiSummary(`History of ${city}`);
+      if (histData) {
+        allFacts.push(...extractFacts(histData.extract, 3).map(f => ({ ...f, score: f.score + 1 })));
+      }
+    }
+
+    // Step 4: Wikipedia geo search — nearby articles (landmarks, parks, historic sites, etc.)
+    try {
+      const nearbyResp = await fetch(
+        `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lng}&gsradius=15000&gslimit=8&format=json&origin=*`,
+        { signal: AbortSignal.timeout(5000) }
+      );
+      const nearbyJson = await nearbyResp.json();
+      const pages = (nearbyJson.query?.geosearch || [])
+        .filter(p => p.title !== usedPlace && !candidates.includes(p.title));
+      for (const page of pages.slice(0, 4)) {
+        const pData = await wikiSummary(page.title);
+        if (!pData) continue;
+        const first = pData.extract
+          .replace(/\n+/g, ' ')
+          .split(/(?<=[.!?])\s+/)
+          .map(s => s.trim())
+          .find(s => s.length > 55 && s.length < 230 && scoreSentence(s) > -1);
+        if (first) allFacts.push({ text: first, score: scoreSentence(first) + 2 });
+      }
+    } catch(e) {}
+
+    if (!allFacts.length) {
       if (textEl) textEl.textContent = 'No local facts found for this area.';
       return;
     }
 
-    // Split into sentences, filter short ones, take up to 10
-    const sentences = extract
-      .replace(/\n/g, ' ')
-      .split(/(?<=[.!?])\s+/)
-      .map(s => s.trim())
-      .filter(s => s.length > 60);
-    localFacts   = sentences.slice(0, 10);
+    // Step 5: deduplicate, sort by score, take top 10
+    const seen   = new Set();
+    localFacts   = allFacts
+      .sort((a, b) => b.score - a.score)
+      .filter(f => { const k = f.text.slice(0, 50); if (seen.has(k)) return false; seen.add(k); return true; })
+      .slice(0, 10)
+      .map(f => f.text);
     localFactIdx = 0;
     explorePlace = usedPlace;
     showLocalFact();
