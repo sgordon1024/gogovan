@@ -1874,8 +1874,11 @@
       text-align: center;
       line-height: 1.4;
       flex: 1;
+      min-height: 0;
       display: flex;
       align-items: center;
+      justify-content: center;
+      padding: 10px 0;
     }
     #explore-facts-footer {
       display: flex;
@@ -4301,20 +4304,20 @@ function refreshModeChip() {
   if (speedEl) {
     const speedVal = (drivingMode && currentSpeedMph != null) ? Math.round(currentSpeedMph) : null;
     speedEl.textContent = speedVal != null ? speedVal : '—';
-    // Multi-stop color ramp: black → white → yellow → orange → red → red+blink
+    // Multi-stop color ramp: dim white → white → yellow → orange → red → red+blink
     if (speedVal != null) {
       const stops = [
-        { v:  0, r:   0, g:   0, b:   0 },   // stopped  — black
-        { v: 30, r: 255, g: 255, b: 255 },   // cruising — white
-        { v: 70, r: 255, g: 255, b: 140 },   // highway  — light yellow
-        { v: 80, r: 255, g:  80, b:   5 },   // fast     — red/orange
-        { v: 90, r: 255, g:   0, b:   0 },   // too fast — red
+        { v:  0, r: 255, g: 255, b: 255, a: 0.18 },  // stopped  — faint white
+        { v: 30, r: 255, g: 255, b: 255, a: 1.00 },  // cruising — white
+        { v: 70, r: 255, g: 255, b: 140, a: 1.00 },  // highway  — light yellow
+        { v: 80, r: 255, g:  80, b:   5, a: 1.00 },  // fast     — red/orange
+        { v: 90, r: 255, g:   0, b:   0, a: 1.00 },  // too fast — red
       ];
-      let r, g, b;
+      let r, g, b, a;
       if (speedVal <= stops[0].v) {
-        ({ r, g, b } = stops[0]);
+        ({ r, g, b, a } = stops[0]);
       } else if (speedVal >= stops[stops.length - 1].v) {
-        ({ r, g, b } = stops[stops.length - 1]);
+        ({ r, g, b, a } = stops[stops.length - 1]);
       } else {
         for (let i = 1; i < stops.length; i++) {
           if (speedVal <= stops[i].v) {
@@ -4322,15 +4325,16 @@ function refreshModeChip() {
             r = Math.round(stops[i-1].r + t * (stops[i].r - stops[i-1].r));
             g = Math.round(stops[i-1].g + t * (stops[i].g - stops[i-1].g));
             b = Math.round(stops[i-1].b + t * (stops[i].b - stops[i-1].b));
+            a = +(stops[i-1].a + t * (stops[i].a - stops[i-1].a)).toFixed(3);
             break;
           }
         }
       }
-      const col = `rgb(${r},${g},${b})`;
+      const col = `rgba(${r},${g},${b},${a})`;
       speedEl.style.color = col;
-      speedEl.style.textShadow = r === 0 && g === 0 && b === 0
+      speedEl.style.textShadow = a < 0.25
         ? 'none'
-        : `0 0 8px ${col}, 0 0 24px rgba(${r},${g},${b},0.5), 0 0 48px rgba(${r},${g},${b},0.2)`;
+        : `0 0 8px ${col}, 0 0 24px rgba(${r},${g},${b},${+(a*0.5).toFixed(2)}), 0 0 48px rgba(${r},${g},${b},${+(a*0.2).toFixed(2)})`;
       speedEl.classList.toggle('blinking', speedVal >= 90);
     } else {
       speedEl.style.color = '';
@@ -4590,9 +4594,7 @@ function setRestStopUI(icon, name, distMi, timeMin, exitStr, lat, lng) {
   if (distMi != null) {
     metaEl.style.display = 'flex';
     distEl.textContent = distMi < 10 ? distMi.toFixed(1) + ' mi' : Math.round(distMi) + ' mi';
-    timeEl.textContent = timeMin < 60
-      ? Math.round(timeMin) + ' min away'
-      : Math.floor(timeMin/60) + 'h ' + (Math.round(timeMin%60)) + 'm away';
+    timeEl.style.display = 'none';
     exitEl.textContent = exitStr || '';
     exitEl.style.display = exitStr ? '' : 'none';
   } else {
@@ -4724,6 +4726,7 @@ let lastExploreLng = null;
 let localFacts     = [];
 let localFactIdx   = 0;
 let explorePlace   = '';
+let _currentUtter  = null;
 
 function startExploreUpdates() {
   stopExploreUpdates();
@@ -4913,6 +4916,19 @@ async function fetchLocalFacts(lat, lng) {
   }
 }
 
+function summarizeFact(text) {
+  // Strip a boring "[Place] is/was a [city/town/county…]." opener so we skip to the interesting part
+  let s = text.replace(
+    /^(The\s+)?([\w\s,'\-]{1,40}?)\s+(is|was|are|were)\s+(a|an|the\s+)?(city|town|village|county|borough|municipality|settlement|community|unincorporated\s+community)[^.!]*[.!]\s*/i,
+    ''
+  ).trim();
+  if (s.length < 25) s = text.trim(); // fallback if strip removed too much
+  const words = s.split(/\s+/).filter(Boolean);
+  const slice = words.slice(0, 6);
+  const joined = slice.join(' ').replace(/[,;:]+$/, '');
+  return words.length > 6 ? joined + '…' : joined;
+}
+
 function showLocalFact() {
   const placeEl = document.getElementById('explore-facts-place');
   const textEl  = document.getElementById('explore-facts-text');
@@ -4920,16 +4936,26 @@ function showLocalFact() {
   const hintEl  = document.getElementById('explore-facts-hint');
   if (!textEl || !localFacts.length) return;
   if (placeEl) placeEl.textContent = explorePlace;
-  textEl.textContent = localFacts[localFactIdx];
+  textEl.textContent = summarizeFact(localFacts[localFactIdx]);
   if (progEl) progEl.textContent = `${localFactIdx + 1} / ${localFacts.length}`;
   if (hintEl) { hintEl.textContent = 'tap to hear'; hintEl.classList.remove('speaking'); }
+}
+
+function _cancelUtter() {
+  // Clear handlers BEFORE cancelling so iOS onerror from cancel() doesn't increment
+  if (_currentUtter) {
+    _currentUtter.onend  = null;
+    _currentUtter.onerror = null;
+    _currentUtter = null;
+  }
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
 }
 
 function tapLocalFact() {
   if (!localFacts.length) return;
   // If already speaking, stop and cycle to next
   if (window.speechSynthesis && window.speechSynthesis.speaking) {
-    window.speechSynthesis.cancel();
+    _cancelUtter();
     localFactIdx = (localFactIdx + 1) % localFacts.length;
     showLocalFact();
     return;
@@ -4949,8 +4975,9 @@ function speakLocalFact() {
     return;
   }
 
-  window.speechSynthesis.cancel();
+  _cancelUtter();
   const utter = new SpeechSynthesisUtterance(text);
+  _currentUtter = utter;
   utter.rate  = 0.85;
   utter.pitch = 1.0;
 
@@ -4958,6 +4985,8 @@ function speakLocalFact() {
     if (hintEl) { hintEl.textContent = '▶ reading…'; hintEl.classList.add('speaking'); }
   };
   utter.onend = utter.onerror = () => {
+    if (_currentUtter !== utter) return; // was manually cancelled — don't increment
+    _currentUtter = null;
     localFactIdx = (localFactIdx + 1) % localFacts.length;
     showLocalFact(); // resets hint to "tap to hear" and removes .speaking
   };
