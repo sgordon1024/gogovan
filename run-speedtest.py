@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """
-run-speedtest.py — Runs speedtest-cli and publishes result to MQTT.
+run-speedtest.py — Runs the official Ookla speedtest CLI and publishes result to MQTT.
 Triggered by the systemd speedtest.timer every 30 minutes, and also
 by manual "Run Speed Test" taps in the dashboard (via can-bridge.py).
+
+Uses the official Ookla speedtest binary (multi-stream, accurate) with a fallback
+to speedtest-cli (Python package) if the Ookla binary isn't found.
 """
-import json, subprocess, os
+import json, subprocess, os, shutil
 import paho.mqtt.client as mqtt
 
 MQTT_HOST     = 'localhost'
@@ -44,6 +47,72 @@ def get_upstream():
     return 'unknown'
 
 
+def run_ookla():
+    """Run the official Ookla speedtest CLI. Returns parsed result dict.
+    Retries up to 3 times on transient socket/connection failures."""
+    last_err = None
+    for attempt in range(3):
+        r = subprocess.run(
+            ['speedtest', '--format=json', '--accept-license', '--accept-gdpr'],
+            capture_output=True, text=True, timeout=120
+        )
+        # Ookla emits multiple JSON lines; we want the one with "type": "result"
+        data = None
+        all_lines = (r.stdout + r.stderr).splitlines()
+        for line in all_lines:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+                if obj.get('type') == 'result':
+                    data = obj
+                    break
+            except json.JSONDecodeError:
+                continue
+        if data is not None:
+            break
+        # Collect the error message for reporting if all retries fail
+        err_msgs = []
+        for line in all_lines:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+                if obj.get('error'):
+                    err_msgs.append(obj['error'])
+                elif obj.get('type') == 'log' and obj.get('level') == 'error':
+                    err_msgs.append(obj.get('message', ''))
+            except json.JSONDecodeError:
+                pass
+        last_err = '; '.join(err_msgs) if err_msgs else f'stdout={r.stdout!r} stderr={r.stderr!r}'
+    if data is None:
+        raise ValueError(f'No result after 3 attempts. Last error: {last_err}')
+    # bandwidth is bytes/sec → Mbps
+    download_mbps = round(data['download']['bandwidth'] * 8 / 1_000_000, 1)
+    upload_mbps   = round(data['upload']['bandwidth']   * 8 / 1_000_000, 1)
+    ping_ms       = round(data['ping']['latency'])
+    server_name   = data.get('server', {}).get('name', 'Unknown')
+    timestamp     = data.get('timestamp', '')
+    return download_mbps, upload_mbps, ping_ms, server_name, timestamp
+
+
+def run_speedtest_cli():
+    """Fallback: run the Python speedtest-cli package."""
+    r = subprocess.run(
+        ['speedtest-cli', '--json', '--secure'],
+        capture_output=True, text=True, timeout=120
+    )
+    data = json.loads(r.stdout)
+    download_mbps = round(data['download'] / 1e6, 1)
+    upload_mbps   = round(data['upload']   / 1e6, 1)
+    ping_ms       = round(data['ping'])
+    server_name   = data.get('server', {}).get('sponsor', 'Unknown')
+    timestamp     = data.get('timestamp', '')
+    return download_mbps, upload_mbps, ping_ms, server_name, timestamp
+
+
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
 client.connect(MQTT_HOST, MQTT_PORT, 60)
 client.publish('van/status/network/speedtest/running', 'true', retain=True)
@@ -51,18 +120,20 @@ client.disconnect()
 
 upstream = get_upstream()
 try:
-    r = subprocess.run(
-        ['speedtest-cli', '--json', '--secure'],
-        capture_output=True, text=True, timeout=120
-    )
-    data = json.loads(r.stdout)
+    # Prefer the official Ookla binary (multi-stream, accurate)
+    if shutil.which('speedtest'):
+        download, upload, ping, server, timestamp = run_ookla()
+    else:
+        # Fallback to Python speedtest-cli (single-stream, may under-measure)
+        download, upload, ping, server, timestamp = run_speedtest_cli()
+
     result = {
-        'download':  round(data['download'] / 1e6, 1),
-        'upload':    round(data['upload']   / 1e6, 1),
-        'ping':      round(data['ping']),
-        'server':    data.get('server', {}).get('sponsor', 'Unknown'),
+        'download':  download,
+        'upload':    upload,
+        'ping':      ping,
+        'server':    server,
         'upstream':  upstream,
-        'timestamp': data.get('timestamp', ''),
+        'timestamp': timestamp,
         'error':     None,
     }
 except Exception as e:

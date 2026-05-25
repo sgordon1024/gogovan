@@ -2094,6 +2094,15 @@
     .stats-filters { display:flex; gap:8px; padding:12px 16px 4px; flex-shrink:0; }
     .stats-filter { flex:1; padding:8px 4px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--txt2); font-size:13px; font-weight:600; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:background .15s, color .15s; }
     .stats-filter.active { background:var(--amber); color:#000; border-color:transparent; }
+    .stats-timerange { display:flex; gap:6px; padding:6px 16px 0; flex-shrink:0; }
+    .stats-tr { flex:1; padding:5px 4px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--txt2); font-size:12px; font-weight:600; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:background .15s, color .15s, border-color .15s; }
+    .stats-tr.active { background:var(--surface); color:var(--txt); border-color:var(--txt2); }
+    .chart-tooltip { position:absolute; top:6px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:8px 11px; pointer-events:none; z-index:10; min-width:118px; max-width:155px; box-shadow:0 4px 16px rgba(0,0,0,.45); }
+    .ctt-date { font-size:11px; color:var(--txt2); margin-bottom:2px; }
+    .ctt-carrier { font-size:11px; font-weight:700; color:var(--amber); margin-bottom:3px; }
+    .ctt-carrier.starlink { color:var(--blue); }
+    .ctt-speeds { font-size:13px; font-weight:700; color:var(--txt); }
+    .ctt-ping { font-size:11px; color:var(--txt2); margin-top:2px; }
     .stats-scroll { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom:calc(16px + env(safe-area-inset-bottom)); }
     .stats-chart-wrap { margin:12px 16px 0; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:12px 8px 8px; }
     .stats-chart-legend { display:flex; gap:16px; padding:8px 8px 0; }
@@ -2649,9 +2658,16 @@ safe-buffer/index.js:
       <button class="stats-filter" data-f="tmobile" onclick="setStatsFilter('tmobile')">T-Mobile</button>
       <button class="stats-filter" data-f="starlink" onclick="setStatsFilter('starlink')">Starlink</button>
     </div>
+    <div class="stats-timerange">
+      <button class="stats-tr" data-tr="day" onclick="setStatsTimeRange('day')">Day</button>
+      <button class="stats-tr" data-tr="week" onclick="setStatsTimeRange('week')">Week</button>
+      <button class="stats-tr" data-tr="month" onclick="setStatsTimeRange('month')">Month</button>
+      <button class="stats-tr active" data-tr="all" onclick="setStatsTimeRange('all')">All Time</button>
+    </div>
     <div class="stats-scroll">
-      <div class="stats-chart-wrap">
-        <svg id="statsChart" width="100%" style="display:block"></svg>
+      <div class="stats-chart-wrap" style="position:relative">
+        <svg id="statsChart" width="100%" style="display:block;touch-action:none"></svg>
+        <div id="chartTooltip" class="chart-tooltip" style="display:none"></div>
         <div class="stats-chart-legend">
           <div class="stats-legend-item"><div class="stats-legend-line" style="background:var(--amber)"></div> T-Mobile ↓</div>
           <div class="stats-legend-item"><div class="stats-legend-dash" style="border-color:var(--amber)"></div> T-Mobile ↑</div>
