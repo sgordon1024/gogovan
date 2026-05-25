@@ -7,8 +7,21 @@ by manual "Run Speed Test" taps in the dashboard (via can-bridge.py).
 Uses the official Ookla speedtest binary (multi-stream, accurate) with a fallback
 to speedtest-cli (Python package) if the Ookla binary isn't found.
 """
-import json, subprocess, os, shutil
+import json, subprocess, os, shutil, socket
 import paho.mqtt.client as mqtt
+
+class _OoklaPortError(Exception):
+    """Raised when Ookla fails with a socket/connect error — triggers HTTPS fallback."""
+    pass
+
+def has_internet(host='8.8.8.8', port=53, timeout=4):
+    """Quick TCP check — if we can reach Google DNS port 53, we have internet."""
+    try:
+        socket.setdefaulttimeout(timeout)
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
+        return True
+    except Exception:
+        return False
 
 MQTT_HOST     = 'localhost'
 MQTT_PORT     = 1883
@@ -88,7 +101,10 @@ def run_ookla():
                 pass
         last_err = err_msg or f'exit code {r.returncode}'
     if data is None:
-        raise ValueError(f'Speed test failed: {last_err}')
+        # Ookla socket errors usually mean port 8080 is blocked — try HTTPS fallback
+        if last_err and any(k in last_err for k in ('socket', 'connect', 'Cannot read', 'Cannot open', 'Timeout')):
+            raise _OoklaPortError(last_err)
+        raise ValueError(last_err)
     # bandwidth is bytes/sec → Mbps
     download_mbps = round(data['download']['bandwidth'] * 8 / 1_000_000, 1)
     upload_mbps   = round(data['upload']['bandwidth']   * 8 / 1_000_000, 1)
@@ -113,6 +129,70 @@ def run_speedtest_cli():
     return download_mbps, upload_mbps, ping_ms, server_name, timestamp
 
 
+def run_https_speedtest():
+    """
+    HTTPS-only fallback using Cloudflare speed test endpoints (port 443).
+    Used when Ookla fails due to port 8080 being blocked.
+    Returns (download_mbps, upload_mbps, ping_ms, server_name, timestamp).
+    """
+    import urllib.request, time, datetime
+
+    server_name = 'Cloudflare (HTTPS)'
+    timestamp   = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    # Ping: measure latency to Cloudflare
+    ping_ms = None
+    try:
+        t0 = time.time()
+        urllib.request.urlopen('https://speed.cloudflare.com/__down?bytes=1', timeout=5)
+        ping_ms = round((time.time() - t0) * 1000)
+    except Exception:
+        pass
+
+    # Download: measure for up to 15 s regardless of how much arrives
+    down_mbps = None
+    try:
+        BUDGET = 15
+        t0 = time.time()
+        received = 0
+        # Request a large file; we'll stop reading after BUDGET seconds
+        with urllib.request.urlopen('https://speed.cloudflare.com/__down?bytes=104857600', timeout=BUDGET + 5) as r:
+            while time.time() - t0 < BUDGET:
+                chunk = r.read(65536)
+                if not chunk:
+                    break
+                received += len(chunk)
+        elapsed = time.time() - t0
+        if received > 0 and elapsed > 0:
+            down_mbps = round(received * 8 / elapsed / 1_000_000, 1)
+    except Exception:
+        pass
+
+    # Upload: POST up to 15 s worth of data
+    up_mbps = None
+    try:
+        BUDGET = 15
+        upload_data = b'0' * 5_000_000   # 5 MB — enough to saturate most mobile links
+        t0 = time.time()
+        req = urllib.request.Request(
+            'https://speed.cloudflare.com/__up',
+            data=upload_data,
+            headers={'Content-Type': 'application/octet-stream'},
+            method='POST'
+        )
+        urllib.request.urlopen(req, timeout=BUDGET + 5)
+        elapsed = time.time() - t0
+        if elapsed > 0:
+            up_mbps = round(len(upload_data) * 8 / elapsed / 1_000_000, 1)
+    except Exception:
+        pass
+
+    if down_mbps is None:
+        raise ValueError('HTTPS speed test failed — no internet connection')
+
+    return down_mbps, up_mbps or 0, ping_ms or 0, server_name, timestamp
+
+
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
 client.connect(MQTT_HOST, MQTT_PORT, 60)
 client.publish('van/status/network/speedtest/running', 'true', retain=True)
@@ -120,12 +200,18 @@ client.disconnect()
 
 upstream = get_upstream()
 try:
+    if not has_internet():
+        raise ValueError('No internet connection')
     # Prefer the official Ookla binary (multi-stream, accurate)
-    if shutil.which('speedtest'):
-        download, upload, ping, server, timestamp = run_ookla()
-    else:
-        # Fallback to Python speedtest-cli (single-stream, may under-measure)
-        download, upload, ping, server, timestamp = run_speedtest_cli()
+    try:
+        if shutil.which('speedtest'):
+            download, upload, ping, server, timestamp = run_ookla()
+        else:
+            download, upload, ping, server, timestamp = run_speedtest_cli()
+    except _OoklaPortError:
+        # Port 8080 blocked — fall back to HTTPS-only test via Cloudflare
+        print('Ookla port 8080 blocked, falling back to HTTPS speed test…')
+        download, upload, ping, server, timestamp = run_https_speedtest()
 
     result = {
         'download':  download,
