@@ -1768,6 +1768,32 @@
       font-size: clamp(11px, 2.8vw, 14px);
       color: var(--txt2);
     }
+    #drive-rest-category {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.9px;
+      text-transform: uppercase;
+      color: var(--txt2);
+      opacity: 0.7;
+    }
+    #drive-rest-dir-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 3px 9px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--txt2);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      margin-top: 2px;
+      text-decoration: none;
+    }
+    #drive-rest-dir-btn[hidden] { display: none; }
+    #drive-rest-dir-btn:active { opacity: 0.6; }
     /* ── Explore bottom row ──────────────────────── */
     #explore-bottom-row {
       display: flex;
@@ -2751,8 +2777,9 @@ safe-buffer/index.js:
   <div id="drive-explore-panel">
     <!-- Top row: rest stop + speedometer (same layout as before) -->
     <div id="drive-top-row">
-      <div id="drive-rest-box">
+      <div id="drive-rest-box" onclick="handleRestBoxClick(event)">
         <div id="drive-rest-spinner" hidden></div>
+        <div id="drive-rest-category">Rest Areas</div>
         <div id="drive-rest-icon"></div>
         <div id="drive-rest-name">Finding rest stops…</div>
         <div id="drive-rest-meta" style="display:none">
@@ -2760,6 +2787,9 @@ safe-buffer/index.js:
           <span id="drive-rest-time"></span>
           <span id="drive-rest-exit"></span>
         </div>
+        <button id="drive-rest-dir-btn" hidden onclick="openPOIDirections(event)">
+          ↗ Directions
+        </button>
       </div>
       <div id="drive-speed-box">
         <div id="drive-speed-number">—</div>
@@ -3222,6 +3252,8 @@ const LUCIDE_PATHS = {
   'rotate-cw':      `<path d="M21 2v6h-6"/><path d="M21 13a9 9 0 1 1-3-7.7L21 8"/>`,
   power:            `<path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" x2="12" y1="2" y2="12"/>`,
   x:                `<path d="M18 6 6 18"/><path d="m6 6 12 12"/>`,
+  'shopping-cart':  `<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>`,
+  tent:             `<path d="M3.5 21 14 3"/><path d="M20.5 21 10 3"/><path d="M15.5 21 12 15l-3.5 6"/><path d="M2 21h20"/>`,
 };
 function lucideIcon(name, size = 16, sw = 2) {
   const p = LUCIDE_PATHS[name] || LUCIDE_PATHS.star;
@@ -4423,6 +4455,66 @@ function closeCoin() {
 }
 
 
+// ── POI categories for rest-stop box ─────────────
+const POI_CATEGORIES = [
+  {
+    id: 'rest', label: 'Rest Areas', icon: 'coffee',
+    emptyMsg: 'No rest areas ahead',
+    radius: 120000,
+    query: (r, lat, lng) => `[out:json][timeout:12];
+(
+  node["highway"="rest_area"](around:${r},${lat},${lng});
+  node["highway"="services"](around:${r},${lat},${lng});
+  way["highway"="rest_area"](around:${r},${lat},${lng});
+  way["highway"="services"](around:${r},${lat},${lng});
+  node["amenity"="rest_area"](around:${r},${lat},${lng});
+);
+out center;`,
+    defaultName: 'Rest Area',
+  },
+  {
+    id: 'cracker', label: 'Cracker Barrel', icon: 'utensils',
+    emptyMsg: 'No Cracker Barrels ahead',
+    radius: 100000,
+    query: (r, lat, lng) => `[out:json][timeout:12];
+(
+  node["name"~"Cracker Barrel",i](around:${r},${lat},${lng});
+  way["name"~"Cracker Barrel",i](around:${r},${lat},${lng});
+);
+out center;`,
+    defaultName: 'Cracker Barrel',
+  },
+  {
+    id: 'walmart', label: 'Walmart', icon: 'shopping-cart',
+    emptyMsg: 'No Walmarts ahead',
+    radius: 80000,
+    query: (r, lat, lng) => `[out:json][timeout:12];
+(
+  node["name"~"Walmart",i]["shop"](around:${r},${lat},${lng});
+  way["name"~"Walmart",i]["shop"](around:${r},${lat},${lng});
+);
+out center;`,
+    defaultName: 'Walmart',
+  },
+  {
+    id: 'blm', label: 'BLM Land', icon: 'tent',
+    emptyMsg: 'No BLM sites ahead',
+    radius: 150000,
+    query: (r, lat, lng) => `[out:json][timeout:15];
+(
+  node["operator"~"Bureau of Land Management",i](around:${r},${lat},${lng});
+  way["operator"~"Bureau of Land Management",i](around:${r},${lat},${lng});
+  node["operator"~"^BLM$",i](around:${r},${lat},${lng});
+  way["operator"~"^BLM$",i](around:${r},${lat},${lng});
+);
+out center;`,
+    defaultName: 'BLM Site',
+  },
+];
+
+let poiCategoryIdx  = 0;
+let currentPoiResult = null; // {lat, lng, name} — drives the Directions button
+
 // ── Rest stop finder ──────────────────────────────
 let restStopInterval  = null;
 let lastRestStopFetch = 0;
@@ -4441,8 +4533,33 @@ function hideRestSpinner() {
   if (el) el.hidden = true;
 }
 
+function handleRestBoxClick(e) {
+  if (e.target.closest('#drive-rest-dir-btn')) return; // let Directions button handle itself
+  // Cycle to next category
+  poiCategoryIdx = (poiCategoryIdx + 1) % POI_CATEGORIES.length;
+  const cat = POI_CATEGORIES[poiCategoryIdx];
+  const catEl = document.getElementById('drive-rest-category');
+  if (catEl) catEl.textContent = cat.label;
+  currentPoiResult = null;
+  const dirBtn = document.getElementById('drive-rest-dir-btn');
+  if (dirBtn) dirBtn.hidden = true;
+  restStopHasData = false;
+  setRestStopUI('search', 'Searching…', null, null, null);
+  updateRestStop();
+}
+
+function openPOIDirections(e) {
+  e.stopPropagation();
+  if (!currentPoiResult) return;
+  const { lat, lng } = currentPoiResult;
+  window.open(`https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`, '_blank');
+}
+
 function startRestStopUpdates() {
   stopRestStopUpdates();
+  poiCategoryIdx = 0;
+  const catEl = document.getElementById('drive-rest-category');
+  if (catEl) catEl.textContent = POI_CATEGORIES[0].label;
   restStopHasData = false;
   updateRestStop();
   restStopInterval = setInterval(updateRestStop, REST_STOP_CACHE_MS);
@@ -4451,21 +4568,24 @@ function stopRestStopUpdates() {
   if (restStopInterval) { clearInterval(restStopInterval); restStopInterval = null; }
   hideRestSpinner();
   restStopHasData = false;
-  setRestStopUI('loading', 'Finding rest stops…', null, null, null);
+  currentPoiResult = null;
+  const dirBtn = document.getElementById('drive-rest-dir-btn');
+  if (dirBtn) dirBtn.hidden = true;
+  setRestStopUI('search', 'Finding nearby…', null, null, null);
 }
 
-function setRestStopUI(icon, name, distMi, timeMin, exitStr) {
+function setRestStopUI(icon, name, distMi, timeMin, exitStr, lat, lng) {
   const iconEl = document.getElementById('drive-rest-icon');
   const nameEl = document.getElementById('drive-rest-name');
   const metaEl = document.getElementById('drive-rest-meta');
   const distEl = document.getElementById('drive-rest-dist');
   const timeEl = document.getElementById('drive-rest-time');
   const exitEl = document.getElementById('drive-rest-exit');
+  const dirBtn = document.getElementById('drive-rest-dir-btn');
   if (!iconEl) return;
-  iconEl.innerHTML = lucideIcon(
-    icon === 'rest' ? 'coffee' : icon === 'loading' ? 'search' : 'map-pin',
-    36, 1.5
-  );
+  // Accept direct icon names; legacy aliases: 'rest'→'coffee', 'loading'→'search'
+  const iconName = icon === 'rest' ? 'coffee' : icon === 'loading' ? 'search' : icon;
+  iconEl.innerHTML = lucideIcon(iconName, 36, 1.5);
   nameEl.textContent = name;
   if (distMi != null) {
     metaEl.style.display = 'flex';
@@ -4478,6 +4598,13 @@ function setRestStopUI(icon, name, distMi, timeMin, exitStr) {
   } else {
     metaEl.style.display = 'none';
   }
+  // Directions button — show only when we have a real location
+  if (lat != null && lng != null && dirBtn) {
+    currentPoiResult = { lat, lng, name };
+    dirBtn.hidden = false;
+  } else if (dirBtn && lat == null) {
+    dirBtn.hidden = true;
+  }
 }
 
 function clearRestStopState() {
@@ -4487,33 +4614,22 @@ function clearRestStopState() {
 
 async function updateRestStop() {
   if (!lastGPSLat || !lastGPSLng) return;
-  // First load: show placeholder. Subsequent refreshes: just show spinner, keep existing content.
+  const cat = POI_CATEGORIES[poiCategoryIdx];
   if (!restStopHasData) {
-    setRestStopUI('loading', 'Searching ahead…', null, null, null);
+    setRestStopUI('search', 'Searching ahead…', null, null, null);
   }
   showRestSpinner();
   try {
-    // Search 80km radius for rest areas, service areas, truck stops
-    const r = 80000;
-    const query = `[out:json][timeout:10];
-(
-  node["highway"="rest_area"](around:${r},${lastGPSLat},${lastGPSLng});
-  node["highway"="services"](around:${r},${lastGPSLat},${lastGPSLng});
-  way["highway"="rest_area"](around:${r},${lastGPSLat},${lastGPSLng});
-  way["highway"="services"](around:${r},${lastGPSLat},${lastGPSLng});
-  node["amenity"="rest_area"](around:${r},${lastGPSLat},${lastGPSLng});
-);
-out center;`;
+    const query = cat.query(cat.radius, lastGPSLat, lastGPSLng);
     const resp = await fetch('https://overpass-api.de/api/interpreter', {
       method: 'POST',
       body: 'data=' + encodeURIComponent(query),
-      signal: AbortSignal.timeout(12000)
+      signal: AbortSignal.timeout(15000)
     });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
     const elements = data.elements || [];
 
-    // Convert to {lat,lng,name,ref} and filter to ahead (within ±90° of heading)
     const candidates = elements.map(el => {
       const lat = el.lat ?? el.center?.lat;
       const lng = el.lon ?? el.center?.lon;
@@ -4527,24 +4643,24 @@ out center;`;
     }).filter(c => c && c.distM > 100 && (lastGPSHeading == null || Math.abs(c.angDiff) <= 90));
 
     if (!candidates.length) {
-      setRestStopUI('rest', 'No rest stops found ahead', null, null, null);
+      setRestStopUI(cat.icon, cat.emptyMsg, null, null, null);
       restStopHasData = true;
       hideRestSpinner();
       return;
     }
     candidates.sort((a, b) => a.distM - b.distM);
     const best = candidates[0];
-    const distMi = best.distM / 1609.34;
+    const distMi  = best.distM / 1609.34;
     const speedMph = (currentSpeedMph && currentSpeedMph > 5) ? currentSpeedMph : 55;
     const timeMin  = (distMi / speedMph) * 60;
     const exitStr  = best.ref ? 'Exit ' + best.ref : '';
-    const displayName = best.name || 'Rest Area';
-    setRestStopUI('rest', displayName, distMi, timeMin, exitStr);
+    const displayName = best.name || cat.defaultName;
+    setRestStopUI(cat.icon, displayName, distMi, timeMin, exitStr, best.lat, best.lng);
     restStopHasData = true;
     hideRestSpinner();
   } catch(e) {
     if (!restStopHasData) {
-      setRestStopUI('rest', 'Rest stops unavailable', null, null, null);
+      setRestStopUI(cat.icon, 'Unavailable', null, null, null);
     }
     hideRestSpinner();
   }
