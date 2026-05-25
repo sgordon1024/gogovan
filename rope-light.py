@@ -120,29 +120,29 @@ async def candle_effect(client):
     sway_t = random.uniform(0, 6.28)
 
     # ── gust scheduler ──────────────────────────────────────────────────────
-    next_gust_in = random.uniform(0.3, 1.5)
+    next_gust_in = random.uniform(0.25, 1.25)   # 20% faster initial
 
     frame = 0
 
     while True:
         frame        += 1
         next_gust_in -= DT
-        sway_t        = (sway_t + DT * 1.2) % (2 * math.pi)   # ~5-s sway
+        sway_t        = (sway_t + DT * 1.44) % (2 * math.pi)   # ~4-s sway (20% faster)
 
-        # ── base drifts wide every ~0.13 s (every 4 frames @ 30 fps) ───────
-        if frame % 4 == 0:
+        # ── base drifts wide every ~0.1 s (every 3 frames @ 30 fps) ────────
+        if frame % 3 == 0:
             tgt_base += random.gauss(0, 0.055)
             tgt_base  = 0.82 + 0.45 * (tgt_base - 0.82)
             tgt_base  = max(0.30, min(1.0, tgt_base))
 
-        # ── gusts: deep, frequent ────────────────────────────────────────────
-        gust_depth = 0.65 + cycle_speed * 0.07
+        # ── gusts: deeper dips, 20% more frequent ───────────────────────────
+        gust_depth = 0.78 + cycle_speed * 0.07
         if next_gust_in <= 0:
-            tgt_gust     = random.uniform(max(0.12, 1.0 - gust_depth), 0.60)
-            next_gust_in = random.uniform(max(0.3, 1.5 - cycle_speed * 0.1),
-                                          max(0.8, 3.5 - cycle_speed * 0.3))
+            tgt_gust     = random.uniform(max(0.06, 1.0 - gust_depth), 0.55)
+            next_gust_in = random.uniform(max(0.25, 1.25 - cycle_speed * 0.08),
+                                          max(0.65, 2.9 - cycle_speed * 0.25))
         else:
-            tgt_gust = min(1.0, tgt_gust + DT * 0.20)
+            tgt_gust = min(1.0, tgt_gust + DT * 0.24)   # 20% faster recovery
 
         # ── warmth drifts in red → red-orange band every ~0.5 s ─────────────
         if frame % 15 == 0:
@@ -156,22 +156,21 @@ async def candle_effect(client):
             micro_next  = random.randint(3, 6)
             micro_count = 0
 
-        # ── exponential smoothing (α scaled for 30 fps, same time constants) ─
+        # ── exponential smoothing ─────────────────────────────────────────────
         cur_base   += (tgt_base   - cur_base)   * 0.036
         cur_warmth += (tgt_warmth - cur_warmth) * 0.020
 
-        # Asymmetric gust: sharp dip, slow dreamy recovery
+        # Asymmetric gust: sharp dip, slow dreamy recovery (both 20% faster)
         if tgt_gust < cur_gust:
-            cur_gust += (tgt_gust - cur_gust) * 0.28   # fast dip
+            cur_gust += (tgt_gust - cur_gust) * 0.34   # fast dip
         else:
-            cur_gust += (tgt_gust - cur_gust) * 0.035  # ~0.9 s recovery
+            cur_gust += (tgt_gust - cur_gust) * 0.042  # float back up
 
         micro += (tgt_micro - micro) * 0.30
 
         # ── compose level ─────────────────────────────────────────────────────
-        # Sway amplitude ±18% gives clearly visible slow breathing
         sway  = 0.18 * math.sin(sway_t) + 0.06 * math.sin(sway_t * 1.7 + 0.8)
-        level = max(0.08, min(1.0, cur_base * cur_gust + sway + micro))
+        level = max(0.05, min(1.0, cur_base * cur_gust + sway + micro))   # lower floor = deeper dips
 
         r = int(0xff * level * brightness)
         g = int(cur_warmth * 0xff * level * brightness)
