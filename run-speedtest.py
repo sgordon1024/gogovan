@@ -14,14 +14,18 @@ class _OoklaPortError(Exception):
     """Raised when Ookla fails with a socket/connect error — triggers HTTPS fallback."""
     pass
 
-def has_internet(host='8.8.8.8', port=53, timeout=4):
-    """Quick TCP check — if we can reach Google DNS port 53, we have internet."""
-    try:
-        socket.setdefaulttimeout(timeout)
-        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
-        return True
-    except Exception:
-        return False
+def has_internet(timeout=4):
+    """Quick TCP check against two well-known hosts on port 443."""
+    for host in ('1.1.1.1', '8.8.8.8'):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(timeout)
+            s.connect((host, 443))
+            s.close()
+            return True
+        except Exception:
+            pass
+    return False
 
 MQTT_HOST     = 'localhost'
 MQTT_PORT     = 1883
@@ -101,10 +105,7 @@ def run_ookla():
                 pass
         last_err = err_msg or f'exit code {r.returncode}'
     if data is None:
-        # Ookla socket errors usually mean port 8080 is blocked — try HTTPS fallback
-        if last_err and any(k in last_err for k in ('socket', 'connect', 'Cannot read', 'Cannot open', 'Timeout')):
-            raise _OoklaPortError(last_err)
-        raise ValueError(last_err)
+        raise _OoklaPortError(last_err)
     # bandwidth is bytes/sec → Mbps
     download_mbps = round(data['download']['bandwidth'] * 8 / 1_000_000, 1)
     upload_mbps   = round(data['upload']['bandwidth']   * 8 / 1_000_000, 1)
@@ -149,14 +150,19 @@ def run_https_speedtest():
     except Exception:
         pass
 
+    UA = 'Mozilla/5.0 (compatible; GoGoVan-SpeedTest/1.0)'
+
     # Download: measure for up to 15 s regardless of how much arrives
     down_mbps = None
     try:
         BUDGET = 15
         t0 = time.time()
         received = 0
-        # Request a large file; we'll stop reading after BUDGET seconds
-        with urllib.request.urlopen('https://speed.cloudflare.com/__down?bytes=104857600', timeout=BUDGET + 5) as r:
+        req = urllib.request.Request(
+            'https://speed.cloudflare.com/__down?bytes=10000000',
+            headers={'User-Agent': UA}
+        )
+        with urllib.request.urlopen(req, timeout=BUDGET + 5) as r:
             while time.time() - t0 < BUDGET:
                 chunk = r.read(65536)
                 if not chunk:
@@ -172,12 +178,12 @@ def run_https_speedtest():
     up_mbps = None
     try:
         BUDGET = 15
-        upload_data = b'0' * 5_000_000   # 5 MB — enough to saturate most mobile links
+        upload_data = b'0' * 5_000_000
         t0 = time.time()
         req = urllib.request.Request(
             'https://speed.cloudflare.com/__up',
             data=upload_data,
-            headers={'Content-Type': 'application/octet-stream'},
+            headers={'Content-Type': 'application/octet-stream', 'User-Agent': UA},
             method='POST'
         )
         urllib.request.urlopen(req, timeout=BUDGET + 5)
@@ -200,17 +206,15 @@ client.disconnect()
 
 upstream = get_upstream()
 try:
-    if not has_internet():
-        raise ValueError('No internet connection')
     # Prefer the official Ookla binary (multi-stream, accurate)
     try:
         if shutil.which('speedtest'):
             download, upload, ping, server, timestamp = run_ookla()
         else:
             download, upload, ping, server, timestamp = run_speedtest_cli()
-    except _OoklaPortError:
-        # Port 8080 blocked — fall back to HTTPS-only test via Cloudflare
-        print('Ookla port 8080 blocked, falling back to HTTPS speed test…')
+    except _OoklaPortError as e:
+        # Ookla failed — fall back to HTTPS-only test via Cloudflare
+        print(f'Ookla unavailable ({e}), falling back to HTTPS speed test…')
         download, upload, ping, server, timestamp = run_https_speedtest()
 
     result = {
