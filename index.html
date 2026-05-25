@@ -2127,6 +2127,8 @@
     .stats-entry-meta { font-size:12px; color:var(--txt2); margin-top:4px; }
     .stats-gps-link { color:var(--blue); text-decoration:none; }
     .stats-empty { text-align:center; padding:48px 24px; color:var(--txt2); font-size:14px; }
+    .stats-load-more { display:block; width:calc(100% - 32px); margin:4px 16px 16px; padding:12px; background:transparent; color:var(--txt2); font-size:14px; font-weight:600; border:1px solid var(--border); border-radius:12px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+    .stats-load-more:active { opacity:.7; }
     .stats-no-chart { display:flex; align-items:center; justify-content:center; height:120px; color:var(--txt2); font-size:13px; }
 
     /* ── Starlink power card ──────────────────────────── */
@@ -4932,6 +4934,9 @@ function runSpeedTest() {
   btn.disabled = true;
   btn.classList.add('running');
   btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:ptr-spin .75s linear infinite"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg> Testing… (~60s)`;
+  // Clear any previous error immediately
+  const errEl = document.getElementById('speedError');
+  if (errEl) errEl.style.display = 'none';
   mqttClient.publish('van/network/speedtest', 'run');
 }
 
@@ -4953,7 +4958,9 @@ function updateSpeedUI(payload) {
     const d = JSON.parse(payload);
     const errEl = document.getElementById('speedError');
     if (d.error) {
-      errEl.textContent = 'Test failed: ' + d.error;
+      // Truncate long Ookla error chains to the first 80 chars
+      const msg = d.error.length > 80 ? d.error.slice(0, 80).replace(/[;,\s]+$/, '') + '…' : d.error;
+      errEl.textContent = msg;
       errEl.style.display = 'block';
       return;
     }
@@ -4995,7 +5002,34 @@ async function captureGPS() {
 }
 
 // ── Stats overlay ──────────────────────────────────
-let statsFilter = 'all';
+let statsFilter    = 'all';
+let statsTimeRange = 'all';
+let _chartPts      = [];   // current rendered points with pixel coords, for tooltip
+let _chartVBW      = 1;    // viewBox width for coordinate scaling
+let _chartAbortCtrl = null; // AbortController for chart event listeners
+let _statsPage     = 1;    // current pagination page for stats list
+
+// Aggregate raw test entries into daily averages, grouped by carrier.
+// Returns array sorted by ts, one entry per carrier-day with avg down/up/ping.
+function aggregateDailyStats(data) {
+  const map = {};
+  data.forEach(d => {
+    const dt = new Date(d.ts);
+    const key = `${d.upstream}|${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`;
+    if (!map[key]) map[key] = { upstream: d.upstream, ts: d.ts, downs: [], ups: [], pings: [] };
+    map[key].downs.push(d.down);
+    if (d.up  != null) map[key].ups.push(d.up);
+    if (d.ping != null) map[key].pings.push(d.ping);
+  });
+  return Object.values(map).map(g => ({
+    ts:       g.ts,
+    upstream: g.upstream,
+    down:     +(g.downs.reduce((a, b) => a + b, 0) / g.downs.length).toFixed(1),
+    up:       g.ups.length   ? +(g.ups.reduce((a, b) => a + b, 0)   / g.ups.length).toFixed(1)   : null,
+    ping:     g.pings.length ? Math.round(g.pings.reduce((a, b) => a + b, 0) / g.pings.length)   : null,
+  })).sort((a, b) => a.ts - b.ts);
+}
+
 function openStats() {
   document.getElementById('statsOverlay').removeAttribute('hidden');
   renderStats();
@@ -5008,91 +5042,206 @@ function setStatsFilter(f) {
   document.querySelectorAll('.stats-filter').forEach(b => b.classList.toggle('active', b.dataset.f === f));
   renderStats();
 }
-function renderStats() {
-  const all = getSpeedHistory();
-  const data = statsFilter === 'all' ? all : all.filter(d => d.upstream === statsFilter);
-  renderStatsChart(data);
-  renderStatsList(data);
+function setStatsTimeRange(tr) {
+  statsTimeRange = tr;
+  document.querySelectorAll('.stats-tr').forEach(b => b.classList.toggle('active', b.dataset.tr === tr));
+  renderStats();
 }
+function renderStats() {
+  _statsPage = 1;
+  let all = getSpeedHistory();
+  if (statsFilter !== 'all') all = all.filter(d => d.upstream === statsFilter);
+  const now = Date.now();
+  const cutoffs = { day: 864e5, week: 7*864e5, month: 30*864e5 };
+  if (statsTimeRange !== 'all') all = all.filter(d => d.ts >= now - cutoffs[statsTimeRange]);
+  renderStatsChart(all);
+  renderStatsList(all);
+}
+
 function renderStatsChart(data) {
-  const svg = document.getElementById('statsChart');
+  // Abort previous event listeners before attaching new ones
+  if (_chartAbortCtrl) _chartAbortCtrl.abort();
+  _chartAbortCtrl = new AbortController();
+
+  const svg   = document.getElementById('statsChart');
+  const wrap  = svg.parentElement;
+  const ttip  = document.getElementById('chartTooltip');
   svg.innerHTML = '';
-  const sorted = [...data].sort((a,b) => a.ts - b.ts).filter(d => d.down != null);
-  if (sorted.length < 2) {
-    svg.setAttribute('height', '80');
-    const el = document.createElementNS('http://www.w3.org/2000/svg','text');
+  _chartPts = [];
+  if (ttip) ttip.style.display = 'none';
+
+  // Use individual points for day/week; daily aggregates for month/all
+  const useAgg = (statsTimeRange === 'month' || statsTimeRange === 'all');
+  const raw    = [...data].sort((a,b) => a.ts - b.ts).filter(d => d.down != null);
+  const pts    = useAgg ? aggregateDailyStats(raw) : raw;
+
+  if (!pts.length) {
+    svg.setAttribute('height', '90');
+    const ns = 'http://www.w3.org/2000/svg';
+    const el = document.createElementNS(ns, 'text');
     el.setAttribute('x','50%'); el.setAttribute('y','50%'); el.setAttribute('text-anchor','middle');
     el.setAttribute('dominant-baseline','middle'); el.setAttribute('fill','var(--txt2)'); el.setAttribute('font-size','13');
-    el.textContent = sorted.length < 1 ? 'No tests recorded yet' : 'Run at least 2 tests to see chart';
+    el.textContent = raw.length < 1 ? 'No tests recorded yet' : 'No tests in this time range';
     svg.appendChild(el); return;
   }
-  const W = Math.max(200, svg.parentElement.clientWidth - 16);
-  const H = 160;
-  const P = {t:14, r:12, b:28, l:42};
+
+  const W  = Math.max(200, (wrap.clientWidth || 320) - 16);
+  const H  = 240;
+  const P  = {t:16, r:14, b:32, l:46};
   const cW = W - P.l - P.r, cH = H - P.t - P.b;
-  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('height', H);
-  const maxY = Math.max(1, ...sorted.map(d => Math.max(d.down||0, d.up||0))) * 1.2;
-  const minT = sorted[0].ts, maxT = sorted[sorted.length-1].ts;
-  const xp = t => P.l + (sorted.length < 2 ? cW/2 : (t-minT)/(maxT-minT)*cW);
-  const yp = v => P.t + cH - Math.min(cH, Math.max(0, (v/maxY)*cH));
+  _chartVBW = W;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('height', H);
+
+  const maxY = Math.max(1, ...pts.map(d => Math.max(d.down||0, d.up||0))) * 1.15;
+  const minT = pts[0].ts, maxT = pts[pts.length-1].ts;
+  const tRange = maxT - minT || 1;
+  // Single point: center it horizontally instead of pinning to left edge
+  const xp = pts.length === 1
+    ? () => P.l + cW / 2
+    : t => P.l + (t - minT) / tRange * cW;
+  const yp = v => P.t + cH - Math.min(cH, Math.max(0, (v / maxY) * cH));
+
   const ns = 'http://www.w3.org/2000/svg';
-  const mk = (tag, a) => { const e = document.createElementNS(ns,tag); Object.entries(a).forEach(([k,v])=>e.setAttribute(k,v)); return e; };
-  // Grid
-  [0,.25,.5,.75,1].forEach(f => {
+  const mk = (tag, a) => { const e = document.createElementNS(ns, tag); Object.entries(a).forEach(([k,v]) => e.setAttribute(k,v)); return e; };
+
+  // Y grid + labels
+  [0, .25, .5, .75, 1].forEach(f => {
     const gy = yp(maxY*f), val = Math.round(maxY*f);
-    svg.appendChild(mk('line',{x1:P.l,y1:gy,x2:P.l+cW,y2:gy,stroke:'rgba(255,255,255,0.07)','stroke-width':1}));
-    const t = mk('text',{x:P.l-4,y:gy+4,'text-anchor':'end',fill:'var(--txt2)','font-size':9}); t.textContent=val; svg.appendChild(t);
+    svg.appendChild(mk('line', {x1:P.l, y1:gy, x2:P.l+cW, y2:gy, stroke:'rgba(255,255,255,0.07)', 'stroke-width':1}));
+    const t = mk('text', {x:P.l-5, y:gy+4, 'text-anchor':'end', fill:'var(--txt2)', 'font-size':9});
+    t.textContent = val >= 1000 ? (val/1000).toFixed(1)+'G' : val;
+    svg.appendChild(t);
   });
-  // X labels
-  const lblCount = Math.min(4, sorted.length);
-  for (let i=0;i<lblCount;i++) {
-    const d = sorted[Math.round(i*(sorted.length-1)/(lblCount-1))];
+
+  // X labels — time-aware formatting
+  const lblCount = Math.min(5, pts.length);
+  for (let i = 0; i < lblCount; i++) {
+    const d  = pts[Math.round(i * (pts.length - 1) / Math.max(1, lblCount - 1))];
     const dt = new Date(d.ts);
-    const lbl = `${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
-    const t = mk('text',{x:xp(d.ts),y:H-4,'text-anchor':'middle',fill:'var(--txt2)','font-size':8}); t.textContent=lbl; svg.appendChild(t);
+    let lbl;
+    if (statsTimeRange === 'day')        lbl = dt.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+    else if (statsTimeRange === 'week')  lbl = dt.toLocaleDateString('en-US', {weekday:'short', month:'numeric', day:'numeric'});
+    else                                  lbl = dt.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+    const t = mk('text', {x:xp(d.ts), y:H-4, 'text-anchor':'middle', fill:'var(--txt2)', 'font-size':9});
+    t.textContent = lbl;
+    svg.appendChild(t);
   }
-  // Draw per-carrier lines
+
+  // Per-carrier: area fill + download line + upload dashed + dots
   const colors = {tmobile:'var(--amber)', starlink:'var(--blue)', unknown:'var(--txt2)'};
-  const carriers = [...new Set(sorted.map(d=>d.upstream))];
-  carriers.forEach(carrier => {
-    const pts = sorted.filter(d=>d.upstream===carrier);
-    if (!pts.length) return;
-    const col = colors[carrier]||'var(--txt2)';
-    // Download solid line
-    if (pts.length > 1) {
-      svg.appendChild(mk('polyline',{points:pts.map(d=>`${xp(d.ts)},${yp(d.down||0)}`).join(' '),fill:'none',stroke:col,'stroke-width':2,'stroke-linejoin':'round','stroke-linecap':'round'}));
+  const showDots = pts.length <= 120;
+  const dotR     = pts.length > 40 ? 2 : 3.5;
+  [...new Set(pts.map(d => d.upstream))].forEach(carrier => {
+    const cp  = pts.filter(d => d.upstream === carrier);
+    if (!cp.length) return;
+    const col = colors[carrier] || 'var(--txt2)';
+    if (cp.length > 1) {
+      // Semi-transparent area under download
+      const areaStr = `${xp(cp[0].ts)},${P.t+cH} ` + cp.map(d => `${xp(d.ts)},${yp(d.down||0)}`).join(' ') + ` ${xp(cp[cp.length-1].ts)},${P.t+cH}`;
+      svg.appendChild(mk('polygon', {points:areaStr, fill:col, opacity:'0.10'}));
+      // Download solid
+      svg.appendChild(mk('polyline', {points:cp.map(d=>`${xp(d.ts)},${yp(d.down||0)}`).join(' '), fill:'none', stroke:col, 'stroke-width':2, 'stroke-linejoin':'round', 'stroke-linecap':'round'}));
       // Upload dashed
-      svg.appendChild(mk('polyline',{points:pts.map(d=>`${xp(d.ts)},${yp(d.up||0)}`).join(' '),fill:'none',stroke:col,'stroke-width':1.5,'stroke-linejoin':'round','stroke-dasharray':'4 3',opacity:.65}));
+      svg.appendChild(mk('polyline', {points:cp.map(d=>`${xp(d.ts)},${yp(d.up||0)}`).join(' '), fill:'none', stroke:col, 'stroke-width':1.5, 'stroke-linejoin':'round', 'stroke-dasharray':'4 3', opacity:'.6'}));
     }
-    // Dots
-    pts.forEach(d => { svg.appendChild(mk('circle',{cx:xp(d.ts),cy:yp(d.down||0),r:3.5,fill:col,stroke:'var(--bg)','stroke-width':1.5})); });
+    if (showDots) cp.forEach(d => {
+      svg.appendChild(mk('circle', {cx:xp(d.ts), cy:yp(d.down||0), r:dotR, fill:col, stroke:'var(--bg)', 'stroke-width':dotR > 2 ? 1.5 : 1}));
+    });
   });
+
+  // Store point data for tooltip (with pixel X in viewBox coords)
+  _chartPts = pts.map(d => ({ ...d, _px: xp(d.ts) }));
+
+  // Crosshair line (hidden until touch/hover)
+  svg.appendChild(mk('line', {id:'chartCrosshair', x1:P.l, y1:P.t, x2:P.l, y2:P.t+cH,
+    stroke:'rgba(255,255,255,0.35)', 'stroke-width':1, 'stroke-dasharray':'3 3', opacity:'0'}));
+
+  // Transparent interaction overlay
+  svg.appendChild(mk('rect', {id:'chartOverlay', x:P.l, y:P.t, width:cW, height:cH, fill:'transparent', cursor:'crosshair'}));
+
+  // Attach touch/mouse events
+  function svgPixelX(e) {
+    const rect  = svg.getBoundingClientRect();
+    const clX   = e.touches ? e.touches[0].clientX : e.clientX;
+    return (clX - rect.left) * (_chartVBW / (svg.clientWidth || rect.width));
+  }
+  function nearestPt(vbX) {
+    if (!_chartPts.length) return null;
+    return _chartPts.reduce((b, p) => Math.abs(p._px - vbX) < Math.abs(b._px - vbX) ? p : b);
+  }
+  function showTip(e) {
+    if (e.cancelable) e.preventDefault();
+    const vbX = svgPixelX(e);
+    if (vbX < P.l || vbX > P.l + cW) { hideTip(); return; }
+    const p  = nearestPt(vbX);
+    if (!p) return;
+    const ch = document.getElementById('chartCrosshair');
+    if (ch) { ch.setAttribute('x1', p._px); ch.setAttribute('x2', p._px); ch.setAttribute('opacity','1'); }
+    const dt = new Date(p.ts);
+    let dateStr;
+    if (statsTimeRange === 'day')       dateStr = dt.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+    else if (statsTimeRange === 'week') dateStr = dt.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'}) + ' ' + dt.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+    else                                 dateStr = dt.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+    const carrierName  = p.upstream==='tmobile'?'T-Mobile':p.upstream==='starlink'?'Starlink':'Unknown';
+    const carrierClass = p.upstream==='starlink'?'starlink':'';
+    if (ttip) {
+      ttip.innerHTML = `<div class="ctt-date">${dateStr}</div><div class="ctt-carrier ${carrierClass}">${carrierName}</div><div class="ctt-speeds">↓ ${p.down??'—'} / ↑ ${p.up??'—'} Mbps</div>${p.ping?`<div class="ctt-ping">${p.ping} ms ping</div>`:''}`;
+      // Position tooltip relative to chart-wrap; SVG left edge is at 8px (wrap left padding)
+      const svgW   = svg.clientWidth || (wrap.clientWidth - 18);
+      const screenX = p._px / _chartVBW * svgW + 8;
+      ttip.style.left = Math.max(0, Math.min(screenX, (wrap.clientWidth || 300) - 165)) + 'px';
+      ttip.style.display = 'block';
+    }
+  }
+  function hideTip() {
+    if (ttip) ttip.style.display = 'none';
+    const ch = document.getElementById('chartCrosshair');
+    if (ch) ch.setAttribute('opacity', '0');
+  }
+  const sig = _chartAbortCtrl.signal;
+  svg.addEventListener('mousemove',  showTip, { signal: sig });
+  svg.addEventListener('touchmove',  showTip, { passive: false, signal: sig });
+  svg.addEventListener('mouseleave', hideTip, { signal: sig });
+  svg.addEventListener('touchend',   hideTip, { signal: sig });
 }
+
+function statsEntryHtml(d) {
+  const dt = new Date(d.ts);
+  const dateStr = dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' · ' + dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  const carrierLabel = d.upstream==='tmobile'?'T-Mobile':d.upstream==='starlink'?'Starlink':d.upstream||'Unknown';
+  const carrierClass = d.upstream==='tmobile'?'tmobile':d.upstream==='starlink'?'starlink':'unknown';
+  const gpsHtml = d.lat ? `<a class="stats-gps-link" href="https://maps.apple.com/?ll=${d.lat.toFixed(5)},${d.lng.toFixed(5)}" target="_blank"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> ${d.lat.toFixed(4)}, ${d.lng.toFixed(4)}</a>` : '';
+  return `<div class="stats-entry">
+    <div class="stats-entry-header">
+      <span class="stats-carrier-badge stats-carrier-${carrierClass}">${carrierLabel}</span>
+      <span class="stats-entry-date">${dateStr}</span>
+    </div>
+    <div class="stats-entry-vals">
+      <span class="stats-entry-down">${d.down??'—'}</span><span class="stats-entry-unit"> ↓</span>
+      <span class="stats-entry-sep">/</span>
+      <span class="stats-entry-up">${d.up??'—'}</span><span class="stats-entry-unit"> ↑ Mbps</span>
+      <span class="stats-entry-sep">·</span>
+      <span class="stats-entry-ping">${d.ping??'—'} ms</span>
+    </div>
+    <div class="stats-entry-meta">${d.server||''}${d.server&&gpsHtml?' · ':''}${gpsHtml}</div>
+  </div>`;
+}
+
+let _statsData = []; // sorted data for the current stats view (for pagination)
+
 function renderStatsList(data) {
-  const el = document.getElementById('statsList');
-  const sorted = [...data].sort((a,b) => b.ts - a.ts);
-  if (!sorted.length) { el.innerHTML = '<div class="stats-empty">No tests recorded yet.<br>Run a speed test to start tracking.</div>'; return; }
-  el.innerHTML = sorted.map(d => {
-    const dt = new Date(d.ts);
-    const dateStr = dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' · ' + dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-    const carrierLabel = d.upstream==='tmobile'?'T-Mobile':d.upstream==='starlink'?'Starlink':d.upstream||'Unknown';
-    const carrierClass = d.upstream==='tmobile'?'tmobile':d.upstream==='starlink'?'starlink':'unknown';
-    const gpsHtml = d.lat ? `<a class="stats-gps-link" href="https://maps.apple.com/?ll=${d.lat.toFixed(5)},${d.lng.toFixed(5)}" target="_blank"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> ${d.lat.toFixed(4)}, ${d.lng.toFixed(4)}</a>` : '';
-    return `<div class="stats-entry">
-      <div class="stats-entry-header">
-        <span class="stats-carrier-badge stats-carrier-${carrierClass}">${carrierLabel}</span>
-        <span class="stats-entry-date">${dateStr}</span>
-      </div>
-      <div class="stats-entry-vals">
-        <span class="stats-entry-down">${d.down??'—'}</span><span class="stats-entry-unit"> ↓</span>
-        <span class="stats-entry-sep">/</span>
-        <span class="stats-entry-up">${d.up??'—'}</span><span class="stats-entry-unit"> ↑ Mbps</span>
-        <span class="stats-entry-sep">·</span>
-        <span class="stats-entry-ping">${d.ping??'—'} ms</span>
-      </div>
-      <div class="stats-entry-meta">${d.server||''}${d.server&&gpsHtml?' · ':''}${gpsHtml}</div>
-    </div>`;
-  }).join('');
+  const PAGE = 50;
+  _statsData  = [...data].sort((a,b) => b.ts - a.ts);
+  const el    = document.getElementById('statsList');
+  if (!_statsData.length) {
+    el.innerHTML = '<div class="stats-empty">No tests recorded yet.<br>Run a speed test to start tracking.</div>';
+    return;
+  }
+  const page = _statsData.slice(0, PAGE * _statsPage);
+  const more = _statsData.length > page.length;
+  el.innerHTML = page.map(statsEntryHtml).join('') +
+    (more ? `<button class="stats-load-more" onclick="_statsPage++;renderStatsList(_statsData)">Load ${Math.min(PAGE, _statsData.length - page.length)} more</button>` : '');
 }
 
 // ── Starlink power control ────────────────────────

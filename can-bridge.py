@@ -143,40 +143,15 @@ def handle_network(key, payload):
         t.start()
 
 def run_speedtest():
-    """Run speedtest-cli and publish results to MQTT."""
-    global mqtt_client_ref
-    if mqtt_client_ref is None:
-        return
-    print("Speed test starting…")
-    mqtt_client_ref.publish("van/status/network/speedtest/running", "true", retain=True)
-    upstream = get_current_upstream()
+    """Delegate to run-speedtest.py which handles Ookla binary + MQTT publishing."""
+    print("Speed test starting… (delegating to run-speedtest.py)")
     try:
-        r = subprocess.run(
-            ["speedtest-cli", "--json", "--secure"],
-            capture_output=True, text=True, timeout=120
+        subprocess.run(
+            ["python3", "/home/sgordon1024/run-speedtest.py"],
+            timeout=180
         )
-        import json as _json
-        data = _json.loads(r.stdout)
-        result = {
-            "download": round(data["download"] / 1e6, 1),
-            "upload":   round(data["upload"]   / 1e6, 1),
-            "ping":     round(data["ping"]),
-            "server":   data.get("server", {}).get("sponsor", "Unknown"),
-            "upstream": upstream,
-            "timestamp": data.get("timestamp", ""),
-            "error":    None
-        }
-        print(f"Speed test: ↓{result['download']} ↑{result['upload']} ping={result['ping']}ms via {upstream}")
     except Exception as e:
-        result = {
-            "download": None, "upload": None, "ping": None,
-            "server": None, "upstream": upstream,
-            "timestamp": "", "error": str(e)
-        }
-        print(f"Speed test failed: {e}")
-    import json as _json
-    mqtt_client_ref.publish("van/status/network/speedtest", _json.dumps(result), retain=True)
-    mqtt_client_ref.publish("van/status/network/speedtest/running", "false", retain=True)
+        print(f"Speed test failed to launch: {e}")
 
 def can_listener(mqtt_client):
     """

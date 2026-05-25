@@ -72,8 +72,8 @@ def run_ookla():
                 continue
         if data is not None:
             break
-        # Collect the error message for reporting if all retries fail
-        err_msgs = []
+        # Collect the last unique error message for reporting if all retries fail
+        err_msg = None
         for line in all_lines:
             line = line.strip()
             if not line:
@@ -81,14 +81,14 @@ def run_ookla():
             try:
                 obj = json.loads(line)
                 if obj.get('error'):
-                    err_msgs.append(obj['error'])
+                    err_msg = obj['error']
                 elif obj.get('type') == 'log' and obj.get('level') == 'error':
-                    err_msgs.append(obj.get('message', ''))
+                    err_msg = obj.get('message', '')
             except json.JSONDecodeError:
                 pass
-        last_err = '; '.join(err_msgs) if err_msgs else f'stdout={r.stdout!r} stderr={r.stderr!r}'
+        last_err = err_msg or f'exit code {r.returncode}'
     if data is None:
-        raise ValueError(f'No result after 3 attempts. Last error: {last_err}')
+        raise ValueError(f'Speed test failed: {last_err}')
     # bandwidth is bytes/sec → Mbps
     download_mbps = round(data['download']['bandwidth'] * 8 / 1_000_000, 1)
     upload_mbps   = round(data['upload']['bandwidth']   * 8 / 1_000_000, 1)
