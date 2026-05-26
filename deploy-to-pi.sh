@@ -65,6 +65,13 @@ if [ -f "$SPEEDTEST_SRC" ]; then
   sshpass -p "$PASS" scp "$SPEEDTEST_SRC" "$PI:~/run-speedtest.py" && chmod +x run-speedtest.py || echo "WARNING: run-speedtest.py copy failed"
 fi
 
+echo "=== Copying obd-bridge.py ==="
+OBD_SRC="$DIR/obd-bridge.py"; [ -f "$OBD_SRC" ] || OBD_SRC="$SCRIPT_DIR/obd-bridge.py"
+if [ -f "$OBD_SRC" ]; then
+  sshpass -p "$PASS" scp "$OBD_SRC" "$PI:~/obd-bridge.py" || echo "WARNING: obd-bridge.py copy failed"
+  sshpass -p "$PASS" ssh "$PI" 'echo windows | sudo -S systemctl restart obd-bridge 2>/dev/null && echo "obd-bridge restarted"' || echo "WARNING: obd-bridge not yet installed — run pi-setup/setup-obd.sh first"
+fi
+
 echo "=== Verifying services ==="
 sleep 3
 sshpass -p "$PASS" ssh "$PI" 'sudo systemctl is-active can-bridge starlink-bridge rope-light'
