@@ -25,8 +25,7 @@ ssh_pi_sudo() { sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no "$PI_HOST" "e
 
 echo ""
 echo "=== Installing python-obd ==="
-ssh_pi "echo $PASS | sudo -S pip3 install obd && echo 'python-obd installed'" \
-  || ssh_pi "pip3 install --user obd && echo 'python-obd installed (user)'"
+ssh_pi "echo $PASS | sudo -S pip3 install --break-system-packages obd && echo 'python-obd installed'"
 
 echo ""
 echo "=== Adding sgordon1024 to dialout group (for /dev/rfcomm0) ==="
