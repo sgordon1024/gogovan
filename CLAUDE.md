@@ -52,6 +52,7 @@ Pi CAN HAT (Waveshare 2-CH CAN HAT+)
 - `obd-bridge` — `obd-bridge.py` OBD-II data via vGate iCar Pro BT3
 - `gogovan-web` — `python3 -m http.server 80` (port 80, runs as root)
 - `nginx` — serves HTTPS on port 443 via Tailscale cert; proxies `/mqtt` WebSocket to mosquitto:9001
+- `gogovan-watchdog.timer` — runs `/usr/local/bin/gogovan-watchdog.sh` every 2 minutes; auto-switches wlan0 between T-Mobile/Starlink on internet failure and restarts Tailscale if it drops
 
 ---
 
@@ -62,7 +63,20 @@ Pi CAN HAT (Waveshare 2-CH CAN HAT+)
 | Interface | IP | Purpose |
 |---|---|---|
 | `eth0` | 192.168.8.106/24 (DHCP from GL.iNet) | LAN: connected to GL.iNet router via cable |
-| `wlan0` | 192.168.12.122/24 (T-Mobile subnet) | Used only to reach Cerbo GX for MQTT bridge |
+| `wlan0` | varies by upstream | Internet uplink + Cerbo GX MQTT bridge (see wlan0 profiles below) |
+
+**wlan0 connection profiles (NM):**
+
+| Profile | SSID | Subnet | Use |
+|---|---|---|---|
+| `preconfigured` | T-Mobile Home Internet | 192.168.12.x | Primary internet uplink; Cerbo GX (192.168.12.140) is only reachable on this subnet |
+| `wifi-blaster` | Starlink WiFi | 192.168.1.x | Fallback internet uplink when T-Mobile has no coverage |
+
+**Critical wlan0 routing fix (applied):** The T-Mobile Home Internet DHCP server injects a default route at metric 50 via RFC 3442, which breaks Tailscale by creating duplicate routes. Fixed permanently:
+```bash
+sudo nmcli connection modify preconfigured ipv4.ignore-auto-routes yes ipv4.routes "0.0.0.0/0 192.168.12.1 600"
+```
+This tells NM to ignore DHCP-provided routes and use only the explicit static route at metric 600. Do not revert this.
 
 **GL.iNet router (Apple Pi network):**
 - SSID: `Apple Pi` — this is the main network for phones, MacBook, and all van clients
@@ -103,12 +117,12 @@ Adding the dashboard to iPhone home screen (Safari → Share → Add to Home Scr
 | Device | Tailscale IP |
 |---|---|
 | Pi (vanpi) | 100.98.52.107 |
-| MacBook (wt-mbp-steve-gordon) | 100.93.110.117 |
 | iPhone (iphone-15-pro-max) | 100.102.31.31 |
 
 - Key expiry disabled on Pi in Tailscale admin panel (no re-auth needed)
-- Tailscale is **not installed on the MacBook** — use SSH via Apple Pi LAN (`ssh sgordon1024@192.168.8.106`) or via Tailscale if installed
-- iPhone has Tailscale installed; must be connected to use the HTTPS URL
+- **MacBook CANNOT use Tailscale** — it was deleted and cannot be reinstalled (work computer). Never suggest `ssh sgordon1024@100.98.52.107` when helping from the Mac. The ONLY way to SSH from the Mac is `ssh sgordon1024@192.168.8.106` while on the Apple Pi network.
+- iPhone has Tailscale installed; must be connected to use the HTTPS dashboard URL
+- **NEVER run `sudo tailscale up --reset`** — this logs the Pi out of Tailscale entirely and requires opening a browser login URL to re-authenticate. If Tailscale needs a kick, use `sudo systemctl restart tailscaled && sudo tailscale up` (no --reset).
 
 ---
 
@@ -236,8 +250,8 @@ MQTT connection auto-detects protocol: `ws://${hostname}:9001` on HTTP, `wss://$
 - Pi Tailscale IP: `100.98.52.107` (key expiry disabled — no re-auth)
 - Dashboard URL (HTTP): `http://100.98.52.107`
 - Dashboard URL (HTTPS + GPS): `https://vanpi.tail27a0b4.ts.net`
-- SSH: `ssh sgordon1024@100.98.52.107` (password: `windows`)
-- SSH (local): `ssh sgordon1024@192.168.8.106` (when on Apple Pi network)
+- SSH from **iPhone** (via Tailscale): `ssh sgordon1024@100.98.52.107` (password: `windows`)
+- SSH from **Mac** (Apple Pi LAN only): `ssh sgordon1024@192.168.8.106` — Mac CANNOT use Tailscale IP
 
 ---
 
@@ -466,6 +480,41 @@ Interior accent LED rope lights, controlled via Bluetooth LE. The `rope-light` s
 **Poll rates:** Fast gauges every 2 seconds, MIL + DTCs every 30 seconds.
 
 The engine panel in drive mode reads these topics and displays them. OBD data only updates when the vehicle ignition is on.
+
+---
+
+## Network Resilience
+
+The Pi has two internet paths via wlan0 and a watchdog that auto-recovers from outages.
+
+**Watchdog (`gogovan-watchdog.timer`):**
+- Runs every 2 minutes via systemd timer (starts 90s after boot)
+- Script: `/usr/local/bin/gogovan-watchdog.sh`
+- If `ping 8.8.8.8` fails: switches wlan0 to the other connection (preconfigured↔wifi-blaster)
+- If Tailscale is not in `Running` state: restarts `tailscaled` and runs `tailscale up`
+- Logs to syslog tag `gogovan-watchdog` — check with `journalctl -t gogovan-watchdog`
+
+**NM dispatcher scripts in `/etc/NetworkManager/dispatcher.d/`:**
+- `99-clean-routes` — when any interface comes up, removes wlan0 default routes with metric < 200 (belt-and-suspenders backup for the ignore-auto-routes fix)
+- `99-gogovan-nat` — when wlan0 comes up, installs iptables forwarding rules for uap0→wlan0 (legacy hotspot NAT, harmless to keep)
+
+**If Tailscale goes offline (manual recovery):**
+```bash
+ssh sgordon1024@192.168.8.106   # must be on Apple Pi network
+sudo systemctl restart tailscaled
+sleep 5
+sudo tailscale up               # NO --reset flag
+tailscale status                # should show vanpi as connected
+```
+
+**If Pi has no internet (manual recovery):**
+```bash
+# Check which connection is active
+nmcli -g NAME,DEVICE connection show --active | grep wlan0
+# Switch to the other one
+sudo nmcli connection up wifi-blaster   # or: preconfigured
+ping -c 3 8.8.8.8
+```
 
 ---
 
