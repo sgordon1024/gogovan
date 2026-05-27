@@ -107,51 +107,69 @@ def handle_ac(key, payload):
             send_ac("00FFFFFFFFF9FFFF")  # Confirmed step -1°F
 
 def get_current_upstream():
-    """
-    Read current upstream from shared file written by starlink-bridge.py.
-    Falls back to 'unknown' if file not present.
-    """
+    """Detect which upstream Wi-Fi connection wlan0 is using via nmcli."""
     try:
-        with open("/tmp/gogovan_upstream") as f:
-            val = f.read().strip().lower()
-            if val in ("tmobile", "starlink"):
-                return val
-    except Exception:
-        pass
+        result = subprocess.run(
+            ["nmcli", "-g", "DEVICE,CONNECTION", "device", "status"],
+            capture_output=True, text=True, timeout=5
+        )
+        for line in result.stdout.splitlines():
+            parts = line.split(":")
+            if len(parts) >= 2 and parts[0].strip() == "wlan0":
+                conn = parts[1].strip()
+                if conn == "preconfigured":
+                    return "tmobile"
+                elif conn == "wifi-blaster":
+                    return "starlink"
+                else:
+                    return "unknown"
+    except Exception as e:
+        print(f"get_current_upstream error: {e}")
     return "unknown"
 
 def handle_network(key, payload):
-    """Switch upstream Wi-Fi or trigger speed test."""
-    global mqtt_client_ref
-    if key == "upstream":
-        # Manual upstream switch — publish to starlink-bridge via dedicated topics.
-        # starlink-bridge handles the actual GL.iNet repeater switching and plug control.
-        if payload not in ("tmobile", "starlink"):
-            print(f"Unknown network target: {payload}")
-            return
-        print(f"Manual upstream switch requested → {payload}")
-        if mqtt_client_ref is not None:
-            # Power toggle drives the switch: "on" = use Starlink, "off" = use T-Mobile
-            # starlink-bridge listens to van/starlink/power for manual control.
-            # For manual upstream switch we publish directly to starlink power topic.
-            target_power = "on" if payload == "starlink" else "off"
-            mqtt_client_ref.publish("van/starlink/power", target_power)
-            print(f"Requested Starlink power → {target_power}")
-    elif key == "speedtest":
-        # Run speed test in background thread so MQTT loop stays alive
+    """Handle network commands. Upstream switching is owned by starlink-bridge.py;
+    this handler only triggers speed tests."""
+    if key == "speedtest":
         t = threading.Thread(target=run_speedtest, daemon=True)
         t.start()
+    # upstream switching is handled by starlink-bridge.py via van/network/upstream
 
 def run_speedtest():
-    """Delegate to run-speedtest.py which handles Ookla binary + MQTT publishing."""
-    print("Speed test starting… (delegating to run-speedtest.py)")
+    """Run speedtest-cli and publish results to MQTT."""
+    global mqtt_client_ref
+    if mqtt_client_ref is None:
+        return
+    print("Speed test starting…")
+    mqtt_client_ref.publish("van/status/network/speedtest/running", "true", retain=True)
+    upstream = get_current_upstream()
     try:
-        subprocess.run(
-            ["python3", "/home/sgordon1024/run-speedtest.py"],
-            timeout=180
+        r = subprocess.run(
+            ["speedtest-cli", "--json", "--secure"],
+            capture_output=True, text=True, timeout=120
         )
+        import json as _json
+        data = _json.loads(r.stdout)
+        result = {
+            "download": round(data["download"] / 1e6, 1),
+            "upload":   round(data["upload"]   / 1e6, 1),
+            "ping":     round(data["ping"]),
+            "server":   data.get("server", {}).get("sponsor", "Unknown"),
+            "upstream": upstream,
+            "timestamp": data.get("timestamp", ""),
+            "error":    None
+        }
+        print(f"Speed test: ↓{result['download']} ↑{result['upload']} ping={result['ping']}ms via {upstream}")
     except Exception as e:
-        print(f"Speed test failed to launch: {e}")
+        result = {
+            "download": None, "upload": None, "ping": None,
+            "server": None, "upstream": upstream,
+            "timestamp": "", "error": str(e)
+        }
+        print(f"Speed test failed: {e}")
+    import json as _json
+    mqtt_client_ref.publish("van/status/network/speedtest", _json.dumps(result), retain=True)
+    mqtt_client_ref.publish("van/status/network/speedtest/running", "false", retain=True)
 
 def can_listener(mqtt_client):
     """
@@ -265,24 +283,26 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe("van/light/+")
     client.subscribe("van/motor/+")
     client.subscribe("van/ac/+")
-    client.subscribe("van/network/+")
-    print("Subscribed to van/light/+, van/motor/+, van/ac/+, van/network/+")
+    client.subscribe("van/network/speedtest")  # only speedtest; upstream owned by starlink-bridge
+    print("Subscribed to van/light/+, van/motor/+, van/ac/+, van/network/speedtest")
     subprocess.run(["cansend", CAN_IFACE, f"18EEFF{SA}#0000000000008000"])
-
-    # Publish initial upstream status
-    upstream = get_current_upstream()
-    client.publish("van/status/network/upstream", upstream, retain=True)
-    print(f"Initial network upstream → {upstream}")
 
     t = threading.Thread(target=can_listener, args=(client,), daemon=True)
     t.start()
 
 def on_message(client, userdata, msg):
-    parts = msg.topic.split("/")
+    topic   = msg.topic
+    payload = msg.payload.decode().strip().lower()
+
+    # Direct speedtest trigger (subscribed as van/network/speedtest)
+    if topic == "van/network/speedtest":
+        handle_network("speedtest", payload)
+        return
+
+    parts = topic.split("/")
     if len(parts) != 3:
         return
     category, name = parts[1], parts[2]
-    payload = msg.payload.decode().strip().lower()
 
     if category == "light":
         if name == "tank-heater":
@@ -302,9 +322,6 @@ def on_message(client, userdata, msg):
     elif category == "ac":
         print(f"ac/{name} -> {payload}")
         handle_ac(name, payload)
-    elif category == "network":
-        print(f"network/{name} -> {payload}")
-        handle_network(name, payload)
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
 client.on_connect = on_connect

@@ -46,7 +46,7 @@
     body {
       max-width: 430px;
       margin: 0 auto;
-      padding: 0 0 calc(49px + env(safe-area-inset-bottom) + 24px);
+      padding: 0 0 calc(59px + env(safe-area-inset-bottom) + 24px);
       min-width: 320px;
     }
 
@@ -161,7 +161,7 @@
     }
     .offline-banner {
       position: fixed;
-      top: calc(env(safe-area-inset-top) + 8px);
+      top: 20px;
       left: 50%;
       width: calc(100vw - 32px);
       max-width: 398px;
@@ -179,14 +179,11 @@
       justify-content: center;
       gap: 6px;
       transform: translateX(-50%) translateY(calc(-100% - 30px));
-      visibility: hidden;
     }
     .offline-banner.visible {
-      visibility: visible;
       animation: banner-in 0.55s cubic-bezier(0.22,1,0.36,1) forwards;
     }
     .offline-banner.hiding {
-      visibility: visible;
       animation: banner-out 0.22s ease-in forwards;
     }
     .offline-banner-close {
@@ -292,8 +289,8 @@
     }
 
     .section-label-solo {
-      padding: 0 28px;
-      margin: 24px 0 8px;
+      padding: 0 16px;
+      margin: 16px 0 8px;
       display: block;
     }
 
@@ -301,9 +298,8 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 24px;
-      margin: 24px 0 8px;
-      min-height: 44px;
+      padding: 0 16px;
+      margin: 16px 0 8px;
     }
 
     .section-label-row.mt { margin-top: 16px; }
@@ -316,7 +312,7 @@
       transform: translateX(-50%);
       width: 100%;
       max-width: 100%;
-      height: calc(49px + env(safe-area-inset-bottom));
+      height: calc(59px + env(safe-area-inset-bottom));
       padding-bottom: env(safe-area-inset-bottom);
       background: var(--surface);
       border-top: 1px solid var(--border);
@@ -331,19 +327,19 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 3px;
+      gap: 4px;
       background: transparent;
       border: none;
       cursor: pointer;
       color: var(--txt2);
-      min-height: 49px;
+      min-height: 59px;
       -webkit-tap-highlight-color: transparent;
       transition: color 0.15s;
     }
 
     .tab-btn.active { color: var(--amber); }
-    .tab-icon { font-size: 20px; line-height: 1; display: flex; align-items: center; justify-content: center; }
-    .tab-label { font-size: 10px; font-weight: 600; letter-spacing: 0.3px; }
+    .tab-icon { font-size: 24px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+    .tab-label { font-size: 12px; font-weight: 600; letter-spacing: 0.3px; }
 
     .tab-panel { padding: 16px 0 0; }
 
@@ -360,16 +356,6 @@
     /* ── Battery hero ─────────────────────────────── */
     .batt-hero-area {
       padding: 20px 20px 14px;
-      position: relative;
-    }
-
-    .batt-hero-label {
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      color: var(--txt2);
-      margin-bottom: 8px;
     }
 
     .batt-hero-soc {
@@ -456,112 +442,54 @@
       animation: card-strike 0.9s ease-out forwards;
     }
 
-    /* ── 100% full charge coin overlay ───────────────────── */
-    #coin-overlay {
+    /* ── 100% emoji puzzle overlay ───────────────────── */
+    #puzzle-overlay {
       position: absolute;
       inset: 0;
-      background: rgba(8, 8, 18, 0.96);
+      background: rgba(11, 11, 22, 0.97);
       border-radius: var(--radius);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 14px;
+      gap: 10px;
       z-index: 20;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
-      animation: coin-overlay-in 0.55s cubic-bezier(0.34,1.56,0.64,1);
+      animation: puzzle-in 0.35s cubic-bezier(0.34,1.56,0.64,1);
     }
-    @keyframes coin-overlay-in {
-      from { opacity: 0; transform: scale(0.5); }
+    @keyframes puzzle-in {
+      from { opacity: 0; transform: scale(0.88); }
       to   { opacity: 1; transform: scale(1); }
     }
-    #coin-3d {
-      perspective: 500px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    #coin-inner {
-      position: relative;
-      display: inline-block;
-      animation: coin-spin 2.2s linear infinite;
-    }
-    #coin-gold {
-      display: block;
-      font-size: 80px;
-      font-weight: 900;
-      font-family: -apple-system, 'SF Pro Display', system-ui, sans-serif;
-      letter-spacing: -4px;
-      line-height: 1;
-      white-space: nowrap;
-      user-select: none;
-      position: relative;
-      background: linear-gradient(170deg,
-        #fffde0 0%,
-        #ffe44d 10%,
-        #ffc300 26%,
-        #c47000 46%,
-        #e09000 56%,
-        #ffc300 72%,
-        #ffe44d 86%,
-        #fffde0 100%
-      );
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      text-shadow:
-        0 2px 0 rgba(140, 70, 0, 0.9),
-        0 4px 0 rgba(90, 40, 0, 0.7),
-        0 8px 14px rgba(0, 0, 0, 0.85);
-    }
-    #coin-gold::after {
-      content: '100%';
-      position: absolute;
-      top: 0; left: 0;
-      font-size: inherit;
-      font-weight: inherit;
-      font-family: inherit;
-      letter-spacing: inherit;
-      line-height: inherit;
-      white-space: inherit;
-      background: linear-gradient(
-        110deg,
-        transparent 22%,
-        rgba(255,255,255,0.95) 50%,
-        rgba(255,255,200,0.4) 60%,
-        transparent 76%
-      );
-      background-size: 300% 100%;
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      animation: coin-shine 2.2s linear infinite;
-      pointer-events: none;
-    }
-    @keyframes coin-spin {
-      0%   { transform: rotateY(0deg); }
-      100% { transform: rotateY(360deg); }
-    }
-    @keyframes coin-shine {
-      0%   { background-position: 120% 0; }
-      15%  { background-position: 120% 0; }
-      30%  { background-position: -80% 0; }
-      44%  { background-position: -200% 0; }
-      100% { background-position: -200% 0; }
-    }
-    #coin-label {
+    #puzzle-progress {
       font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 3px;
+      font-weight: 600;
+      letter-spacing: 1px;
       text-transform: uppercase;
-      color: #ffc300;
-      opacity: 0.72;
+      color: var(--txt2);
     }
-    #coin-dismiss {
-      font-size: 11px;
-      color: rgba(255,255,255,0.22);
-      letter-spacing: 0.3px;
+    #puzzle-emoji {
+      font-size: 44px;
+      line-height: 1.1;
+      letter-spacing: 6px;
+      text-align: center;
+    }
+    #puzzle-answer {
+      font-size: 19px;
+      font-weight: 800;
+      color: var(--green);
+      text-align: center;
+      letter-spacing: -0.3px;
+      animation: pop-in 0.25s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    @keyframes pop-in {
+      from { opacity: 0; transform: scale(0.7); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    #puzzle-hint {
+      font-size: 12px;
+      color: var(--txt2);
       margin-top: 2px;
     }
 
@@ -602,6 +530,71 @@
     .power-strip-4 .power-value { font-size: clamp(13px,3.5vw,18px) !important; }
     .power-strip-4 .power-label,
     .power-strip-4 .power-sub   { font-size: 11px; }
+
+    /* ── Battery lightning animation ─────────────────── */
+    #battCard { position: relative; }
+
+    #batt-bolt {
+      position: absolute;
+      top: 50%;
+      right: 16px;
+      transform: translateY(-50%);
+      width: 54px;
+      height: 54px;
+      fill: #ffffff;
+      opacity: 0;
+      pointer-events: none;
+      filter: drop-shadow(0 0 6px rgba(255,255,255,0.9))
+              drop-shadow(0 0 18px rgba(79,195,247,0.8))
+              drop-shadow(0 0 36px rgba(79,195,247,0.4));
+    }
+
+    body.driving #batt-bolt {
+      width: 80px;
+      height: 80px;
+      right: 22px;
+      top: 44%;
+    }
+
+    #batt-flash {
+      position: absolute;
+      inset: 0;
+      background: #ffffff;
+      opacity: 0;
+      pointer-events: none;
+      border-radius: var(--radius);
+    }
+
+    @keyframes bolt-strike {
+      /* 3-stroke pattern — bright → gap → medium → gap → dim → out */
+      0%   { opacity: 0; }
+      4%   { opacity: 1; }
+      11%  { opacity: 0.02; }
+      18%  { opacity: 0.88; }
+      27%  { opacity: 0.02; }
+      33%  { opacity: 0.62; }
+      48%  { opacity: 0; }
+      100% { opacity: 0; }
+    }
+
+    @keyframes card-strike {
+      0%   { opacity: 0; }
+      4%   { opacity: 0.20; }
+      11%  { opacity: 0; }
+      18%  { opacity: 0.14; }
+      27%  { opacity: 0; }
+      33%  { opacity: 0.08; }
+      48%  { opacity: 0; }
+      100% { opacity: 0; }
+    }
+
+    #batt-bolt.bolt-flash {
+      animation: bolt-strike 0.9s ease-out forwards;
+    }
+
+    #batt-flash.card-flash {
+      animation: card-strike 0.9s ease-out forwards;
+    }
 
     /* ── Scenes ───────────────────────────────────── */
     .scenes-wrap {
@@ -648,7 +641,6 @@
       line-height: 1;
     }
 
-    /* Small dot in the corner of the active tile when lights have drifted */
     .scene-dirty-dot {
       position: absolute;
       top: 9px;
@@ -671,14 +663,11 @@
       border: 1.5px dashed var(--border);
       border-radius: 14px;
       color: var(--txt2);
-      font-size: 12px;
-      font-weight: 500;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
       transition: all 0.2s;
     }
 
-    /* ── Scene edit button ───────────────────────── */
     .scene-edit-btn {
       font-size: 12px;
       font-weight: 600;
@@ -697,7 +686,6 @@
       background: var(--amber-dim);
     }
 
-    /* ── Scene edit mode tile ────────────────────── */
     .scene-tile.edit-mode {
       grid-column: 1 / -1;
       flex-direction: row;
@@ -708,7 +696,6 @@
       min-height: 52px;
       cursor: default;
     }
-    /* Suppress the scale-down :active effect in edit mode */
     .scene-tile.edit-mode:active { transform: unset; }
 
     .scene-tile-trash {
@@ -739,22 +726,15 @@
     }
     .scene-tile-grip:active { cursor: grabbing; }
 
-    /* ── Jiggle animation ────────────────────────── */
     @keyframes scene-jiggle {
       0%   { transform: rotate(0deg); }
       30%  { transform: rotate(0.35deg); }
       70%  { transform: rotate(-0.35deg); }
       100% { transform: rotate(0deg); }
     }
-    .scene-tile.jiggle {
-      animation: scene-jiggle 0.55s ease-in-out infinite;
-      transform-origin: center center;
-    }
-    .scene-tile.drag-source {
-      opacity: 0;
-    }
+    .scene-tile.jiggle { animation: scene-jiggle 0.55s ease-in-out infinite; transform-origin: center; }
+    .scene-tile.drag-source { opacity: 0; }
 
-    /* ── Drag ghost ──────────────────────────────── */
     .scene-drag-ghost {
       position: fixed;
       pointer-events: none;
@@ -772,11 +752,9 @@
       font-size: 13px;
       font-weight: 600;
       transform: scale(1.05) rotate(1.5deg);
-      transform-origin: center center;
     }
     .scene-drag-ghost .scene-tile-grip { color: var(--txt2); }
 
-    /* ── Scene toast ─────────────────────────────── */
     #scene-toast {
       position: fixed;
       bottom: calc(env(safe-area-inset-bottom) + 84px);
@@ -796,12 +774,8 @@
       z-index: 95;
       white-space: nowrap;
     }
-    #scene-toast.show {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
+    #scene-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-    /* New scene input spans both grid columns */
     .scene-name-input-wrap {
       grid-column: 1 / -1;
       display: flex;
@@ -895,12 +869,7 @@
       padding: 10px 16px;
       position: relative;
       transition: background 0.15s;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      user-select: none;
     }
-
-    .light-row:active { background: var(--surface2); }
 
     .light-row::after {
       content: '';
@@ -914,20 +883,22 @@
 
     .light-row:last-child::after { display: none; }
 
-    /* Visual indicator only — pointer-events off so clicks fall through to the row */
     .light-toggle {
       width: 44px;
       height: 44px;
       border-radius: 50%;
       border: 1.5px solid var(--border);
       background: transparent;
+      cursor: pointer;
       flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
       transition: all 0.2s;
-      pointer-events: none;
+      -webkit-tap-highlight-color: transparent;
     }
+
+    .light-toggle:active { transform: scale(0.88); }
 
     .light-toggle svg { opacity: 0.3; transition: opacity 0.2s; }
     .light-row.on .light-toggle { background: var(--amber-dim); border-color: var(--amber); }
@@ -938,34 +909,14 @@
       font-weight: 500;
       color: var(--txt2);
       flex-shrink: 0;
-      width: 80px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
       transition: color 0.2s;
     }
 
-    .light-row.on .light-name { color: var(--txt); }
-
-    /* Min / max brightness buttons flanking the slider */
-    .dim-end-btn {
-      background: none;
-      border: none;
-      padding: 0;
-      width: 36px;
-      min-height: 44px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      cursor: pointer;
-      color: var(--txt2);
-      opacity: 0.55;
-      -webkit-tap-highlight-color: transparent;
-      transition: opacity 0.15s;
-    }
-    .dim-end-btn:active { opacity: 1; transform: scale(0.88); }
-    .light-row.on .dim-end-btn { color: var(--amber); }
+    .light-row.on .light-name { color: var(--txt); width: 100px; }
+    .light-row:not(.on) .light-name { flex: 1; width: auto; }
 
     .slider-wrap {
       flex: 1;
@@ -976,22 +927,20 @@
       min-height: 44px;
     }
 
-    /* Slider always visible; dim + neutral when light is off */
-    .light-row:not(.on) .slider-wrap { opacity: 0.38; }
+    .light-row:not(.on) .slider-wrap { display: none; }
 
     .dim-slider {
       -webkit-appearance: none;
       appearance: none;
       flex: 1;
       min-width: 0;
-      height: 14px;
-      border-radius: 7px;
+      height: 6px;
+      border-radius: 3px;
       outline: none;
       cursor: pointer;
       background: var(--surface2);
     }
 
-    /* Amber fill tracks the thumb when the light is on */
     .light-row.on .dim-slider {
       background: linear-gradient(
         to right,
@@ -1004,53 +953,72 @@
 
     .dim-slider::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 26px;
-      height: 26px;
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
       background: #fff;
       box-shadow: 0 2px 6px rgba(0,0,0,0.4);
       cursor: pointer;
-      transition: transform 0.12s;
+      transition: transform 0.15s;
     }
 
-    .dim-slider:active::-webkit-slider-thumb { transform: scale(1.18); }
-    .light-row:not(.on) .dim-slider::-webkit-slider-thumb { background: var(--txt2); box-shadow: none; }
+    .dim-slider:active::-webkit-slider-thumb { transform: scale(1.15); }
+    .light-row:not(.on) .dim-slider::-webkit-slider-thumb { background: #55557a; box-shadow: none; }
+
+    .dim-pct {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--txt2);
+      width: 34px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+
+    .light-row.on .dim-pct { color: var(--amber); }
 
     /* ── Rope lights ──────────────────────────────── */
     .rope-palette { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px 14px 14px; }
     .rope-color-btn {
-      width: 32px; height: 32px; min-width: 32px; min-height: 32px;
-      border-radius: 50%; border: none; padding: 0;
-      cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
-      -webkit-tap-highlight-color: transparent;
-      -webkit-appearance: none; appearance: none;
-      flex-shrink: 0; display: block;
+      width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent;
+      cursor: pointer; transition: transform 0.15s, border-color 0.15s;
+      -webkit-tap-highlight-color: transparent; flex-shrink: 0;
     }
     .rope-color-btn:active { transform: scale(0.85); }
-    .rope-color-btn.active { box-shadow: 0 0 0 2.5px var(--amber); }
-    .rope-effects { padding: 0 14px 14px; }
-    .rope-effect-btn {
-      width: 100%; height: 36px; border-radius: 18px; border: none;
-      cursor: pointer; font-size: 13px; font-weight: 600; letter-spacing: 0.3px;
-      color: #000;
-      background: linear-gradient(90deg, #ff2222, #ff7700, #ffee00, #22cc44, #00eeff, #2244ff, #8822ff);
-      transition: opacity 0.15s, transform 0.15s;
-      -webkit-tap-highlight-color: transparent;
+    .rope-color-btn.active { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber); }
+
+    /* Color Cycle — same circle size as swatches, rainbow gradient */
+    .rope-cycle-btn {
+      width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent;
+      background: conic-gradient(#ff2222 0%, #ff7700 16%, #ffee00 33%, #22cc44 50%, #00eeff 66%, #2244ff 82%, #8822ff 100%);
+      cursor: pointer; transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+      -webkit-tap-highlight-color: transparent; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
     }
-    .rope-effect-btn:active { transform: scale(0.97); opacity: 0.85; }
-    .rope-effect-btn.active { box-shadow: 0 0 0 2px var(--amber), 0 0 14px rgba(255,160,64,0.3); }
-    .rope-off-btn { background: rgba(239,83,80,0.15); color: var(--red); border-color: var(--red); }
-    .rope-off-btn:active { background: rgba(239,83,80,0.3); }
+    .rope-cycle-btn:active { transform: scale(0.85); }
+    .rope-cycle-btn.active { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber), 0 0 10px rgba(255,160,64,0.4); }
 
     .rope-slider-row {
       display: flex; align-items: center; gap: 10px;
-      padding: 4px 14px;
+      padding: 6px 14px;
     }
     .rope-slider-row svg { flex-shrink: 0; opacity: 0.6; }
-    .rope-slider-row .dim-slider { flex: 1; }
-    .rope-slider-row .dim-pct { font-size: 13px; font-weight: 600; color: var(--txt2); width: 34px; text-align: right; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+    /* Rope sliders always show the amber fill (same style as active light rows) */
+    .rope-slider-row .dim-slider {
+      flex: 1;
+      background: linear-gradient(
+        to right,
+        var(--amber) 0%,
+        var(--amber) var(--pct, 0%),
+        var(--surface2) var(--pct, 0%),
+        var(--surface2) 100%
+      );
+    }
+    .rope-slider-row .dim-pct { font-size: 13px; font-weight: 600; color: var(--amber); width: 34px; text-align: right; font-variant-numeric: tabular-nums; flex-shrink: 0; }
     .rope-slider-row.speed-row { opacity: 0.4; transition: opacity 0.2s; }
+    .rope-slider-row.speed-row .dim-pct { color: var(--txt2); }
     .rope-slider-row.speed-row.active { opacity: 1; }
+    .rope-slider-row.speed-row.active .dim-pct { color: var(--amber); }
 
     /* ── Climate ──────────────────────────────────── */
     .climate-card {
@@ -1076,7 +1044,7 @@
     .climate-mode.off { color: var(--txt2); }
 
     .climate-temp-actual {
-      font-size: clamp(56px, 15vw, 80px);
+      font-size: clamp(34px, 9vw, 42px);
       font-weight: 700;
       letter-spacing: -1.5px;
       line-height: 1;
@@ -1296,6 +1264,8 @@
       padding: 16px 20px calc(20px + env(safe-area-inset-bottom));
       width: 100%;
       max-width: 430px;
+      max-height: 82vh;
+      overflow-y: auto;
       animation: slideUp 0.28s cubic-bezier(0.32, 0.72, 0, 1);
     }
 
@@ -1331,79 +1301,40 @@
 
     .theme-row {
       display: flex;
-      gap: 8px;
+      gap: 10px;
       margin-bottom: 20px;
-      flex-wrap: nowrap;
-      justify-content: center;
+      flex-wrap: wrap;
+      justify-content: flex-start;
     }
 
     .theme-swatch {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       cursor: pointer;
-      flex: 1;
-      min-width: 0;
-      position: relative;
+      width: 56px;
+      flex-shrink: 0;
       -webkit-tap-highlight-color: transparent;
     }
-
-    .swatch-delete {
-      position: absolute;
-      top: -5px;
-      right: -2px;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: rgba(40,40,60,0.85);
-      border: 1.5px solid rgba(255,255,255,0.25);
-      color: #fff;
-      font-size: 11px;
-      line-height: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      z-index: 3;
-      transition: background 0.15s, transform 0.1s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .swatch-delete:active { transform: scale(0.85); background: rgba(220,50,50,0.9); }
-
-    .theme-restore-btn {
-      background: none;
-      border: none;
-      color: var(--txt2);
-      font-size: 12px;
-      cursor: pointer;
-      padding: 0 0 16px;
-      text-decoration: underline;
-      text-underline-offset: 2px;
-      display: block;
-      margin: 0 auto;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .theme-restore-btn:active { opacity: 0.6; }
 
     .swatch-circle {
-      width: 48px;
-      height: 48px;
-      border-radius: 14px;
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
       position: relative;
-      border: 2px solid transparent;
+      border: 2.5px solid transparent;
       transition: border-color 0.2s, transform 0.15s;
       overflow: hidden;
       flex-shrink: 0;
     }
 
-    .swatch-circle::after {
-      content: '';
+    .swatch-dot {
       position: absolute;
-      bottom: 6px;
-      right: 6px;
-      width: 14px;
-      height: 14px;
+      bottom: 7px;
+      right: 7px;
+      width: 13px;
+      height: 13px;
       border-radius: 50%;
     }
 
@@ -1413,36 +1344,14 @@
       display: none;
       align-items: center;
       justify-content: center;
-      font-size: 18px;
-      background: rgba(0,0,0,0.25);
     }
 
-    .swatch-dot {
-      position: absolute; bottom: 6px; right: 6px;
-      width: 13px; height: 13px; border-radius: 50%;
-    }
-    .theme-swatch.active .swatch-circle { border-color: var(--amber); }
+    .theme-swatch.active .swatch-circle { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber); }
     .theme-swatch.active .swatch-check { display: flex; }
-    .theme-swatch:active .swatch-circle { transform: scale(0.93); }
-    .theme-swatch.saved .swatch-name { opacity: 0.55; }
-
-    .theme-save-bar {
-      display: none; align-items: center; gap: 10px;
-      padding: 12px 16px 8px; margin-top: 6px;
-      border-top: 1px solid var(--border);
-    }
-    .theme-save-bar.visible { display: flex; }
-    .theme-save-label { flex: 1; font-size: 12px; color: var(--txt2); font-style: italic; }
-    .theme-save-btn {
-      padding: 7px 20px; background: var(--amber); color: #000;
-      border: none; border-radius: 20px; font-size: 13px; font-weight: 700;
-      cursor: pointer; letter-spacing: 0.3px; -webkit-tap-highlight-color: transparent;
-      transition: opacity 0.15s;
-    }
-    .theme-save-btn:active { opacity: 0.75; }
+    .theme-swatch:active .swatch-circle { transform: scale(0.91); }
 
     .swatch-name {
-      font-size: 10px;
+      font-size: 9.5px;
       font-weight: 600;
       color: var(--txt2);
       text-align: center;
@@ -1583,20 +1492,8 @@
     body.driving #powerStrip {
       flex: 1;
       min-height: 0;
-      position: relative;
-      grid-template-columns: 1fr 1fr !important;
-      grid-template-rows: 1fr 1fr;
+      grid-template-rows: 1fr;
       align-items: stretch;
-    }
-    body.driving #powerStrip::before {
-      content: '';
-      position: absolute;
-      left: 0; right: 0;
-      top: 50%;
-      height: 1px;
-      background: var(--border);
-      pointer-events: none;
-      z-index: 1;
     }
 
     /* Center content within taller cells, scale text to fill space */
@@ -1608,16 +1505,16 @@
       gap: 6px;
     }
     body.driving .power-label {
-      font-size: clamp(16px,4vw,26px);
+      font-size: clamp(13px,2.8vw,20px);
       white-space: nowrap;
     }
     body.driving .power-value {
-      font-size: clamp(30px,7.5vw,54px) !important;
+      font-size: clamp(22px,5.5vw,40px) !important;
       letter-spacing: -1px;
       white-space: nowrap;
     }
     body.driving .power-sub {
-      font-size: clamp(13px,2.8vw,20px);
+      font-size: clamp(12px,2vw,16px);
       white-space: nowrap;
     }
 
@@ -1629,6 +1526,12 @@
     body.driving #tab-internet {
       padding-left: 0;
       padding-right: 0;
+    }
+
+    body.driving #tab-climate {
+      padding-left: 0;
+      padding-right: 0;
+      overflow-y: auto;
     }
 
     body.driving .section-label-solo {
@@ -1688,142 +1591,6 @@
       overflow: hidden;
     }
     #drive-explore-panel.active { display: flex; }
-
-    /* ── Engine tab overlay ─────────────────────── */
-    #drive-engine-panel {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      bottom: calc(88px + env(safe-area-inset-bottom));
-      padding-top: env(safe-area-inset-top);
-      flex-direction: column;
-      background: var(--surface);
-      z-index: 20;
-      overflow: hidden;
-    }
-    #drive-engine-panel.active { display: flex; }
-
-    #engine-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 16px 8px;
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    #engine-title {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 1.2px;
-      text-transform: uppercase;
-      color: var(--txt2);
-    }
-    #engine-status-pill {
-      font-size: 12px;
-      font-weight: 600;
-      padding: 3px 10px;
-      border-radius: 20px;
-      background: rgba(255,255,255,0.08);
-      color: var(--txt2);
-      transition: color 0.3s, background 0.3s;
-    }
-    #engine-status-pill.connected {
-      color: var(--green);
-      background: rgba(0,230,118,0.12);
-    }
-    #engine-status-pill.error {
-      color: var(--red);
-      background: rgba(255,23,68,0.12);
-    }
-
-    #engine-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      flex: 1;
-      min-height: 0;
-    }
-    .engine-cell {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: clamp(8px, 2vw, 16px);
-      gap: 6px;
-      border-right: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-    .engine-cell:nth-child(even) { border-right: none; }
-    .engine-cell:nth-child(3),
-    .engine-cell:nth-child(4) { border-bottom: none; }
-    .engine-value {
-      font-size: clamp(32px, 8vw, 54px);
-      font-weight: 200;
-      font-variant-numeric: tabular-nums;
-      letter-spacing: -1px;
-      line-height: 1;
-      color: var(--txt);
-      transition: color 0.4s;
-    }
-    #engine-rpm-cell .engine-value {
-      font-size: clamp(36px, 9vw, 64px);
-    }
-    .engine-label {
-      font-size: clamp(11px, 2.8vw, 15px);
-      font-weight: 700;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      color: var(--txt2);
-    }
-    .engine-value.warn  { color: var(--amber); }
-    .engine-value.alert { color: var(--red); }
-
-    #engine-throttle-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 16px;
-      border-top: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    #engine-throttle-row .engine-label { white-space: nowrap; }
-    #engine-throttle-bar {
-      flex: 1;
-      height: 8px;
-      background: rgba(255,255,255,0.1);
-      border-radius: 4px;
-      overflow: hidden;
-    }
-    #engine-throttle-fill {
-      height: 100%;
-      width: 0%;
-      background: var(--amber);
-      border-radius: 4px;
-      transition: width 0.4s ease-out;
-    }
-    #engine-throttle-val {
-      font-size: 14px;
-      font-weight: 600;
-      font-variant-numeric: tabular-nums;
-      color: var(--txt);
-      min-width: 36px;
-      text-align: right;
-    }
-
-    #engine-dtc-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 16px;
-      border-top: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    #engine-dtc-text {
-      font-size: 13px;
-      color: var(--txt2);
-      flex: 1;
-    }
-    #engine-dtc-row.has-codes #engine-dtc-text { color: var(--red); font-weight: 600; }
-    #engine-mil-icon { display: flex; align-items: center; flex-shrink: 0; }
 
     /* Top row: rest stop left, speedometer right */
     #drive-top-row {
@@ -1904,32 +1671,6 @@
       font-size: clamp(11px, 2.8vw, 14px);
       color: var(--txt2);
     }
-    #drive-rest-category {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.9px;
-      text-transform: uppercase;
-      color: var(--txt2);
-      opacity: 0.7;
-    }
-    #drive-rest-dir-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      padding: 3px 9px;
-      background: rgba(255,255,255,0.07);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--txt2);
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      margin-top: 2px;
-      text-decoration: none;
-    }
-    #drive-rest-dir-btn[hidden] { display: none; }
-    #drive-rest-dir-btn:active { opacity: 0.6; }
     /* ── Explore bottom row ──────────────────────── */
     #explore-bottom-row {
       display: flex;
@@ -1998,23 +1739,20 @@
     }
     #explore-facts-box:active { opacity: 0.75; }
     #explore-facts-place {
-      font-size: clamp(12px, 3vw, 16px);
+      font-size: clamp(10px, 2.5vw, 13px);
       font-weight: 700;
       letter-spacing: 0.8px;
       text-transform: uppercase;
       color: var(--amber);
     }
     #explore-facts-text {
-      font-size: clamp(20px, 5.5vw, 28px);
+      font-size: clamp(13px, 3.2vw, 17px);
       color: var(--txt);
       text-align: center;
-      line-height: 1.4;
+      line-height: 1.45;
       flex: 1;
-      min-height: 0;
       display: flex;
       align-items: center;
-      justify-content: center;
-      padding: 10px 0;
     }
     #explore-facts-footer {
       display: flex;
@@ -2023,10 +1761,8 @@
       width: 100%;
       gap: 8px;
     }
-    #explore-facts-hint { font-size: 13px; color: var(--txt2); }
-    #explore-facts-hint.speaking { color: var(--amber); animation: hint-pulse 1s ease-in-out infinite; }
-    @keyframes hint-pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
-    #explore-facts-progress { font-size: 13px; color: var(--txt2); font-variant-numeric: tabular-nums; }
+    #explore-facts-hint { font-size: 11px; color: var(--txt2); }
+    #explore-facts-progress { font-size: 11px; color: var(--txt2); font-variant-numeric: tabular-nums; }
     #drive-rest-weather {
       display: flex;
       align-items: center;
@@ -2059,10 +1795,10 @@
     }
 
     #drive-speed-number {
-      font-size: clamp(72px, 20vw, 110px);
+      font-size: clamp(96px, 28vw, 148px);
       font-weight: 200;
       font-family: 'Courier New', 'Lucida Console', monospace;
-      letter-spacing: 4px;
+      letter-spacing: 6px;
       line-height: 1;
       color: #fff;
       font-variant-numeric: tabular-nums;
@@ -2072,23 +1808,15 @@
         0 0 48px rgba(255,255,255,0.15);
     }
 
-    @keyframes speed-blink {
-      0%,  49% { opacity: 1; }
-      50%, 99% { opacity: 0.08; }
-    }
-    #drive-speed-number.blinking {
-      animation: speed-blink 0.45s steps(1) infinite;
-    }
-
     #drive-speed-unit {
-      font-size: 12px;
+      font-size: 14px;
       font-weight: 700;
       font-family: 'Courier New', 'Lucida Console', monospace;
       letter-spacing: 8px;
       text-transform: uppercase;
       color: var(--txt2);
       opacity: 0.7;
-      margin-top: 4px;
+      margin-top: 6px;
       text-shadow: none;
     }
 
@@ -2162,7 +1890,7 @@
 
     #ptr-indicator {
       position: fixed;
-      top: env(safe-area-inset-top);
+      top: 0;
       left: 50%;
       transform: translateX(-50%) translateY(-60px);
       width: 44px;
@@ -2259,15 +1987,6 @@
     .stats-filters { display:flex; gap:8px; padding:12px 16px 4px; flex-shrink:0; }
     .stats-filter { flex:1; padding:8px 4px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--txt2); font-size:13px; font-weight:600; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:background .15s, color .15s; }
     .stats-filter.active { background:var(--amber); color:#000; border-color:transparent; }
-    .stats-timerange { display:flex; gap:6px; padding:6px 16px 0; flex-shrink:0; }
-    .stats-tr { flex:1; padding:5px 4px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--txt2); font-size:12px; font-weight:600; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:background .15s, color .15s, border-color .15s; }
-    .stats-tr.active { background:var(--surface); color:var(--txt); border-color:var(--txt2); }
-    .chart-tooltip { position:absolute; top:6px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:8px 11px; pointer-events:none; z-index:10; min-width:118px; max-width:155px; box-shadow:0 4px 16px rgba(0,0,0,.45); }
-    .ctt-date { font-size:11px; color:var(--txt2); margin-bottom:2px; }
-    .ctt-carrier { font-size:11px; font-weight:700; color:var(--amber); margin-bottom:3px; }
-    .ctt-carrier.starlink { color:var(--blue); }
-    .ctt-speeds { font-size:13px; font-weight:700; color:var(--txt); }
-    .ctt-ping { font-size:11px; color:var(--txt2); margin-top:2px; }
     .stats-scroll { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom:calc(16px + env(safe-area-inset-bottom)); }
     .stats-chart-wrap { margin:12px 16px 0; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:12px 8px 8px; }
     .stats-chart-legend { display:flex; gap:16px; padding:8px 8px 0; }
@@ -2292,8 +2011,6 @@
     .stats-entry-meta { font-size:12px; color:var(--txt2); margin-top:4px; }
     .stats-gps-link { color:var(--blue); text-decoration:none; }
     .stats-empty { text-align:center; padding:48px 24px; color:var(--txt2); font-size:14px; }
-    .stats-load-more { display:block; width:calc(100% - 32px); margin:4px 16px 16px; padding:12px; background:transparent; color:var(--txt2); font-size:14px; font-weight:600; border:1px solid var(--border); border-radius:12px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
-    .stats-load-more:active { opacity:.7; }
     .stats-no-chart { display:flex; align-items:center; justify-content:center; height:120px; color:var(--txt2); font-size:13px; }
 
     /* ── Starlink power card ──────────────────────────── */
@@ -2354,6 +2071,23 @@
       from { opacity: 0; transform: translateX(-50%) translateY(14px); }
       to   { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
+    /* ── Manual override chip ───────────────────── */
+    .net-override-chip { display:flex; align-items:center; justify-content:space-between; margin:8px 16px 0; padding:10px 14px; background:rgba(255,160,0,0.1); border:1px solid rgba(255,160,0,0.3); border-radius:10px; }
+    .net-override-chip[hidden] { display:none !important; }
+    .net-override-text { font-size:13px; color:var(--amber); font-weight:500; }
+    .net-override-clear { background:none; border:none; color:var(--amber); font-size:12px; font-weight:600; cursor:pointer; padding:2px 6px; -webkit-tap-highlight-color:transparent; opacity:0.8; }
+    .net-override-clear:active { opacity:1; }
+    /* ── Warmup progress bar ─────────────────────── */
+    .net-warmup-wrap { margin:10px 0 2px; }
+    .net-warmup-bar { height:4px; background:var(--border); border-radius:2px; overflow:hidden; margin-bottom:6px; }
+    .net-warmup-fill { height:100%; background:var(--amber); border-radius:2px; transition:width 1s linear; width:0%; }
+    .net-warmup-eta { font-size:12px; color:var(--txt2); }
+    /* ── State-driven status icon color ─────────── */
+    .net-status-icon.state-starlink { color:var(--blue); }
+    .net-status-icon.state-tmobile  { color:var(--green); }
+    .net-status-icon.state-warmup   { color:var(--amber); }
+    .net-status-icon.state-reverting{ color:var(--txt2); }
+
     .starlink-quality-banner {
       position: fixed;
       bottom: calc(49px + env(safe-area-inset-bottom) + 10px);
@@ -2423,14 +2157,12 @@ safe-buffer/index.js:
 
   <header>
     <div id="modeChip" class="mode-chip">
-      <span id="modeChipIcon"></span>
+      <span id="modeChipIcon">🚗</span>
       <span id="modeChipLabel">Driving</span>
     </div>
   </header>
 
   <!-- ARRIVED TOAST -->
-  <div id="scene-toast"></div>
-
   <div id="arrived-toast" class="arrived-toast">
     <span class="arrived-toast-msg">Restore lights from before driving?</span>
     <button class="arrived-toast-restore" onclick="restorePreDriveLights()">Restore</button>
@@ -2444,8 +2176,8 @@ safe-buffer/index.js:
   <div id="starlinkQualityBanner" class="starlink-quality-banner" hidden>
     <svg class="starlink-quality-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
     <div class="starlink-quality-body">
-      <div class="starlink-quality-title">Starlink connection quality is poor</div>
-      <div class="starlink-quality-sub">High latency or packet loss detected. Could be dish placement, weak signal between routers, or a temporary Starlink blip.</div>
+      <div class="starlink-quality-title">Starlink may be obstructed</div>
+      <div class="starlink-quality-sub">High latency detected — the dish may have a blocked sky view.</div>
     </div>
     <button class="starlink-quality-dismiss" onclick="dismissQualityBanner()" aria-label="Dismiss">
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
@@ -2465,9 +2197,9 @@ safe-buffer/index.js:
 
     <!-- Drive mode top row: rest stop (left) + speed (right) -->
     <div id="drive-power-detail">
+    <span class="section-label section-label-solo">Battery</span>
     <div class="card" id="battCard">
       <div class="batt-hero-area">
-        <div class="batt-hero-label">Battery</div>
         <div class="batt-hero-soc" id="battPct"><span class="skel">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
         <div class="batt-hero-voltage" id="battSub"><span class="skel">&nbsp;&nbsp;&nbsp;</span></div>
         <!-- charging lightning bolt — visible only when animating -->
@@ -2502,16 +2234,6 @@ safe-buffer/index.js:
       </div>
       <!-- card-wide flash overlay for lightning effect -->
       <div id="batt-flash" aria-hidden="true"></div>
-      <!-- 100% full charge coin -->
-      <div id="coin-overlay" hidden onclick="closeCoin()">
-        <div id="coin-3d">
-          <div id="coin-inner">
-            <span id="coin-gold">100%</span>
-          </div>
-        </div>
-        <div id="coin-label">Fully Charged</div>
-        <div id="coin-dismiss">tap to dismiss</div>
-      </div>
     </div>
 
     <div class="card" id="drive-mode-card">
@@ -2528,9 +2250,7 @@ safe-buffer/index.js:
     </div><!-- /#drive-power-detail -->
 
     <div id="inverter-section">
-    <div class="section-label-row mt">
-      <span class="section-label">Inverter</span>
-    </div>
+    <span class="section-label section-label-solo">Inverter</span>
     <div class="card">
       <div class="inverter-card">
         <div class="inv-shore-row">
@@ -2540,10 +2260,10 @@ safe-buffer/index.js:
         <div class="clim-group">
           <span class="clim-group-label">Mode</span>
           <div class="clim-seg">
-            <button class="clim-seg-btn" id="invMode3" onclick="setInverterMode(3)">On</button>
-            <button class="clim-seg-btn" id="invMode1" onclick="setInverterMode(1)">Charger</button>
-            <button class="clim-seg-btn" id="invMode2" onclick="setInverterMode(2)">Inverter</button>
-            <button class="clim-seg-btn" id="invMode4" onclick="setInverterMode(4)">Off</button>
+            <button class="clim-seg-btn active" id="invMode3" onclick="setInverterMode(3)">On</button>
+            <button class="clim-seg-btn"        id="invMode1" onclick="setInverterMode(1)">Charger</button>
+            <button class="clim-seg-btn"        id="invMode2" onclick="setInverterMode(2)">Inverter</button>
+            <button class="clim-seg-btn"        id="invMode4" onclick="setInverterMode(4)">Off</button>
           </div>
         </div>
         <div class="inv-limit">
@@ -2569,13 +2289,13 @@ safe-buffer/index.js:
     <div class="scenes-wrap">
       <div class="scenes-grid" id="scenesScroll"></div>
     </div>
-    <div class="card" style="padding-bottom:12px">
+    <div class="card">
       <div id="lightsList"></div>
     </div>
-    <span class="section-label section-label-solo" style="margin-top:16px">Rope Lights</span>
+    <span class="section-label section-label-solo">Rope Lights</span>
     <div class="card">
-      <div class="light-row" id="ropeRow" onclick="toggleRopeLight()">
-        <span class="light-toggle" aria-hidden="true">
+      <div class="light-row" id="ropeRow">
+        <button class="light-toggle" id="ropeToggle" onclick="toggleRopeLight()" aria-label="Rope lights">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--txt2)" stroke-width="2.5" stroke-linecap="round" id="ropeIcon">
             <circle cx="12" cy="12" r="5"/>
             <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
@@ -2583,7 +2303,7 @@ safe-buffer/index.js:
             <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
             <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
           </svg>
-        </span>
+        </button>
         <span class="light-name">Rope Lights</span>
       </div>
       <div class="rope-palette">
@@ -2601,13 +2321,15 @@ safe-buffer/index.js:
         <button class="rope-color-btn" id="ropePurple" onclick="setRopeColor('purple')" style="background:#8822ff" title="Purple"></button>
         <button class="rope-color-btn" id="ropePink"   onclick="setRopeColor('pink')"   style="background:#ff44aa" title="Pink"></button>
         <button class="rope-color-btn" id="ropeWhite"  onclick="setRopeColor('white')"  style="background:#ffffff" title="White"></button>
-        <button class="rope-color-btn" id="ropeEffectCycle"   onclick="setRopeEffect('cycle')"   style="background:conic-gradient(from 0deg,hsl(0,100%,55%) 0deg,hsl(45,100%,55%) 45deg,hsl(90,100%,45%) 90deg,hsl(150,100%,45%) 135deg,hsl(180,100%,50%) 180deg,hsl(210,100%,55%) 225deg,hsl(270,100%,60%) 270deg,hsl(300,100%,55%) 315deg,hsl(360,100%,55%) 360deg)" title="Color Cycle"></button>
-        <button class="rope-color-btn" id="ropeEffectCandle"  onclick="setRopeEffect('candle')"  style="background:radial-gradient(circle at 50% 65%, #ffee55 0%, #ff8800 45%, #993300 100%)" title="Candle"></button>
-        <button class="rope-color-btn" id="ropeEffectBreathe" onclick="setRopeEffect('breathe')" style="background:radial-gradient(circle, #e8f0ff 0%, #6688ff 55%, #1133cc 100%)" title="Breathe"></button>
-        <button class="rope-color-btn" id="ropeEffectAurora"  onclick="setRopeEffect('aurora')"  style="background:conic-gradient(from 160deg, #003322, #00bb55, #0055cc, #6600aa, #003322)" title="Aurora"></button>
-        <button class="rope-color-btn" id="ropeEffectStrobe"  onclick="setRopeEffect('strobe')"  style="background:repeating-linear-gradient(90deg,#ffffff 0px,#ffffff 5px,#111111 5px,#111111 10px)" title="Strobe"></button>
+        <!-- Color Cycle: round rainbow circle, same size as color swatches -->
+        <button class="rope-cycle-btn" id="ropeEffectCycle" onclick="setRopeEffect('cycle')" title="Color Cycle">
+          <!-- sparkle / play icon -->
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.7)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+          </svg>
+        </button>
       </div>
-      <div class="rope-slider-row" style="padding-top:8px;padding-bottom:4px">
+      <div class="rope-slider-row">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--txt2)" stroke-width="2" stroke-linecap="round">
           <circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/>
           <line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/>
@@ -2618,7 +2340,7 @@ safe-buffer/index.js:
           oninput="setRopeBrightness(this.value)" style="--pct:100%">
         <span class="dim-pct" id="ropeBrightPct">100%</span>
       </div>
-      <div class="rope-slider-row speed-row" id="ropeSpeedRow" style="padding-bottom:12px">
+      <div class="rope-slider-row speed-row" id="ropeSpeedRow">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--txt2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
         </svg>
@@ -2628,6 +2350,7 @@ safe-buffer/index.js:
       </div>
     </div>
   </div>
+  <div id="scene-toast"></div>
 
   <!-- TAB: CLIMATE -->
   <div id="tab-climate" class="tab-panel" hidden>
@@ -2702,9 +2425,13 @@ safe-buffer/index.js:
     <div class="card" style="margin-bottom:12px">
       <div class="net-status-row">
         <div class="net-status-icon" id="netStatusIcon"><svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg></div>
-        <div>
+        <div style="flex:1">
           <div class="net-status-label" id="netStatusLabel">Detecting…</div>
           <div class="net-status-sub" id="netStatusSub">Checking upstream</div>
+          <div class="net-warmup-wrap" id="netWarmupWrap" hidden>
+            <div class="net-warmup-bar"><div class="net-warmup-fill" id="netWarmupFill"></div></div>
+            <div class="net-warmup-eta" id="netWarmupEta">Warming up…</div>
+          </div>
         </div>
       </div>
     </div>
@@ -2721,7 +2448,12 @@ safe-buffer/index.js:
         <div class="net-btn-sub">Fallback</div>
       </button>
     </div>
-    <p class="net-hint">Switching takes ~10 seconds. GoGoVan internet will be briefly interrupted.</p>
+    <p class="net-hint">Switching to Starlink takes ~2 minutes while the dish warms up. T-Mobile is instant.</p>
+    <!-- Manual override chip — only shown while override is active -->
+    <div class="net-override-chip" id="netOverrideChip" hidden>
+      <span class="net-override-text">Manual override · auto resumes in 30 min</span>
+      <button class="net-override-clear" onclick="clearManualOverride()">Resume Auto</button>
+    </div>
 
     <!-- Speed test -->
     <span class="section-label section-label-solo">Speed Test</span>
@@ -2795,19 +2527,18 @@ safe-buffer/index.js:
       </div>
       <!-- Threshold slider — only active when auto is on -->
       <div class="starlink-thresh-row disabled" id="starlinkThreshRow">
-        <span class="thresh-label">Switch when below</span>
+        <span class="thresh-label">Switch on below</span>
         <div class="thresh-slider-wrap">
-          <span class="thresh-end-label">1</span>
+          <span class="thresh-end-label">0</span>
           <input type="range" class="dim-slider" id="threshSlider"
-            min="1" max="25" value="5" style="--pct:20%"
+            min="0" max="100" value="35" style="--pct:35%"
             oninput="onThreshInput(this)" onchange="onThreshChange(this)"
-            aria-label="T-Mobile speed threshold (Mbps)">
-          <span class="thresh-end-label">25</span>
+            aria-label="T-Mobile signal threshold">
+          <span class="thresh-end-label">100</span>
         </div>
-        <span class="thresh-val-label" id="threshVal">5</span><span style="font-size:11px;color:var(--txt2);margin-left:2px">Mbps</span>
+        <span class="thresh-val-label" id="threshVal">35</span>
       </div>
-      <div class="net-hint" id="starlinkAutoHint" style="padding:0 16px 14px;text-align:left">When on, Starlink powers up if T-Mobile speed drops below <span id="threshHintVal">5</span> Mbps.</div>
-      <div class="net-hint" id="starlinkManualHint" style="padding:0 16px 14px;text-align:left" hidden>Auto-switch off — the power button controls the dish directly. No automatic switching or loops.</div>
+      <div class="net-hint" style="padding:0 16px 14px;text-align:left">When on, Starlink powers up if T-Mobile signal drops below <span id="threshHintVal">35</span>.</div>
     </div>
   </div>
 
@@ -2825,16 +2556,9 @@ safe-buffer/index.js:
       <button class="stats-filter" data-f="tmobile" onclick="setStatsFilter('tmobile')">T-Mobile</button>
       <button class="stats-filter" data-f="starlink" onclick="setStatsFilter('starlink')">Starlink</button>
     </div>
-    <div class="stats-timerange">
-      <button class="stats-tr" data-tr="day" onclick="setStatsTimeRange('day')">Day</button>
-      <button class="stats-tr" data-tr="week" onclick="setStatsTimeRange('week')">Week</button>
-      <button class="stats-tr" data-tr="month" onclick="setStatsTimeRange('month')">Month</button>
-      <button class="stats-tr active" data-tr="all" onclick="setStatsTimeRange('all')">All Time</button>
-    </div>
     <div class="stats-scroll">
-      <div class="stats-chart-wrap" style="position:relative">
-        <svg id="statsChart" width="100%" style="display:block;touch-action:none"></svg>
-        <div id="chartTooltip" class="chart-tooltip" style="display:none"></div>
+      <div class="stats-chart-wrap">
+        <svg id="statsChart" width="100%" style="display:block"></svg>
         <div class="stats-chart-legend">
           <div class="stats-legend-item"><div class="stats-legend-line" style="background:var(--amber)"></div> T-Mobile ↓</div>
           <div class="stats-legend-item"><div class="stats-legend-dash" style="border-color:var(--amber)"></div> T-Mobile ↑</div>
@@ -2861,10 +2585,6 @@ safe-buffer/index.js:
       <div class="theme-row" id="vividRow"></div>
       <div class="theme-group-label">Special</div>
       <div class="theme-row" id="specialRow"></div>
-      <div class="theme-save-bar" id="themeSaveBar">
-        <span class="theme-save-label" id="themeSaveLabel">Previewing</span>
-        <button class="theme-save-btn" onclick="saveTheme()">Save</button>
-      </div>
     </div>
   </div>
 
@@ -2910,9 +2630,9 @@ safe-buffer/index.js:
       <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg>
       Internet
     </button>
-    <button class="drive-nav-btn" id="driveNavEngine" onclick="switchDriveTab('engine')">
-      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"/><path d="m15 5 3 3"/></svg>
-      Engine
+    <button class="drive-nav-btn" id="driveNavClimate" onclick="switchDriveTab('climate')">
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="22"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></svg>
+      Climate
     </button>
   </nav>
 
@@ -2920,9 +2640,8 @@ safe-buffer/index.js:
   <div id="drive-explore-panel">
     <!-- Top row: rest stop + speedometer (same layout as before) -->
     <div id="drive-top-row">
-      <div id="drive-rest-box" onclick="handleRestBoxClick(event)">
+      <div id="drive-rest-box">
         <div id="drive-rest-spinner" hidden></div>
-        <div id="drive-rest-category">Rest Areas</div>
         <div id="drive-rest-icon"></div>
         <div id="drive-rest-name">Finding rest stops…</div>
         <div id="drive-rest-meta" style="display:none">
@@ -2930,9 +2649,6 @@ safe-buffer/index.js:
           <span id="drive-rest-time"></span>
           <span id="drive-rest-exit"></span>
         </div>
-        <button id="drive-rest-dir-btn" hidden onclick="openPOIDirections(event)">
-          ↗ Directions
-        </button>
       </div>
       <div id="drive-speed-box">
         <div id="drive-speed-number">—</div>
@@ -2952,50 +2668,15 @@ safe-buffer/index.js:
       </div>
     </div>
     <!-- Local facts strip -->
-    <div id="explore-facts-box" onclick="tapLocalFact()">
+    <div id="explore-facts-box" onclick="cycleLocalFact()">
       <div id="explore-facts-place"></div>
       <div id="explore-facts-text">Loading local facts…</div>
       <div id="explore-facts-footer">
-        <span id="explore-facts-hint">tap to hear</span>
+        <span id="explore-facts-hint">tap to cycle</span>
         <span id="explore-facts-progress"></span>
       </div>
     </div>
     <div id="drive-gps-status" style="font-size:13px;color:var(--txt2);padding:4px 12px;text-align:center;flex-shrink:0;"></div>
-  </div>
-
-  <!-- Drive Engine panel — fixed overlay shown when Engine tab is active -->
-  <div id="drive-engine-panel">
-    <div id="engine-header">
-      <span id="engine-title">Engine</span>
-      <span id="engine-status-pill">● Searching…</span>
-    </div>
-    <div id="engine-grid">
-      <div class="engine-cell" id="engine-rpm-cell">
-        <div class="engine-value" id="engine-rpm">—</div>
-        <div class="engine-label">RPM</div>
-      </div>
-      <div class="engine-cell" id="engine-fuel-cell">
-        <div class="engine-value" id="engine-fuel">—</div>
-        <div class="engine-label">Fuel</div>
-      </div>
-      <div class="engine-cell" id="engine-coolant-cell">
-        <div class="engine-value" id="engine-coolant">—</div>
-        <div class="engine-label">Coolant</div>
-      </div>
-      <div class="engine-cell" id="engine-voltage-cell">
-        <div class="engine-value" id="engine-voltage">—</div>
-        <div class="engine-label">Alternator</div>
-      </div>
-    </div>
-    <div id="engine-throttle-row">
-      <span class="engine-label">Throttle</span>
-      <div id="engine-throttle-bar"><div id="engine-throttle-fill"></div></div>
-      <span id="engine-throttle-val">—</span>
-    </div>
-    <div id="engine-dtc-row">
-      <span id="engine-mil-icon"></span>
-      <span id="engine-dtc-text">No fault codes</span>
-    </div>
   </div>
 
 <script>
@@ -3072,54 +2753,51 @@ const THEMES = [
     vars:{'--bg':'#0A0010','--surface':'#120018','--surface2':'#1C0024','--border':'rgba(255,255,255,0.18)','--txt':'#FFFFFF','--txt2':'#CCCCCC','--blue':'#00AAFF','--amber':'#FF0000','--amber-dim':'rgba(255,0,0,0.18)','--green':'#00FF88','--red':'#FF1744','--tog-off':'#2A003A'}},
 ];
 
-let persistedTheme = localStorage.getItem('theme') || 'night'; // saved to disk
-let activeTheme    = persistedTheme;                           // currently on screen (may be a preview)
+let activeTheme   = localStorage.getItem('theme') || 'night';
 let rainbowTimerId = null;
 
 function applyTheme(id) {
+  // Stop any running rainbow animation
   if (rainbowTimerId) { clearInterval(rainbowTimerId); rainbowTimerId = null; }
+
   const t = THEMES.find(t => t.id === id) || THEMES[0];
   const root = document.documentElement;
   Object.entries(t.vars).forEach(([k,v]) => root.style.setProperty(k, v));
   activeTheme = id;
-  // NOTE: does NOT save to localStorage — call saveTheme() to persist
+  localStorage.setItem('theme', id);
+
+  // Rainbow: cycle --amber and --blue through the hue wheel
   if (id === 'rainbow') {
     let hue = 0;
     rainbowTimerId = setInterval(() => {
-      hue = (hue + 2) % 360;
-      root.style.setProperty('--amber', `hsl(${hue},100%,55%)`);
-      root.style.setProperty('--amber-dim', `hsla(${hue},100%,55%,0.18)`);
-    }, 50);
+      hue = (hue + 1.2) % 360;
+      const h2 = (hue + 130) % 360;
+      root.style.setProperty('--amber',     `hsl(${hue},100%,62%)`);
+      root.style.setProperty('--amber-dim', `hsla(${hue},100%,62%,0.2)`);
+      root.style.setProperty('--blue',      `hsl(${h2},100%,65%)`);
+    }, 30);
   }
+
   renderThemePicker();
   renderLights();
-}
-
-function saveTheme() {
-  persistedTheme = activeTheme;
-  localStorage.setItem('theme', activeTheme);
-  renderThemePicker();
 }
 
 function renderThemePicker() {
   const groups = ['dark','light','vivid','special'];
   const rowIds  = { dark:'darkRow', light:'lightRow', vivid:'vividRow', special:'specialRow' };
-  const isPreviewing = activeTheme !== persistedTheme;
   groups.forEach(group => {
     const row = document.getElementById(rowIds[group]);
     if (!row) return;
     row.innerHTML = '';
     THEMES.filter(t => t.group === group).forEach(t => {
-      const isLight      = !t.dark;
-      const checkStroke  = isLight ? '#111111' : 'white';
-      const checkOverlay = isLight ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.3)';
+      const isLight     = !t.dark;
+      const checkStroke = isLight ? '#111111' : 'white';
+      const checkOverlay= isLight ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.3)';
       const bgStyle = t.id === 'rainbow'
-        ? 'background:conic-gradient(#FF0000 0%,#FF8800 14%,#FFFF00 28%,#00CC00 42%,#0088FF 57%,#8800FF 71%,#FF00FF 85%,#FF0000 100%);'
+        ? 'background: conic-gradient(#FF0000 0%, #FF8800 14%, #FFFF00 28%, #00CC00 42%, #0088FF 57%, #8800FF 71%, #FF00FF 85%, #FF0000 100%);'
         : `background:${t.bg};`;
-      const isActive    = t.id === activeTheme;
-      const isSaved     = t.id === persistedTheme;
       const el = document.createElement('div');
-      el.className = 'theme-swatch' + (isActive ? ' active' : '') + (isSaved && isPreviewing ? ' saved' : '');
+      el.className = 'theme-swatch' + (t.id === activeTheme ? ' active' : '');
       el.onclick = () => { applyTheme(t.id); };
       el.innerHTML = `
         <div class="swatch-circle" style="${bgStyle}">
@@ -3128,26 +2806,13 @@ function renderThemePicker() {
           </div>
           <div class="swatch-dot" style="background:${t.id === 'rainbow' ? 'white' : t.accent};"></div>
         </div>
-        <span class="swatch-name">${t.name}${isSaved && isPreviewing ? ' ↩' : ''}</span>`;
+        <span class="swatch-name">${t.name}</span>`;
       row.appendChild(el);
     });
   });
-  // Show/hide the save bar
-  const saveBar = document.getElementById('themeSaveBar');
-  if (saveBar) {
-    saveBar.classList.toggle('visible', isPreviewing);
-    if (isPreviewing) {
-      const t = THEMES.find(t => t.id === activeTheme);
-      document.getElementById('themeSaveLabel').textContent = `Previewing "${t?.name || activeTheme}"`;
-    }
-  }
 }
 
 function openThemePicker() {
-  // If there's an unsaved preview, revert to the saved theme first
-  if (activeTheme !== persistedTheme) {
-    applyTheme(persistedTheme);
-  }
   renderThemePicker();
   document.getElementById('overlay').classList.add('open');
 }
@@ -3197,7 +2862,6 @@ function publishLight(id, onOff) {
   const key = LIGHT_MQTT_KEY[id];
   if (!key || !mqttClient || !mqttClient.connected) return;
   mqttClient.publish(`van/light/${key}`, onOff);
-  mqttClient.publish(`van/status/light/${key}`, onOff, { retain: true, qos: 0 });
   console.log(`MQTT → van/light/${key}: ${onOff}`);
 }
 
@@ -3222,12 +2886,10 @@ const findLight = id => allLights().find(l => l.id === id);
 
 function lightRowHTML(light) {
   const { on, level, id, name } = light;
-  const lvl = on ? level : (level || 50);
+  const lvl = on ? level : 0;
   const stroke = on ? 'var(--amber)' : 'var(--txt2)';
-  const moonSvg = lucideIcon('moon', 13);
-  const sunSvg  = lucideIcon('sun',  15);
-  return `<div class="light-row${on?' on':''}" id="row-${id}" onclick="lightRowTap('${id}',event)">
-    <span class="light-toggle" aria-hidden="true">
+  return `<div class="light-row${on?' on':''}" id="row-${id}">
+    <button class="light-toggle" onclick="toggleLight('${id}')" aria-label="Toggle ${name}">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${stroke}" stroke-width="2.5" stroke-linecap="round">
         <circle cx="12" cy="12" r="5"/>
         <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
@@ -3235,17 +2897,14 @@ function lightRowHTML(light) {
         <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
         <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
       </svg>
-    </span>
+    </button>
     <span class="light-name">${name}</span>
-    <div class="slider-wrap" id="sw-${id}">
-      <button class="dim-end-btn" onclick="event.stopPropagation();setLightLevel('${id}',1)" aria-label="Minimum brightness">${moonSvg}</button>
-      <input type="range" class="dim-slider" min="1" max="100" value="${lvl}" style="--pct:${lvl}%"
-        onpointerdown="dimSliderDown(this)"
-        oninput="dimSliderInput('${id}',this)"
-        onpointerup="dimSliderUp('${id}',this)"
+    <div class="slider-wrap">
+      <input type="range" class="dim-slider" min="0" max="100" value="${lvl}" style="--pct:${lvl}%"
+        oninput="dimLightUI('${id}',this.value)"
         onchange="dimLightSend('${id}',this.value)"
         aria-label="${name} brightness">
-      <button class="dim-end-btn" onclick="event.stopPropagation();setLightLevel('${id}',100)" aria-label="Full brightness">${sunSvg}</button>
+      <span class="dim-pct">${on ? lvl+'%' : '—'}</span>
     </div>
   </div>`;
 }
@@ -3262,6 +2921,11 @@ function renderLights() {
     if (gi < LIGHT_GROUPS.length - 1) html += `<div class="group-divider"></div>`;
   });
   document.getElementById('lightsList').innerHTML = html;
+  updateMasterBtn();
+}
+
+function updateMasterBtn() {
+  document.getElementById('masterBtn').classList.toggle('on', allLights().some(l => l.on));
 }
 
 function toggleLight(id) {
@@ -3277,107 +2941,36 @@ function toggleLight(id) {
   markSceneDirty();
 }
 
-// ── Light row tap handler ─────────────────────────
-// Whole row is tappable. Slider-wrap zone → set brightness at X position.
-// Everything else (icon, name) → toggle on/off.
-
-function lightRowTap(id, event) {
-  // Range input taps are handled by dimSliderUp; min/max buttons stopPropagation
-  if (event.target.tagName === 'INPUT') return;
-
-  const sliderWrap = document.getElementById('sw-' + id);
-  if (sliderWrap && sliderWrap.contains(event.target)) {
-    // Project tap X onto the slider track range → brightness 1–100
-    const slider = sliderWrap.querySelector('.dim-slider');
-    const rect   = slider.getBoundingClientRect();
-    const x      = Math.max(0, Math.min(event.clientX - rect.left, rect.width));
-    const pct    = Math.max(1, Math.min(100, Math.round(x / rect.width * 100)));
-    setLightLevel(id, pct);
-  } else {
-    toggleLight(id);
-  }
-}
-
-function setLightLevel(id, pct) {
-  const l = findLight(id);
-  if (!l) return;
-  l.on = true;
-  l.level = pct;
-  publishLight(id, String(pct));
-  renderLights();
-  markSceneDirty();
-}
-
-// ── Tap-to-set dimmer logic ───────────────────────
-// Drag adjusts brightness in real time. A tap (1 input event) lets dimSliderUp handle it.
-// We count input events: 1 = tap (thumb jumped to position), >1 = confirmed drag.
-
-function dimSliderDown(el) {
-  el._inputCount = 0;
-}
-
-function dimSliderInput(id, el) {
-  el._inputCount = (el._inputCount || 0) + 1;
-  const val = parseInt(el.value);
-  el.style.setProperty('--pct', val + '%');
-
-  if (el._inputCount > 1) {
-    // Confirmed drag — turn light on and track position in real time
-    const l = findLight(id);
-    const row = document.getElementById('row-' + id);
-    if (l && !l.on) {
-      l.on = true;
-      row?.classList.add('on');
-      row?.querySelector('.light-toggle svg')?.setAttribute('stroke', 'var(--amber)');
-    }
-    if (l) l.level = val;
-    markSceneDirty();
-  }
-}
-
-function dimSliderUp(id, el) {
-  const isTap = (el._inputCount || 0) <= 1;
-  el._inputCount = 0;
-  if (isTap) setLightLevel(id, parseInt(el.value));
-  // Drag: onchange fires next and calls dimLightSend
-}
-
-// Called by onchange after drag ends — sends final value to MQTT
-function dimLightSend(id, value) {
-  const l = findLight(id);
-  if (!l?.on) return; // skip if tap-off already handled it
-  const v = parseInt(value);
-  if (v > 0) l.lastLevel = v;
-  publishLight(id, String(v));
-  markSceneDirty();
-}
-
-// Called from MQTT updates (Pi → dashboard)
 function dimLightUI(id, value) {
   const l = findLight(id); if (!l) return;
   const v = parseInt(value);
-  if (v > 0) l.level = v; // preserve last brightness when turning off
-  l.on = v > 0;
+  l.level = v; l.on = v > 0;
   const row = document.getElementById('row-' + id);
-  if (!row) return;
-  const displayVal = v > 0 ? v : (l.level || 50);
-  const slider = row.querySelector('.dim-slider');
-  if (slider) { slider.value = displayVal; slider.style.setProperty('--pct', displayVal + '%'); }
+  row.querySelector('.dim-slider').style.setProperty('--pct', v + '%');
   row.classList.toggle('on', v > 0);
-  const pctEl = row.querySelector('.dim-pct');
-  if (pctEl) pctEl.textContent = v > 0 ? v + '%' : '—';
+  row.querySelector('.dim-pct').textContent = v > 0 ? v + '%' : '—';
+  updateMasterBtn();
   const group = LIGHT_GROUPS.find(g => g.lights.some(x => x.id === id));
   if (group) {
     const anyOn = group.lights.some(l => l.on);
-    row.closest('.card')?.querySelectorAll('.group-header').forEach(h => {
-      if (h.querySelector('.group-label')?.textContent === group.label)
-        h.querySelector('.toggle-switch')?.classList.toggle('on', anyOn);
+    row.closest('.card').querySelectorAll('.group-header').forEach(h => {
+      if (h.querySelector('.group-label').textContent === group.label)
+        h.querySelector('.toggle-switch').classList.toggle('on', anyOn);
     });
   }
 }
 
+function dimLightSend(id, value) {
+  const v = parseInt(value);
+  const l = findLight(id);
+  if (l && v > 0) l.lastLevel = v;
+  publishLight(id, v > 0 ? String(v) : 'off');
+  markSceneDirty();
+}
+
 function dimLight(id, value) {
   dimLightUI(id, value);
+  dimLightSend(id, value);
 }
 
 function toggleGroup(groupId) {
@@ -3391,6 +2984,15 @@ function toggleGroup(groupId) {
   markSceneDirty();
 }
 
+function toggleAllLights() {
+  const anyOn = allLights().some(l => l.on);
+  LIGHT_GROUPS.forEach(g => g.lights.forEach(l => {
+    l.on = !anyOn; l.level = !anyOn ? 80 : 0;
+    publishLight(l.id, l.on ? '80' : 'off');
+  }));
+  renderLights();
+  markSceneDirty();
+}
 
 // ── Lucide icons ─────────────────────────────────
 const LUCIDE_PATHS = {
@@ -3417,21 +3019,6 @@ const LUCIDE_PATHS = {
   'arrow-down-left':`<path d="M17 17H7V7"/><path d="m17 7-10 10"/>`,
   'alert-triangle': `<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>`,
   pencil:           `<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>`,
-  'trash-2':        `<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>`,
-  'grip-vertical':  `<circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/>`,
-  cloud:            `<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>`,
-  'cloud-rain':     `<path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 14.9"/><line x1="16" x2="16" y1="19" y2="21"/><line x1="8" x2="8" y1="19" y2="21"/><line x1="12" x2="12" y1="17" y2="23"/>`,
-  'cloud-drizzle':  `<path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 14.9"/><line x1="8" x2="8" y1="19" y2="21"/><line x1="8" x2="8" y1="13" y2="15"/><line x1="16" x2="16" y1="19" y2="21"/><line x1="16" x2="16" y1="13" y2="15"/><line x1="12" x2="12" y1="21" y2="23"/><line x1="12" x2="12" y1="15" y2="17"/>`,
-  'cloud-lightning':`<path d="M6 16.326A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 .5 8.973"/><path d="m13 12-3 5h4l-3 5"/>`,
-  navigation:       `<polygon points="3 11 22 2 13 21 11 13 3 11"/>`,
-  'map-pin':        `<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>`,
-  search:           `<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>`,
-  coffee:           `<path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" x2="6" y1="2" y2="4"/><line x1="10" x2="10" y1="2" y2="4"/><line x1="14" x2="14" y1="2" y2="4"/>`,
-  'rotate-cw':      `<path d="M21 2v6h-6"/><path d="M21 13a9 9 0 1 1-3-7.7L21 8"/>`,
-  power:            `<path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" x2="12" y1="2" y2="12"/>`,
-  x:                `<path d="M18 6 6 18"/><path d="m6 6 12 12"/>`,
-  'shopping-cart':  `<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>`,
-  tent:             `<path d="M3.5 21 14 3"/><path d="M20.5 21 10 3"/><path d="M15.5 21 12 15l-3.5 6"/><path d="M2 21h20"/>`,
 };
 function lucideIcon(name, size = 16, sw = 2) {
   const p = LUCIDE_PATHS[name] || LUCIDE_PATHS.star;
@@ -3442,16 +3029,16 @@ function lucideIcon(name, size = 16, sw = 2) {
 const DEFAULT_SCENES = [
   { id:'sleep',   name:'Sleep',   icon:'moon',
     lights:{ main:{on:false,level:0}, kitchen:{on:false,level:0}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:false,level:0}, awning:{on:false,level:0}, step:{on:false,level:0} },
-    rope:{ on:false, color:null, effect:null, brightness:100, speed:5 }},
+    rope:{ on:false, color:null, effect:null }},
   { id:'movie',   name:'Movie',   icon:'film',
     lights:{ main:{on:true,level:15}, kitchen:{on:false,level:0}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:true,level:20}, bench:{on:true,level:15}, awning:{on:false,level:0}, step:{on:false,level:0} },
-    rope:{ on:true, color:'amber', effect:null, brightness:60, speed:5 }},
+    rope:{ on:true, color:'amber', effect:null }},
   { id:'morning', name:'Morning', icon:'sun',
     lights:{ main:{on:true,level:60}, kitchen:{on:true,level:80}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:false,level:0}, awning:{on:false,level:0}, step:{on:false,level:0} },
-    rope:{ on:false, color:null, effect:null, brightness:100, speed:5 }},
+    rope:{ on:false, color:null, effect:null }},
   { id:'dinner',  name:'Dinner',  icon:'utensils',
     lights:{ main:{on:true,level:70}, kitchen:{on:true,level:100}, bed:{on:false,level:0}, cargo:{on:false,level:0}, bunk:{on:false,level:0}, bench:{on:true,level:50}, awning:{on:false,level:0}, step:{on:false,level:0} },
-    rope:{ on:true, color:'amber', effect:null, brightness:70, speed:5 }},
+    rope:{ on:true, color:'amber', effect:null }},
 ];
 
 let scenes = [];
@@ -3463,11 +3050,7 @@ const SCENE_ID_ICONS = { sleep:'moon', movie:'film', morning:'sun', dinner:'uten
 function migrateScene(s) {
   const name = s.name.replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}]️?\s*/u, '').trim() || s.name;
   const icon = s.icon || SCENE_ID_ICONS[s.id] || 'star';
-  // Add rope state for scenes saved before rope support was added
-  const rope = {
-    on: false, color: null, effect: null, brightness: 100, speed: 5,
-    ...(s.rope || {}),
-  };
+  const rope = s.rope || { on: false, color: null, effect: null };
   return { ...s, name, icon, rope };
 }
 
@@ -3484,35 +3067,17 @@ function loadScenes() {
 
 function saveScenes() {
   localStorage.setItem('scenes', JSON.stringify(scenes));
-  if (mqttClient?.connected)
-    mqttClient.publish('van/status/scenes', JSON.stringify(scenes), { retain: true, qos: 0 });
 }
 
-function moveSceneLeft(id) {
-  const idx = scenes.findIndex(s => s.id === id);
-  if (idx <= 0) return;
-  [scenes[idx - 1], scenes[idx]] = [scenes[idx], scenes[idx - 1]];
-  saveScenes();
-  renderScenes();
-}
-
-function moveSceneRight(id) {
-  const idx = scenes.findIndex(s => s.id === id);
-  if (idx >= scenes.length - 1) return;
-  [scenes[idx], scenes[idx + 1]] = [scenes[idx + 1], scenes[idx]];
-  saveScenes();
-  renderScenes();
-}
-
-// ── Scene edit mode state ─────────────────────────
+// ── Scene edit mode ───────────────────────────────
 let sceneEditMode = false;
-let _sceneDragId = null; // ID of the tile being dragged
+let _sceneDragId  = null;
 
 function toggleSceneEdit() {
   sceneEditMode = !sceneEditMode;
   if (!sceneEditMode) {
     saveScenes();
-    showSceneToast('Light themes saved ✓');
+    showSceneToast('Scenes saved ✓');
   }
   const btn = document.getElementById('sceneEditBtn');
   if (btn) {
@@ -3539,11 +3104,9 @@ function renderScenes() {
   if (sceneEditMode) {
     scenes.forEach((scene, i) => wrap.appendChild(_buildEditTile(scene, null, i)));
   } else {
-    // Normal mode
     scenes.forEach(scene => {
       const isActive = scene.id === lastAppliedSceneId;
       const isDirty  = isActive && sceneIsDirty;
-
       const tile = document.createElement('button');
       tile.className = 'scene-tile' + (isActive ? ' active' : '');
       tile.dataset.sceneId = scene.id;
@@ -3557,7 +3120,6 @@ function renderScenes() {
       nameEl.textContent = scene.name;
       tile.appendChild(nameEl);
 
-      // Amber dot = unsaved changes; tapping the active tile will save them
       if (isDirty) {
         const dot = document.createElement('span');
         dot.className = 'scene-dirty-dot';
@@ -3565,13 +3127,12 @@ function renderScenes() {
         tile.appendChild(dot);
       }
 
-      // Long-press → enter edit mode (like iOS)
       let longPressTimer;
       tile.addEventListener('touchstart', () => {
         longPressTimer = setTimeout(() => toggleSceneEdit(), 500);
       }, { passive: true });
-      tile.addEventListener('touchend',   () => clearTimeout(longPressTimer));
-      tile.addEventListener('touchmove',  () => clearTimeout(longPressTimer));
+      tile.addEventListener('touchend',  () => clearTimeout(longPressTimer));
+      tile.addEventListener('touchmove', () => clearTimeout(longPressTimer));
 
       tile.addEventListener('click', () => {
         if (isActive && sceneIsDirty) saveToScene(scene.id);
@@ -3580,7 +3141,6 @@ function renderScenes() {
       wrap.appendChild(tile);
     });
 
-    // Add tile — only in normal mode
     const addTile = document.createElement('button');
     addTile.className = 'scene-add-tile';
     addTile.innerHTML = lucideIcon('plus', 20);
@@ -3592,8 +3152,7 @@ function renderScenes() {
 // ── Drag-to-reorder ───────────────────────────────
 function setupDragHandle(gripEl, sceneId) {
   gripEl.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
     _startSceneDrag(e, sceneId, gripEl);
   }, { passive: false });
 }
@@ -3601,74 +3160,47 @@ function setupDragHandle(gripEl, sceneId) {
 function _startSceneDrag(e, sceneId, gripEl) {
   const wrap = document.getElementById('scenesScroll');
   if (!wrap) return;
-
-  // Find the source tile
   const sourceTile = wrap.querySelector(`[data-scene-id="${sceneId}"]`);
   if (!sourceTile) return;
-
   const tileRect = sourceTile.getBoundingClientRect();
 
-  // Create ghost
   const ghost = document.createElement('div');
   ghost.className = 'scene-drag-ghost';
   ghost.style.width  = tileRect.width + 'px';
   ghost.style.height = tileRect.height + 'px';
   ghost.style.left   = tileRect.left + 'px';
   ghost.style.top    = tileRect.top + 'px';
-  // Ghost content: grip + name
   const scene = scenes.find(s => s.id === sceneId);
   if (scene) {
     const gName = document.createElement('span');
-    gName.className = 'scene-tile-name';
-    gName.textContent = scene.name;
+    gName.className = 'scene-tile-name'; gName.textContent = scene.name;
     const gGrip = document.createElement('span');
-    gGrip.className = 'scene-tile-grip';
+    gGrip.className = 'scene-tile-grip'; gGrip.style.marginLeft = 'auto';
     gGrip.innerHTML = lucideIcon('grip-vertical', 18, 2);
-    gGrip.style.marginLeft = 'auto';
-    ghost.appendChild(gName);
-    ghost.appendChild(gGrip);
+    ghost.appendChild(gName); ghost.appendChild(gGrip);
   }
   document.body.appendChild(ghost);
-
-  // Hide source
   sourceTile.classList.add('drag-source');
-
   _sceneDragId = sceneId;
 
-  // Pointer offset within tile
   const offsetX = e.clientX - tileRect.left;
   const offsetY = e.clientY - tileRect.top;
 
   function onMove(ev) {
-    const x = ev.clientX - offsetX;
-    const y = ev.clientY - offsetY;
-    ghost.style.left = x + 'px';
-    ghost.style.top  = y + 'px';
-
-    // Ghost center
-    const ghostCX = ev.clientX;
-    const ghostCY = ev.clientY;
-
-    // Find overlapping tile (excluding drag source)
+    ghost.style.left = (ev.clientX - offsetX) + 'px';
+    ghost.style.top  = (ev.clientY - offsetY) + 'px';
     const tiles = Array.from(wrap.querySelectorAll('[data-scene-id]'));
-    let targetId = null;
     for (const t of tiles) {
       if (t.dataset.sceneId === sceneId) continue;
       const r = t.getBoundingClientRect();
-      if (ghostCX >= r.left && ghostCX <= r.right && ghostCY >= r.top && ghostCY <= r.bottom) {
-        targetId = t.dataset.sceneId;
+      if (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom) {
+        const di = scenes.findIndex(s => s.id === sceneId);
+        const ti = scenes.findIndex(s => s.id === t.dataset.sceneId);
+        if (di !== -1 && ti !== -1 && di !== ti) {
+          [scenes[di], scenes[ti]] = [scenes[ti], scenes[di]];
+          _reRenderEditTiles(sceneId);
+        }
         break;
-      }
-    }
-
-    if (targetId && targetId !== sceneId) {
-      const dragIdx   = scenes.findIndex(s => s.id === sceneId);
-      const targetIdx = scenes.findIndex(s => s.id === targetId);
-      if (dragIdx !== -1 && targetIdx !== -1 && dragIdx !== targetIdx) {
-        // Swap
-        [scenes[dragIdx], scenes[targetIdx]] = [scenes[targetIdx], scenes[dragIdx]];
-        // Re-render edit mode tiles without clearing drag state
-        _reRenderEditTiles(sceneId);
       }
     }
   }
@@ -3677,19 +3209,14 @@ function _startSceneDrag(e, sceneId, gripEl) {
     document.removeEventListener('pointermove', onMove);
     document.removeEventListener('pointerup', onUp);
     document.removeEventListener('pointercancel', onUp);
-    ghost.remove();
-    _sceneDragId = null;
-    renderScenes(); // clean re-render
+    ghost.remove(); _sceneDragId = null; renderScenes();
   }
 
   document.addEventListener('pointermove', onMove);
   document.addEventListener('pointerup', onUp);
   document.addEventListener('pointercancel', onUp);
-
-  // Pointer events are tracked at document level, no capture needed
 }
 
-// Shared tile builder for both renderScenes (edit mode) and _reRenderEditTiles
 function _buildEditTile(scene, dragSceneId, i) {
   const tile = document.createElement('div');
   tile.className = 'scene-tile edit-mode jiggle' + (scene.id === dragSceneId ? ' drag-source' : '');
@@ -3697,67 +3224,42 @@ function _buildEditTile(scene, dragSceneId, i) {
   tile.style.animationDelay = `${(i * 47) % 200}ms`;
 
   const nameEl = document.createElement('span');
-  nameEl.className = 'scene-tile-name';
-  nameEl.style.flex = '1';
-  nameEl.textContent = scene.name;
+  nameEl.className = 'scene-tile-name'; nameEl.style.flex = '1'; nameEl.textContent = scene.name;
   tile.appendChild(nameEl);
 
   const trashBtn = document.createElement('button');
   trashBtn.className = 'scene-tile-trash';
   trashBtn.innerHTML = lucideIcon('trash-2', 14, 2.5);
-  trashBtn.addEventListener('click', (e) => { e.stopPropagation(); deleteScene(scene.id); });
+  trashBtn.addEventListener('click', e => { e.stopPropagation(); deleteScene(scene.id); });
   tile.appendChild(trashBtn);
 
   const gripEl = document.createElement('span');
-  gripEl.className = 'scene-tile-grip';
-  gripEl.style.marginLeft = '0';
+  gripEl.className = 'scene-tile-grip'; gripEl.style.marginLeft = '0';
   gripEl.innerHTML = lucideIcon('grip-vertical', 18, 2);
   setupDragHandle(gripEl, scene.id);
   tile.appendChild(gripEl);
-
   return tile;
 }
 
-// Rebuild edit tiles with FLIP animation so displaced tiles slide instead of snap
 function _reRenderEditTiles(dragSceneId) {
   const wrap = document.getElementById('scenesScroll');
   if (!wrap) return;
-
-  // FLIP — step 1: snapshot positions before the rebuild
   const before = {};
-  wrap.querySelectorAll('[data-scene-id]').forEach(t => {
-    before[t.dataset.sceneId] = t.getBoundingClientRect();
-  });
-
-  // Rebuild
+  wrap.querySelectorAll('[data-scene-id]').forEach(t => { before[t.dataset.sceneId] = t.getBoundingClientRect(); });
   wrap.innerHTML = '';
   scenes.forEach((scene, i) => wrap.appendChild(_buildEditTile(scene, dragSceneId, i)));
-
-  // FLIP — steps 2–4: for each tile that moved, play it from old → new position
   wrap.querySelectorAll('[data-scene-id]').forEach(tile => {
     const id = tile.dataset.sceneId;
-    if (id === dragSceneId) return; // ghost handles the dragged tile visually
-    const oldRect = before[id];
-    if (!oldRect) return;
+    if (id === dragSceneId) return;
+    const oldRect = before[id]; if (!oldRect) return;
     const newRect = tile.getBoundingClientRect();
-    const dx = oldRect.left - newRect.left;
-    const dy = oldRect.top  - newRect.top;
-    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return; // didn't move
-
-    // Freeze at old position (pause jiggle so transforms don't conflict)
+    const dx = oldRect.left - newRect.left; const dy = oldRect.top - newRect.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
     tile.style.animationPlayState = 'paused';
-    tile.style.transition = 'none';
-    tile.style.transform  = `translate(${dx}px, ${dy}px)`;
-
-    // Two rAFs: first ensures the frozen state is painted, second starts the transition
+    tile.style.transition = 'none'; tile.style.transform = `translate(${dx}px,${dy}px)`;
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      tile.style.transition = 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)';
-      tile.style.transform  = '';
-      // Resume jiggle once the slide is done
-      setTimeout(() => {
-        tile.style.transition = '';
-        tile.style.animationPlayState = '';
-      }, 220);
+      tile.style.transition = 'transform 0.2s cubic-bezier(0.4,0,0.2,1)'; tile.style.transform = '';
+      setTimeout(() => { tile.style.transition = ''; tile.style.animationPlayState = ''; }, 220);
     }));
   });
 }
@@ -3774,48 +3276,16 @@ function applyScene(id) {
   });
   // Apply rope light state
   if (scene.rope) {
-    const r = scene.rope;
-    // Apply brightness first (so it's set before turning on)
-    const bright = r.brightness ?? 100;
-    const speed  = r.speed ?? 5;
-    ropeActiveBrightness = bright;
-    ropeActiveSpeed      = speed;
-    const brightEl = document.getElementById('ropeBrightness');
-    if (brightEl) {
-      brightEl.value = bright;
-      brightEl.style.setProperty('--pct', bright + '%');
-      document.getElementById('ropeBrightPct').textContent = bright + '%';
-    }
-    const speedEl = document.getElementById('ropeSpeed');
-    if (speedEl) {
-      speedEl.value = speed;
-      speedEl.style.setProperty('--pct', ((speed - 1) / 9 * 100).toFixed(0) + '%');
-      document.getElementById('ropeSpeedPct').textContent = speed;
-    }
-    if (mqttClient?.connected) {
-      mqttClient.publish('van/rope-light/brightness', String(bright));
-      mqttClient.publish('van/status/rope-light/brightness', String(bright), { retain: true, qos: 0 });
-    }
-    if (r.on) {
-      if (r.effect) {
-        setRopeEffect(r.effect);
-        if (mqttClient?.connected) {
-          mqttClient.publish('van/rope-light/speed', String(speed));
-          mqttClient.publish('van/status/rope-light/speed', String(speed), { retain: true, qos: 0 });
-        }
-      } else if (r.color) {
-        setRopeColor(r.color);
-      } else if (!ropeOn) {
-        toggleRopeLight();
-      }
+    if (scene.rope.on) {
+      if (scene.rope.effect) setRopeEffect(scene.rope.effect);
+      else if (scene.rope.color) setRopeColor(scene.rope.color);
+      else if (!ropeOn) toggleRopeLight();
     } else if (ropeOn) {
       toggleRopeLight();
     }
   }
   lastAppliedSceneId = id;
   sceneIsDirty = false;
-  if (mqttClient?.connected)
-    mqttClient.publish('van/status/scene/active', id, { retain: true, qos: 0 });
   renderLights();
   renderScenes();
 }
@@ -3824,13 +3294,7 @@ function saveToScene(id) {
   const scene = scenes.find(s => s.id === id);
   if (!scene) return;
   allLights().forEach(l => { scene.lights[l.id] = { on: l.on, level: l.level }; });
-  scene.rope = {
-    on: ropeOn,
-    color: ropeActiveColor,
-    effect: ropeActiveEffect,
-    brightness: ropeActiveBrightness,
-    speed: ropeActiveSpeed,
-  };
+  scene.rope = { on: ropeOn, color: ropeActiveColor, effect: ropeActiveEffect };
   sceneIsDirty = false;
   saveScenes();
   renderScenes();
@@ -3840,17 +3304,10 @@ function markSceneDirty() {
   if (!lastAppliedSceneId) return;
   const scene = scenes.find(s => s.id === lastAppliedSceneId);
   if (!scene) return;
-  const lightsDirty = allLights().some(l => {
+  const dirty = allLights().some(l => {
     const s = scene.lights[l.id];
     return s && (s.on !== l.on || (l.on && s.level !== l.level));
   });
-  const r = scene.rope || {};
-  const ropeDirty = r.on !== ropeOn
-    || (ropeOn && r.color !== ropeActiveColor)
-    || (ropeOn && r.effect !== ropeActiveEffect)
-    || (ropeOn && (r.brightness ?? 100) !== ropeActiveBrightness)
-    || (ropeOn && r.effect && (r.speed ?? 5) !== ropeActiveSpeed);
-  const dirty = lightsDirty || ropeDirty;
   if (dirty !== sceneIsDirty) {
     sceneIsDirty = dirty;
     renderScenes();
@@ -3866,7 +3323,6 @@ function deleteScene(id) {
 
 function promptNewScene() {
   const grid = document.getElementById('scenesScroll');
-  // Replace the + tile with a full-width input that spans both columns
   const addTile = grid.querySelector('.scene-add-tile');
   if (addTile) addTile.remove();
 
@@ -3892,13 +3348,7 @@ function saveNewScene() {
   const id = 'scene_' + Date.now();
   const lights = {};
   allLights().forEach(l => { lights[l.id] = { on: l.on, level: l.level }; });
-  const rope = {
-    on: ropeOn,
-    color: ropeActiveColor,
-    effect: ropeActiveEffect,
-    brightness: ropeActiveBrightness,
-    speed: ropeActiveSpeed,
-  };
+  const rope = { on: ropeOn, color: ropeActiveColor, effect: ropeActiveEffect };
   scenes.push({ id, name, icon: 'star', lights, rope });
   saveScenes();
   renderScenes();
@@ -3918,11 +3368,7 @@ function acTempUp() {
     document.getElementById('climateSet').textContent = climateSet;
     localStorage.setItem('acSetpoint', climateSet);
   }
-  if (mqttClient?.connected) {
-    mqttClient.publish('van/ac/setpoint', 'up');
-    if (climateSet !== null)
-      mqttClient.publish('van/status/ac/setpoint', String(climateSet), { retain: true, qos: 0 });
-  }
+  if (mqttClient?.connected) mqttClient.publish('van/ac/setpoint', 'up');
 }
 
 function acTempDown() {
@@ -3931,29 +3377,19 @@ function acTempDown() {
     document.getElementById('climateSet').textContent = climateSet;
     localStorage.setItem('acSetpoint', climateSet);
   }
-  if (mqttClient?.connected) {
-    mqttClient.publish('van/ac/setpoint', 'down');
-    if (climateSet !== null)
-      mqttClient.publish('van/status/ac/setpoint', String(climateSet), { retain: true, qos: 0 });
-  }
+  if (mqttClient?.connected) mqttClient.publish('van/ac/setpoint', 'down');
 }
 
 function setAcMode(mode) {
   acMode = mode;
   updateAcModeUI();
-  if (mqttClient?.connected) {
-    mqttClient.publish('van/ac/mode', mode);
-    mqttClient.publish('van/status/ac/mode', mode, { retain: true, qos: 0 });
-  }
+  if (mqttClient?.connected) mqttClient.publish('van/ac/mode', mode);
 }
 
 function setAcFan(speed) {
   acFan = speed;
   updateAcFanUI();
-  if (mqttClient?.connected) {
-    mqttClient.publish('van/ac/fan', speed);
-    mqttClient.publish('van/status/ac/fan', speed, { retain: true, qos: 0 });
-  }
+  if (mqttClient?.connected) mqttClient.publish('van/ac/fan', speed);
 }
 
 function updateAcModeUI() {
@@ -3971,6 +3407,64 @@ function updateAcFanUI() {
     const el = document.getElementById('acFan' + s[0].toUpperCase() + s.slice(1));
     if (el) el.classList.toggle('active', acFan === s);
   });
+}
+
+// ── Rope lights ───────────────────────────────────
+let ropeOn = false;
+let ropeActiveColor = null;
+let ropeActiveEffect = null;
+
+function toggleRopeLight() {
+  ropeOn = !ropeOn;
+  document.getElementById('ropeRow').classList.toggle('on', ropeOn);
+  document.getElementById('ropeIcon').setAttribute('stroke', ropeOn ? 'var(--amber)' : 'var(--txt2)');
+  if (!ropeOn) {
+    document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.rope-cycle-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('ropeSpeedRow').classList.remove('active');
+    ropeActiveColor = null;
+    ropeActiveEffect = null;
+  }
+  if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', ropeOn ? 'on' : 'off');
+}
+
+function setRopeColor(color) {
+  ropeOn = true;
+  document.getElementById('ropeRow').classList.add('on');
+  document.getElementById('ropeIcon').setAttribute('stroke', 'var(--amber)');
+  document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.rope-cycle-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('rope' + color.charAt(0).toUpperCase() + color.slice(1)).classList.add('active');
+  ropeActiveColor = color;
+  ropeActiveEffect = null;
+  if (mqttClient?.connected) mqttClient.publish('van/rope-light/color', color);
+}
+
+function setRopeEffect(effect) {
+  ropeOn = true;
+  document.getElementById('ropeRow').classList.add('on');
+  document.getElementById('ropeIcon').setAttribute('stroke', 'var(--amber)');
+  document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.rope-cycle-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('ropeEffect' + effect.charAt(0).toUpperCase() + effect.slice(1)).classList.add('active');
+  document.getElementById('ropeSpeedRow').classList.add('active');
+  ropeActiveColor = null;
+  ropeActiveEffect = effect;
+  if (mqttClient?.connected) mqttClient.publish('van/rope-light/effect', effect);
+}
+
+function setRopeBrightness(val) {
+  const pct = Math.round(val);
+  document.getElementById('ropeBrightPct').textContent = pct + '%';
+  document.getElementById('ropeBrightness').style.setProperty('--pct', pct + '%');
+  if (mqttClient?.connected) mqttClient.publish('van/rope-light/brightness', String(pct));
+}
+
+function setRopeSpeed(val) {
+  document.getElementById('ropeSpeedPct').textContent = val;
+  const pct = ((val - 1) / 9 * 100).toFixed(0) + '%';
+  document.getElementById('ropeSpeed').style.setProperty('--pct', pct);
+  if (mqttClient?.connected) mqttClient.publish('van/rope-light/speed', String(val));
 }
 
 // ── Shore power ───────────────────────────────────
@@ -3999,129 +3493,20 @@ function togglePump() {
   pumpOn = !pumpOn;
   document.getElementById('pumpBtn').classList.toggle('active', pumpOn);
   document.getElementById('pumpState').textContent = pumpOn ? 'Running' : 'Off';
-  if (mqttClient?.connected) {
-    mqttClient.publish('van/light/pump', pumpOn ? 'on' : 'off');
-    mqttClient.publish('van/status/light/pump', pumpOn ? 'on' : 'off', { retain: true, qos: 0 });
-    console.log(`MQTT → van/light/pump: ${pumpOn ? 'on' : 'off'}`);
-  }
+  if (mqttClient?.connected) mqttClient.publish('van/light/pump', pumpOn ? 'on' : 'off');
+  console.log(`MQTT → van/light/pump: ${pumpOn ? 'on' : 'off'}`);
 }
 
 function toggleTankHeater() {
   tankHeatOn = !tankHeatOn;
   document.getElementById('tankHeatBtn').classList.toggle('active', tankHeatOn);
   document.getElementById('tankHeatState').textContent = tankHeatOn ? 'On' : 'Off';
-  if (mqttClient?.connected) {
-    mqttClient.publish('van/light/tank-heater', tankHeatOn ? 'on' : 'off');
-    mqttClient.publish('van/status/light/tank-heater', tankHeatOn ? 'on' : 'off', { retain: true, qos: 0 });
-    console.log(`MQTT → van/light/tank-heater: ${tankHeatOn ? 'on' : 'off'}`);
-  }
-}
-
-// ── Rope lights ───────────────────────────────────
-let ropeOn = false;
-let preRopeOn         = false;  // rope light state before drive mode
-let preRopeColor      = null;
-let preRopeEffect     = null;
-let preRopeBrightness = 100;
-let preRopeSpeed      = 5;
-let ropeActiveColor      = null;
-let ropeActiveEffect     = null;
-let ropeActiveBrightness = 100;
-let ropeActiveSpeed      = 5;
-
-function ropeOff() {
-  if (!ropeOn) return;
-  ropeOn = false;
-  document.getElementById('ropeRow').classList.remove('on');
-  document.getElementById('ropeIcon').setAttribute('stroke', 'var(--txt2)');
-  if (mqttClient?.connected) {
-    mqttClient.publish('van/rope-light/power', 'off');
-    mqttClient.publish('van/status/rope-light/power', 'off', { retain: true, qos: 0 });
-  }
-}
-
-function toggleRopeLight() {
-  ropeOn = !ropeOn;
-  document.getElementById('ropeRow').classList.toggle('on', ropeOn);
-  document.getElementById('ropeIcon').setAttribute('stroke', ropeOn ? 'var(--amber)' : 'var(--txt2)');
-  if (!ropeOn) {
-    document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('ropeSpeedRow').classList.remove('active');
-    ropeActiveColor = null;
-    ropeActiveEffect = null;
-  }
-  if (mqttClient?.connected) {
-    mqttClient.publish('van/rope-light/power', ropeOn ? 'on' : 'off');
-    mqttClient.publish('van/status/rope-light/power', ropeOn ? 'on' : 'off', { retain: true, qos: 0 });
-  }
-  markSceneDirty();
-}
-
-function updateRopeIcon() {
-  document.getElementById('ropeIcon').setAttribute('stroke', ropeOn ? 'var(--amber)' : 'var(--txt2)');
-}
-
-function setRopeColor(color) {
-  ropeOn = true;
-  document.getElementById('ropeRow').classList.add('on');
-  document.getElementById('ropeIcon').setAttribute('stroke', 'var(--amber)');
-  document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('rope' + color.charAt(0).toUpperCase() + color.slice(1)).classList.add('active');
-  ropeActiveColor = color;
-  ropeActiveEffect = null;
-  if (mqttClient?.connected) {
-    mqttClient.publish('van/rope-light/color', color);
-    mqttClient.publish('van/status/rope-light/power',  'on',    { retain: true, qos: 0 });
-    mqttClient.publish('van/status/rope-light/color',  color,   { retain: true, qos: 0 });
-    mqttClient.publish('van/status/rope-light/effect', '',      { retain: true, qos: 0 });
-  }
-  markSceneDirty();
-}
-
-function setRopeEffect(effect) {
-  ropeOn = true;
-  document.getElementById('ropeRow').classList.add('on');
-  document.getElementById('ropeIcon').setAttribute('stroke', 'var(--amber)');
-  document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('ropeEffect' + effect.charAt(0).toUpperCase() + effect.slice(1)).classList.add('active');
-  document.getElementById('ropeSpeedRow').classList.add('active');
-  ropeActiveColor = null;
-  ropeActiveEffect = effect;
-  if (mqttClient?.connected) {
-    mqttClient.publish('van/rope-light/effect', effect);
-    mqttClient.publish('van/status/rope-light/power',  'on',    { retain: true, qos: 0 });
-    mqttClient.publish('van/status/rope-light/effect', effect,  { retain: true, qos: 0 });
-    mqttClient.publish('van/status/rope-light/color',  '',      { retain: true, qos: 0 });
-  }
-  markSceneDirty();
-}
-
-function setRopeBrightness(val) {
-  const pct = Math.round(val);
-  ropeActiveBrightness = pct;
-  document.getElementById('ropeBrightPct').textContent = pct + '%';
-  document.getElementById('ropeBrightness').style.setProperty('--pct', pct + '%');
-  if (mqttClient?.connected) {
-    mqttClient.publish('van/rope-light/brightness', String(pct));
-    mqttClient.publish('van/status/rope-light/brightness', String(pct), { retain: true, qos: 0 });
-  }
-  markSceneDirty();
-}
-
-function setRopeSpeed(val) {
-  ropeActiveSpeed = parseInt(val);
-  document.getElementById('ropeSpeedPct').textContent = val;
-  const pct = ((val - 1) / 9 * 100).toFixed(0) + '%';
-  document.getElementById('ropeSpeed').style.setProperty('--pct', pct);
-  if (mqttClient?.connected) {
-    mqttClient.publish('van/rope-light/speed', String(val));
-    mqttClient.publish('van/status/rope-light/speed', String(val), { retain: true, qos: 0 });
-  }
-  markSceneDirty();
+  if (mqttClient?.connected) mqttClient.publish('van/light/tank-heater', tankHeatOn ? 'on' : 'off');
+  console.log(`MQTT → van/light/tank-heater: ${tankHeatOn ? 'on' : 'off'}`);
 }
 
 // ── Inverter ──────────────────────────────────────
-let inverterMode = null;  // null = unknown until MQTT confirms
+let inverterMode = 3;
 let inputAmps    = null;
 const INPUT_AMPS_MIN = 2;
 const INPUT_AMPS_MAX = 50;
@@ -4136,8 +3521,7 @@ function setInverterMode(mode) {
 function updateInverterUI() {
   [1, 2, 3, 4].forEach(m => {
     const el = document.getElementById(`invMode${m}`);
-    // null means data not yet received — show no button active
-    if (el) el.classList.toggle('active', inverterMode !== null && inverterMode === m);
+    if (el) el.classList.toggle('active', inverterMode === m);
   });
 }
 
@@ -4162,6 +3546,7 @@ let currentSolarW   = 0;
 let preDriveTab     = 'power';
 let preDriveLights  = [];   // [{id, level}] lights that were on before driving
 let pumpWasOn       = false; // was pump on before driving
+let predriveRope    = null;  // {color, effect, brightness, speed} if rope was on before driving
 let arrivedToastTimer = null;
 
 const DRIVE_SPEED_MPH  = 5;    // mph to consider driving
@@ -4190,11 +3575,6 @@ function setGPSStatus(msg) {
 
 function onGPSUpdate(pos) {
   const raw = pos.coords.speed; // m/s — only populated with enableHighAccuracy: true
-  lastGPSLat = pos.coords.latitude;
-  lastGPSLng = pos.coords.longitude;
-  if (pos.coords.heading != null && !isNaN(pos.coords.heading)) {
-    lastGPSHeading = pos.coords.heading;
-  }
   if (raw == null) {
     setGPSStatus('Speed unavailable — check GPS permissions');
     currentSpeedMph = 0;
@@ -4227,10 +3607,9 @@ function onGPSError(err) {
   refreshModeChip();
 }
 
-function enterDrivingMode(manual = false) {
+function enterDrivingMode() {
   drivingMode  = true;
   drivingTimer = null;
-  if (manual) manualDriveMode = true;
 
   // Save pre-drive state for restore on exit
   preDriveLights = [];
@@ -4238,6 +3617,12 @@ function enterDrivingMode(manual = false) {
     if (l.on) preDriveLights.push({ id: l.id, level: l.level });
   }));
   pumpWasOn = pumpOn;
+  predriveRope = ropeOn ? {
+    color:      ropeActiveColor,
+    effect:     ropeActiveEffect,
+    brightness: document.getElementById('ropeBrightness')?.value ?? 100,
+    speed:      document.getElementById('ropeSpeed')?.value ?? 5,
+  } : null;
 
   // 1. Turn off all lights
   LIGHT_GROUPS.forEach(g => g.lights.forEach(l => {
@@ -4254,16 +3639,21 @@ function enterDrivingMode(manual = false) {
     if (pumpState) pumpState.textContent = 'Off';
   }
 
-  // 3. Save rope light state and turn off (always send — JS state may lag physical state)
-  preRopeOn         = ropeOn;
-  preRopeColor      = ropeActiveColor;
-  preRopeEffect     = ropeActiveEffect;
-  preRopeBrightness = ropeActiveBrightness;
-  preRopeSpeed      = ropeActiveSpeed;
-  ropeOn = false;
-  document.getElementById('ropeRow').classList.remove('on');
-  document.getElementById('ropeIcon').setAttribute('stroke', 'var(--txt2)');
-  if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', 'off');
+  // 3. Turn off AC
+  setAcMode('off');
+
+  // 4. Turn off rope lights
+  if (ropeOn) {
+    ropeOn = false;
+    document.getElementById('ropeRow')?.classList.remove('on');
+    document.getElementById('ropeIcon')?.setAttribute('stroke', 'var(--txt2)');
+    document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.rope-cycle-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('ropeSpeedRow')?.classList.remove('active');
+    ropeActiveColor = null;
+    ropeActiveEffect = null;
+    if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', 'off');
+  }
 
   // 4. Retract awning (G12 stops at limit switch if already retracted)
   if (mqttClient?.connected) mqttClient.publish('van/motor/awning-retract', 'on');
@@ -4288,7 +3678,6 @@ function exitDrivingMode() {
   if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
   document.body.classList.remove('driving');
   document.getElementById('drive-explore-panel')?.classList.remove('active');
-  document.getElementById('drive-engine-panel')?.classList.remove('active');
   stopRestStopUpdates();
   stopExploreUpdates();
   switchTab(preDriveTab);
@@ -4304,43 +3693,28 @@ function exitDrivingMode() {
   if (pumpBtn)   pumpBtn.classList.add('active');
   if (pumpState) pumpState.textContent = 'On';
 
-  // Restore rope lights to pre-drive state (always direct — never use toggle)
-  // Restore brightness and speed first
-  ropeActiveBrightness = preRopeBrightness;
-  ropeActiveSpeed      = preRopeSpeed;
-  const _brightEl = document.getElementById('ropeBrightness');
-  if (_brightEl) {
-    _brightEl.value = preRopeBrightness;
-    _brightEl.style.setProperty('--pct', preRopeBrightness + '%');
-    document.getElementById('ropeBrightPct').textContent = preRopeBrightness + '%';
-  }
-  const _speedEl = document.getElementById('ropeSpeed');
-  if (_speedEl) {
-    _speedEl.value = preRopeSpeed;
-    _speedEl.style.setProperty('--pct', ((preRopeSpeed - 1) / 9 * 100).toFixed(0) + '%');
-    document.getElementById('ropeSpeedPct').textContent = preRopeSpeed;
-  }
-  if (mqttClient?.connected) mqttClient.publish('van/rope-light/brightness', String(preRopeBrightness));
-  if (preRopeOn) {
-    if (preRopeEffect) {
-      // Restore any effect (cycle, candle, breathe, aurora, strobe)
-      setRopeEffect(preRopeEffect);
-      if (mqttClient?.connected) mqttClient.publish('van/rope-light/speed', String(preRopeSpeed));
-    } else if (preRopeColor) {
-      setRopeColor(preRopeColor);
+  // Restore rope lights if they were on before driving
+  if (predriveRope) {
+    const r = predriveRope;
+    predriveRope = null;
+    const brightnessEl = document.getElementById('ropeBrightness');
+    const speedEl      = document.getElementById('ropeSpeed');
+    if (brightnessEl) { brightnessEl.value = r.brightness; setRopeBrightness(r.brightness); }
+    if (speedEl)      { speedEl.value = r.speed; setRopeSpeed(r.speed); }
+    if (r.effect) {
+      setRopeEffect(r.effect);
+    } else if (r.color) {
+      setRopeColor(r.color);
     } else {
       ropeOn = true;
-      document.getElementById('ropeRow').classList.add('on');
-      document.getElementById('ropeIcon').setAttribute('stroke', 'var(--amber)');
+      document.getElementById('ropeRow')?.classList.add('on');
+      document.getElementById('ropeIcon')?.setAttribute('stroke', 'var(--amber)');
       if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', 'on');
     }
-  } else {
-    // Were off before — make sure they stay off
-    if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', 'off');
   }
 
-  // Show "Arrived?" toast if any lights or rope lights were on before driving
-  if (preDriveLights.length > 0 || preRopeOn) showArrivedToast();
+  // Show "Arrived?" toast if any lights were on before driving
+  if (preDriveLights.length > 0) showArrivedToast();
 }
 
 function showArrivedToast() {
@@ -4358,7 +3732,6 @@ function dismissArrivedToast() {
 }
 
 function restorePreDriveLights() {
-  // Restore G12 lights
   preDriveLights.forEach(({ id, level }) => {
     const light = LIGHT_GROUPS.flatMap(g => g.lights).find(l => l.id === id);
     if (!light) return;
@@ -4367,53 +3740,22 @@ function restorePreDriveLights() {
     publishLight(id, String(level));
   });
   preDriveLights = [];
-
-  // Restore rope lights (re-apply in case the silent restore at exit didn't land)
-  ropeActiveBrightness = preRopeBrightness;
-  ropeActiveSpeed      = preRopeSpeed;
-  const brightEl = document.getElementById('ropeBrightness');
-  if (brightEl) {
-    brightEl.value = preRopeBrightness;
-    brightEl.style.setProperty('--pct', preRopeBrightness + '%');
-    document.getElementById('ropeBrightPct').textContent = preRopeBrightness + '%';
-  }
-  const speedEl = document.getElementById('ropeSpeed');
-  if (speedEl) {
-    speedEl.value = preRopeSpeed;
-    speedEl.style.setProperty('--pct', ((preRopeSpeed - 1) / 9 * 100).toFixed(0) + '%');
-    document.getElementById('ropeSpeedPct').textContent = preRopeSpeed;
-  }
-  if (mqttClient?.connected) mqttClient.publish('van/rope-light/brightness', String(preRopeBrightness));
-  if (preRopeOn) {
-    if (preRopeEffect === 'cycle') {
-      setRopeEffect('cycle');
-      if (mqttClient?.connected) mqttClient.publish('van/rope-light/speed', String(preRopeSpeed));
-    } else if (preRopeColor) {
-      setRopeColor(preRopeColor);
-    } else {
-      ropeOn = true;
-      document.getElementById('ropeRow').classList.add('on');
-      document.getElementById('ropeIcon').setAttribute('stroke', 'var(--amber)');
-      if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', 'on');
-    }
-  }
-
   renderLights();
   dismissArrivedToast();
 }
 
 function switchDriveTab(name) {
   const explorePanel = document.getElementById('drive-explore-panel');
-  const enginePanel  = document.getElementById('drive-engine-panel');
-  explorePanel.classList.toggle('active', name === 'explore');
-  enginePanel.classList.toggle('active',  name === 'engine');
-  // Both overlay panels sit on top of the power tab
-  if (name === 'explore' || name === 'engine') switchTab('power');
-  else switchTab(name === 'power' ? 'power' : 'internet');
-  document.getElementById('driveNavPower').classList.toggle('active',    name === 'power');
-  document.getElementById('driveNavExplore').classList.toggle('active',  name === 'explore');
+  if (name === 'explore') {
+    switchTab('power'); // keep power tab active beneath (battery card hidden by explore overlay)
+    explorePanel.classList.add('active');
+  } else {
+    explorePanel.classList.remove('active');
+    switchTab(name === 'power' ? 'power' : 'internet');
+  }
+  document.getElementById('driveNavPower').classList.toggle('active', name === 'power');
+  document.getElementById('driveNavExplore').classList.toggle('active', name === 'explore');
   document.getElementById('driveNavInternet').classList.toggle('active', name === 'internet');
-  document.getElementById('driveNavEngine').classList.toggle('active',   name === 'engine');
   if (name === 'explore') refreshExploreData();
 }
 
@@ -4480,42 +3822,16 @@ function refreshModeChip() {
   if (speedEl) {
     const speedVal = (drivingMode && currentSpeedMph != null) ? Math.round(currentSpeedMph) : null;
     speedEl.textContent = speedVal != null ? speedVal : '—';
-    // Multi-stop color ramp: dim white → white → yellow → orange → red → red+blink
-    if (speedVal != null) {
-      const stops = [
-        { v:  0, r: 255, g: 255, b: 255, a: 0.18 },  // stopped  — faint white
-        { v: 30, r: 255, g: 255, b: 255, a: 1.00 },  // cruising — white
-        { v: 70, r: 255, g: 255, b: 140, a: 1.00 },  // highway  — light yellow
-        { v: 80, r: 255, g:  80, b:   5, a: 1.00 },  // fast     — red/orange
-        { v: 90, r: 255, g:   0, b:   0, a: 1.00 },  // too fast — red
-      ];
-      let r, g, b, a;
-      if (speedVal <= stops[0].v) {
-        ({ r, g, b, a } = stops[0]);
-      } else if (speedVal >= stops[stops.length - 1].v) {
-        ({ r, g, b, a } = stops[stops.length - 1]);
-      } else {
-        for (let i = 1; i < stops.length; i++) {
-          if (speedVal <= stops[i].v) {
-            const t = (speedVal - stops[i-1].v) / (stops[i].v - stops[i-1].v);
-            r = Math.round(stops[i-1].r + t * (stops[i].r - stops[i-1].r));
-            g = Math.round(stops[i-1].g + t * (stops[i].g - stops[i-1].g));
-            b = Math.round(stops[i-1].b + t * (stops[i].b - stops[i-1].b));
-            a = +(stops[i-1].a + t * (stops[i].a - stops[i-1].a)).toFixed(3);
-            break;
-          }
-        }
-      }
-      const col = `rgba(${r},${g},${b},${a})`;
+    // Interpolate color white → red from 0 → 90 mph
+    if (speedVal != null && speedVal > 0) {
+      const ratio = Math.min(speedVal / 90, 1);
+      const gb = Math.round(255 * (1 - ratio));
+      const col = `rgb(255,${gb},${gb})`;
       speedEl.style.color = col;
-      speedEl.style.textShadow = a < 0.25
-        ? 'none'
-        : `0 0 8px ${col}, 0 0 24px rgba(${r},${g},${b},${+(a*0.5).toFixed(2)}), 0 0 48px rgba(${r},${g},${b},${+(a*0.2).toFixed(2)})`;
-      speedEl.classList.toggle('blinking', speedVal >= 90);
+      speedEl.style.textShadow = `0 0 8px ${col}, 0 0 24px rgba(255,${gb},${gb},0.5), 0 0 48px rgba(255,${gb},${gb},0.2)`;
     } else {
       speedEl.style.color = '';
       speedEl.style.textShadow = '';
-      speedEl.classList.remove('blinking');
     }
   }
 
@@ -4525,7 +3841,7 @@ function refreshModeChip() {
     // Speed shown in panel — chip hidden by CSS in driving mode
     chip.style.display = 'flex';
     chip.className = 'mode-chip driving';
-    icon.innerHTML  = lucideIcon('navigation', 13, 2);
+    icon.textContent  = '🚗';
     label.textContent = (currentSpeedMph != null)
       ? Math.round(currentSpeedMph) + ' mph'
       : 'Driving';
@@ -4609,91 +3925,160 @@ function strikeLightning() {
   });
 }
 
-// ── 100% full charge coin ─────────────────────────────
-let lastSocFull  = false;
-let coinTimer    = null;
+// ── 100% emoji puzzle ─────────────────────────────
+// Seeded LCG PRNG (Lehmer) — deterministic daily shuffle
+function seededRng(seed) {
+  let s = seed >>> 0;
+  return () => { s = Math.imul(1664525, s) + 1013904223 >>> 0; return s / 0x100000000; };
+}
+function dailySeed() {
+  const d = new Date();
+  return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+}
+function shuffleSeeded(arr, rng) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Puzzle types: 'puzzle' = guess the emoji, 'joke' = Q&A joke, 'compliment'
+const PUZZLE_POOL = [
+  { t:'puzzle', e:'🦁 👑',         a:'Lion King' },
+  { t:'puzzle', e:'🐢 🍕',         a:'Ninja Turtles' },
+  { t:'puzzle', e:'🌮 🔔',         a:'Taco Bell' },
+  { t:'puzzle', e:'🕷️ 🕸️',        a:'Spider-Man' },
+  { t:'puzzle', e:'🐻 🍯',         a:'Winnie the Pooh' },
+  { t:'puzzle', e:'❄️ 👸',         a:'Frozen' },
+  { t:'puzzle', e:'🍌 🍞',         a:'Banana Bread' },
+  { t:'puzzle', e:'🎸 ⭐',         a:'Rock Star' },
+  { t:'puzzle', e:'🍎 📱',         a:'Apple iPhone' },
+  { t:'puzzle', e:'☀️ 🕶️',        a:'Summer Vibes' },
+  { t:'puzzle', e:'🦇 🧛',         a:'Dracula' },
+  { t:'puzzle', e:'🎵 👻',         a:'Ghostbusters' },
+  { t:'puzzle', e:'🐉 ♟️',         a:'Game of Thrones' },
+  { t:'puzzle', e:'🏝️ 🤠',         a:'Cowboy on a Beach' },
+  { t:'puzzle', e:'🐝 🎬',         a:'Bee Movie' },
+  { t:'puzzle', e:'🍕 🔺',         a:'Pizza Hut' },
+  { t:'puzzle', e:'🦊 🔵',         a:'Firefox' },
+  { t:'puzzle', e:'🐦 𝕏',          a:'Twitter / X' },
+  { t:'puzzle', e:'🦄 🌈',         a:'Magic!' },
+  { t:'puzzle', e:'🧙 💍',         a:'Lord of the Rings' },
+];
+
+const JOKE_POOL = [
+  { t:'joke', e:'Why did the battery go to therapy?', a:'It had too many issues with charging! 😄' },
+  { t:'joke', e:"Why don't scientists trust atoms?", a:'Because they make up everything! 😂' },
+  { t:'joke', e:'What do you call a van with no wheels?', a:'A living room! 🚐💀' },
+  { t:'joke', e:'How does the moon cut his hair?', a:'Eclipse it! 🌙✂️' },
+  { t:'joke', e:'Why did the solar panel break up with the grid?', a:"It wanted to be off with someone else! ☀️💔" },
+  { t:'joke', e:'What did one power cell say to the other?', a:'You electric me! ⚡😍' },
+  { t:'joke', e:'Why is the van always calm?', a:'Because it has good suspension! 🚐😌' },
+  { t:'joke', e:'What do you call cheese that isn\'t yours?', a:'Nacho cheese! 🧀' },
+  { t:'joke', e:'Why did the camper go to school?', a:"Because it wanted to go further! 🎒🚐" },
+  { t:'joke', e:"I'm reading a book about anti-gravity.", a:"It's impossible to put down! 📚🪐" },
+];
+
+const COMPLIMENT_POOL = [
+  { t:'compliment', e:'You\'re basically a solar-powered superhero. ☀️🦸', a:'Seriously. You live off the sun. That\'s incredible.' },
+  { t:'compliment', e:'Most people dream of van life. You\'re living it. 🌅', a:'Every sunrise out your window is earned.' },
+  { t:'compliment', e:'You\'re 100% charged and so is your vibe. 🔋✨', a:'Top tier energy. Always.' },
+  { t:'compliment', e:'Adventuring on your own terms. 🗺️🚐', a:'That takes guts. You\'ve got them.' },
+  { t:'compliment', e:'You make "fully charged" look effortless. 💯⚡', a:'Peak performance. Peak person.' },
+  { t:'compliment', e:'The van has good energy because you brought yours. 🌟', a:'Mood is contagious — keep spreading it.' },
+  { t:'compliment', e:'You turned a Sprinter into a spaceship. 🚀', a:'Engineering, design, vibes — all yours.' },
+  { t:'compliment', e:'100% battery. 100% you. 💪🔋', a:'Both fully loaded and ready to roll.' },
+  { t:'compliment', e:'You built something people only Pinterest about. 📌', a:'That\'s the real flex.' },
+  { t:'compliment', e:'GoGoVan is basically your superpower. ⚡🚐', a:'Fully charged and fully awesome.' },
+];
+
+// Always end with these two
+const PUZZLE_FINALE = [
+  { t:'puzzle', e:'🚐 ⚡', a:"That's you! 🎉" },
+  { t:'compliment', e:'🔋 💯', a:'FULL CHARGE!! 🎊' },
+];
+
+let puzzleList  = [];
+let puzzleIdx   = 0;
+let puzzlePhase = 'hidden';   // 'question' | 'answer' | 'hidden'
+let puzzleTimer = null;
+let lastSocFull = false;
 
 function checkBattFull(pct) {
   if (pct >= 100 && !lastSocFull) {
     lastSocFull = true;
-    showCoin();
+    startPuzzles();
   } else if (pct < 100) {
     lastSocFull = false;
   }
 }
 
-function showCoin() {
-  const overlay = document.getElementById('coin-overlay');
-  overlay.hidden = false;
-  clearTimeout(coinTimer);
-  coinTimer = setTimeout(closeCoin, 5000);
+function startPuzzles() {
+  const rng = seededRng(dailySeed());
+  const puzzles    = shuffleSeeded(PUZZLE_POOL, rng).slice(0, 3);
+  const jokes      = shuffleSeeded(JOKE_POOL, rng).slice(0, 2);
+  const compliments = shuffleSeeded(COMPLIMENT_POOL, rng).slice(0, 3);
+  const mixed      = shuffleSeeded([...puzzles, ...jokes, ...compliments], rng);
+  puzzleList  = [...mixed, ...PUZZLE_FINALE];
+  puzzleIdx   = 0;
+  showPuzzle();
 }
 
-function closeCoin() {
-  clearTimeout(coinTimer);
-  document.getElementById('coin-overlay').hidden = true;
+function showPuzzle() {
+  if (puzzleIdx >= puzzleList.length) { closePuzzle(); return; }
+  const p    = puzzleList[puzzleIdx];
+  const over = document.getElementById('puzzle-overlay');
+  const em   = document.getElementById('puzzle-emoji');
+  const ans  = document.getElementById('puzzle-answer');
+  const hint = document.getElementById('puzzle-hint');
+  const prog = document.getElementById('puzzle-progress');
+  // Reset
+  ans.hidden      = true;
+  ans.textContent = p.a;
+  prog.textContent = `${puzzleIdx + 1} / ${puzzleList.length}`;
+
+  if (p.t === 'joke') {
+    em.textContent   = p.e;           // question text
+    hint.textContent = 'tap for punchline';
+  } else if (p.t === 'compliment') {
+    em.textContent   = p.e;
+    hint.textContent = 'tap to read more';
+  } else {
+    em.textContent   = p.e;           // emojis
+    hint.textContent = 'tap to reveal';
+  }
+  // Restart overlay animation by briefly removing it
+  over.hidden = true;
+  requestAnimationFrame(() => {
+    over.hidden = false;
+    puzzlePhase = 'question';
+  });
+  clearTimeout(puzzleTimer);
 }
 
+function puzzleTap() {
+  clearTimeout(puzzleTimer);
+  if (puzzlePhase === 'question') {
+    const ans  = document.getElementById('puzzle-answer');
+    const hint = document.getElementById('puzzle-hint');
+    ans.hidden       = false;
+    hint.textContent = puzzleIdx < puzzleList.length - 1 ? 'tap for next →' : 'tap to close';
+    puzzlePhase      = 'answer';
+    puzzleTimer      = setTimeout(() => { puzzleIdx++; showPuzzle(); }, 3500);
+  } else if (puzzlePhase === 'answer') {
+    puzzleIdx++;
+    showPuzzle();
+  }
+}
 
-// ── POI categories for rest-stop box ─────────────
-const POI_CATEGORIES = [
-  {
-    id: 'rest', label: 'Rest Areas', icon: 'coffee',
-    emptyMsg: 'No rest areas ahead',
-    radius: 120000,
-    query: (r, lat, lng) => `[out:json][timeout:12];
-(
-  node["highway"="rest_area"](around:${r},${lat},${lng});
-  node["highway"="services"](around:${r},${lat},${lng});
-  way["highway"="rest_area"](around:${r},${lat},${lng});
-  way["highway"="services"](around:${r},${lat},${lng});
-  node["amenity"="rest_area"](around:${r},${lat},${lng});
-);
-out center;`,
-    defaultName: 'Rest Area',
-  },
-  {
-    id: 'cracker', label: 'Cracker Barrel', icon: 'utensils',
-    emptyMsg: 'No Cracker Barrels ahead',
-    radius: 100000,
-    query: (r, lat, lng) => `[out:json][timeout:12];
-(
-  node["name"~"Cracker Barrel",i](around:${r},${lat},${lng});
-  way["name"~"Cracker Barrel",i](around:${r},${lat},${lng});
-);
-out center;`,
-    defaultName: 'Cracker Barrel',
-  },
-  {
-    id: 'walmart', label: 'Walmart', icon: 'shopping-cart',
-    emptyMsg: 'No Walmarts ahead',
-    radius: 80000,
-    query: (r, lat, lng) => `[out:json][timeout:12];
-(
-  node["name"~"Walmart",i]["shop"](around:${r},${lat},${lng});
-  way["name"~"Walmart",i]["shop"](around:${r},${lat},${lng});
-);
-out center;`,
-    defaultName: 'Walmart',
-  },
-  {
-    id: 'blm', label: 'BLM Land', icon: 'tent',
-    emptyMsg: 'No BLM sites ahead',
-    radius: 150000,
-    query: (r, lat, lng) => `[out:json][timeout:15];
-(
-  node["operator"~"Bureau of Land Management",i](around:${r},${lat},${lng});
-  way["operator"~"Bureau of Land Management",i](around:${r},${lat},${lng});
-  node["operator"~"^BLM$",i](around:${r},${lat},${lng});
-  way["operator"~"^BLM$",i](around:${r},${lat},${lng});
-);
-out center;`,
-    defaultName: 'BLM Site',
-  },
-];
+function closePuzzle() {
+  document.getElementById('puzzle-overlay').hidden = true;
+  puzzlePhase = 'hidden';
+  clearTimeout(puzzleTimer);
+}
 
-let poiCategoryIdx  = 0;
-let currentPoiResult = null; // {lat, lng, name} — drives the Directions button
 
 // ── Rest stop finder ──────────────────────────────
 let restStopInterval  = null;
@@ -4713,33 +4098,8 @@ function hideRestSpinner() {
   if (el) el.hidden = true;
 }
 
-function handleRestBoxClick(e) {
-  if (e.target.closest('#drive-rest-dir-btn')) return; // let Directions button handle itself
-  // Cycle to next category
-  poiCategoryIdx = (poiCategoryIdx + 1) % POI_CATEGORIES.length;
-  const cat = POI_CATEGORIES[poiCategoryIdx];
-  const catEl = document.getElementById('drive-rest-category');
-  if (catEl) catEl.textContent = cat.label;
-  currentPoiResult = null;
-  const dirBtn = document.getElementById('drive-rest-dir-btn');
-  if (dirBtn) dirBtn.hidden = true;
-  restStopHasData = false;
-  setRestStopUI('search', 'Searching…', null, null, null);
-  updateRestStop();
-}
-
-function openPOIDirections(e) {
-  e.stopPropagation();
-  if (!currentPoiResult) return;
-  const { lat, lng } = currentPoiResult;
-  window.open(`https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`, '_blank');
-}
-
 function startRestStopUpdates() {
   stopRestStopUpdates();
-  poiCategoryIdx = 0;
-  const catEl = document.getElementById('drive-rest-category');
-  if (catEl) catEl.textContent = POI_CATEGORIES[0].label;
   restStopHasData = false;
   updateRestStop();
   restStopInterval = setInterval(updateRestStop, REST_STOP_CACHE_MS);
@@ -4748,40 +4108,32 @@ function stopRestStopUpdates() {
   if (restStopInterval) { clearInterval(restStopInterval); restStopInterval = null; }
   hideRestSpinner();
   restStopHasData = false;
-  currentPoiResult = null;
-  const dirBtn = document.getElementById('drive-rest-dir-btn');
-  if (dirBtn) dirBtn.hidden = true;
-  setRestStopUI('search', 'Finding nearby…', null, null, null);
+  setRestStopUI('loading', 'Finding rest stops…', null, null, null);
 }
 
-function setRestStopUI(icon, name, distMi, timeMin, exitStr, lat, lng) {
+function setRestStopUI(icon, name, distMi, timeMin, exitStr) {
   const iconEl = document.getElementById('drive-rest-icon');
   const nameEl = document.getElementById('drive-rest-name');
   const metaEl = document.getElementById('drive-rest-meta');
   const distEl = document.getElementById('drive-rest-dist');
   const timeEl = document.getElementById('drive-rest-time');
   const exitEl = document.getElementById('drive-rest-exit');
-  const dirBtn = document.getElementById('drive-rest-dir-btn');
   if (!iconEl) return;
-  // Accept direct icon names; legacy aliases: 'rest'→'coffee', 'loading'→'search'
-  const iconName = icon === 'rest' ? 'coffee' : icon === 'loading' ? 'search' : icon;
-  iconEl.innerHTML = lucideIcon(iconName, 36, 1.5);
+  iconEl.innerHTML = lucideIcon(
+    icon === 'rest' ? 'coffee' : icon === 'loading' ? 'search' : 'map-pin',
+    36, 1.5
+  );
   nameEl.textContent = name;
   if (distMi != null) {
     metaEl.style.display = 'flex';
     distEl.textContent = distMi < 10 ? distMi.toFixed(1) + ' mi' : Math.round(distMi) + ' mi';
-    timeEl.style.display = 'none';
+    timeEl.textContent = timeMin < 60
+      ? Math.round(timeMin) + ' min away'
+      : Math.floor(timeMin/60) + 'h ' + (Math.round(timeMin%60)) + 'm away';
     exitEl.textContent = exitStr || '';
     exitEl.style.display = exitStr ? '' : 'none';
   } else {
     metaEl.style.display = 'none';
-  }
-  // Directions button — show only when we have a real location
-  if (lat != null && lng != null && dirBtn) {
-    currentPoiResult = { lat, lng, name };
-    dirBtn.hidden = false;
-  } else if (dirBtn && lat == null) {
-    dirBtn.hidden = true;
   }
 }
 
@@ -4792,22 +4144,33 @@ function clearRestStopState() {
 
 async function updateRestStop() {
   if (!lastGPSLat || !lastGPSLng) return;
-  const cat = POI_CATEGORIES[poiCategoryIdx];
+  // First load: show placeholder. Subsequent refreshes: just show spinner, keep existing content.
   if (!restStopHasData) {
-    setRestStopUI('search', 'Searching ahead…', null, null, null);
+    setRestStopUI('loading', 'Searching ahead…', null, null, null);
   }
   showRestSpinner();
   try {
-    const query = cat.query(cat.radius, lastGPSLat, lastGPSLng);
+    // Search 80km radius for rest areas, service areas, truck stops
+    const r = 80000;
+    const query = `[out:json][timeout:10];
+(
+  node["highway"="rest_area"](around:${r},${lastGPSLat},${lastGPSLng});
+  node["highway"="services"](around:${r},${lastGPSLat},${lastGPSLng});
+  way["highway"="rest_area"](around:${r},${lastGPSLat},${lastGPSLng});
+  way["highway"="services"](around:${r},${lastGPSLat},${lastGPSLng});
+  node["amenity"="rest_area"](around:${r},${lastGPSLat},${lastGPSLng});
+);
+out center;`;
     const resp = await fetch('https://overpass-api.de/api/interpreter', {
       method: 'POST',
       body: 'data=' + encodeURIComponent(query),
-      signal: AbortSignal.timeout(15000)
+      signal: AbortSignal.timeout(12000)
     });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
     const elements = data.elements || [];
 
+    // Convert to {lat,lng,name,ref} and filter to ahead (within ±90° of heading)
     const candidates = elements.map(el => {
       const lat = el.lat ?? el.center?.lat;
       const lng = el.lon ?? el.center?.lon;
@@ -4821,24 +4184,24 @@ async function updateRestStop() {
     }).filter(c => c && c.distM > 100 && (lastGPSHeading == null || Math.abs(c.angDiff) <= 90));
 
     if (!candidates.length) {
-      setRestStopUI(cat.icon, cat.emptyMsg, null, null, null);
+      setRestStopUI('rest', 'No rest stops found ahead', null, null, null);
       restStopHasData = true;
       hideRestSpinner();
       return;
     }
     candidates.sort((a, b) => a.distM - b.distM);
     const best = candidates[0];
-    const distMi  = best.distM / 1609.34;
+    const distMi = best.distM / 1609.34;
     const speedMph = (currentSpeedMph && currentSpeedMph > 5) ? currentSpeedMph : 55;
     const timeMin  = (distMi / speedMph) * 60;
     const exitStr  = best.ref ? 'Exit ' + best.ref : '';
-    const displayName = best.name || cat.defaultName;
-    setRestStopUI(cat.icon, displayName, distMi, timeMin, exitStr, best.lat, best.lng);
+    const displayName = best.name || 'Rest Area';
+    setRestStopUI('rest', displayName, distMi, timeMin, exitStr);
     restStopHasData = true;
     hideRestSpinner();
   } catch(e) {
     if (!restStopHasData) {
-      setRestStopUI(cat.icon, 'Unavailable', null, null, null);
+      setRestStopUI('rest', 'Rest stops unavailable', null, null, null);
     }
     hideRestSpinner();
   }
@@ -4902,7 +4265,6 @@ let lastExploreLng = null;
 let localFacts     = [];
 let localFactIdx   = 0;
 let explorePlace   = '';
-let _currentUtter  = null;
 
 function startExploreUpdates() {
   stopExploreUpdates();
@@ -4967,142 +4329,61 @@ async function fetchExploreWeather(lat, lng) {
 }
 
 async function fetchLocalFacts(lat, lng) {
-  const placeEl = document.getElementById('explore-facts-place');
-  const textEl  = document.getElementById('explore-facts-text');
-  const progEl  = document.getElementById('explore-facts-progress');
+  const placeEl   = document.getElementById('explore-facts-place');
+  const textEl    = document.getElementById('explore-facts-text');
+  const progEl    = document.getElementById('explore-facts-progress');
   if (textEl) textEl.textContent = 'Loading local facts…';
   if (placeEl) placeEl.textContent = '';
   if (progEl) progEl.textContent = '';
   try {
-    // Step 1: reverse geocode
-    const geoResp = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=10&addressdetails=1`,
-      { headers: { 'Accept-Language': 'en', 'User-Agent': 'GoGoVan/1.0' }, signal: AbortSignal.timeout(8000) }
-    );
+    // Step 1: reverse geocode to get place name
+    const geoUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=10&addressdetails=1`;
+    const geoResp = await fetch(geoUrl, {
+      headers: { 'Accept-Language': 'en', 'User-Agent': 'GoGoVan/1.0' },
+      signal: AbortSignal.timeout(8000)
+    });
     if (!geoResp.ok) throw new Error('geo fail');
-    const geo    = await geoResp.json();
+    const geo = await geoResp.json();
     const city   = geo.address?.city || geo.address?.town || geo.address?.village || geo.address?.hamlet || '';
     const county = geo.address?.county || '';
     const state  = geo.address?.state || '';
+
+    // Try city first, then county, then state
     const candidates = [city, county, state].filter(Boolean);
-
-    // Helper: fetch Wikipedia summary for a search term
-    async function wikiSummary(term) {
-      try {
-        const r = await fetch(
-          `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(term)}`,
-          { signal: AbortSignal.timeout(6000) }
-        );
-        if (!r.ok) return null;
-        const d = await r.json();
-        return (d.extract?.length > 80) ? d : null;
-      } catch(e) { return null; }
-    }
-
-    // Helper: score a sentence for how interesting it is to a traveler
-    function scoreSentence(s) {
-      let score = 0;
-      const sl = s.toLowerCase();
-      if (/\b(1[4-9]\d\d|20[0-2]\d)\b/.test(s)) score += 3;           // has a year
-      for (const w of ['first', 'only', 'largest', 'smallest', 'tallest', 'oldest', 'longest',
-                        'famous', 'known for', 'notable', 'record', 'birthplace', 'named after',
-                        'founded', 'established', 'home to', 'historic', 'landmark', 'capital',
-                        'population', 'inhabitants', 'ghost town', 'battle', 'war', 'disaster',
-                        'discovery', 'invention', 'murder', 'outlaw', 'legend', 'rumored']) {
-        if (sl.includes(w)) score += 2;
-      }
-      if (/\b\d[\d,]+\b/.test(s)) score += 1;                          // contains a number
-      // Penalise boring "X is a city/town/county in Y state" openers
-      if (/^[\w\s,']+is (a|an|the) (city|town|village|unincorporated|hamlet|county|borough|township|state|municipality)/i.test(s)) score -= 4;
-      if (s.length < 55 || s.length > 290) score -= 1;
-      return score;
-    }
-
-    // Helper: pull scored sentences out of a Wikipedia extract
-    function extractFacts(extract, max = 4) {
-      return extract
-        .replace(/\n+/g, ' ')
-        .split(/(?<=[.!?])\s+/)
-        .map(s => s.trim())
-        .filter(s => s.length > 50)
-        .map(s => ({ text: s, score: scoreSentence(s) }))
-        .filter(f => f.score > -1)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, max);
-    }
-
-    let allFacts  = [];
+    let extract = '';
     let usedPlace = '';
-
-    // Step 2: main place articles (city → county → state)
     for (const place of candidates) {
-      const data = await wikiSummary(place);
-      if (!data) continue;
-      usedPlace = data.title || place;
-      allFacts.push(...extractFacts(data.extract, 4));
-      if (allFacts.length >= 4) break;
+      const wikiUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(place)}`;
+      try {
+        const wResp = await fetch(wikiUrl, { signal: AbortSignal.timeout(8000) });
+        if (!wResp.ok) continue;
+        const wData = await wResp.json();
+        if (wData.extract && wData.extract.length > 100) {
+          extract   = wData.extract;
+          usedPlace = wData.title || place;
+          break;
+        }
+      } catch(e) { continue; }
     }
 
-    // Step 3: "History of [city]" often has richer historical facts
-    if (city) {
-      const histData = await wikiSummary(`History of ${city}`);
-      if (histData) {
-        allFacts.push(...extractFacts(histData.extract, 3).map(f => ({ ...f, score: f.score + 1 })));
-      }
-    }
-
-    // Step 4: Wikipedia geo search — nearby articles (landmarks, parks, historic sites, etc.)
-    try {
-      const nearbyResp = await fetch(
-        `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lng}&gsradius=15000&gslimit=8&format=json&origin=*`,
-        { signal: AbortSignal.timeout(5000) }
-      );
-      const nearbyJson = await nearbyResp.json();
-      const pages = (nearbyJson.query?.geosearch || [])
-        .filter(p => p.title !== usedPlace && !candidates.includes(p.title));
-      for (const page of pages.slice(0, 4)) {
-        const pData = await wikiSummary(page.title);
-        if (!pData) continue;
-        const first = pData.extract
-          .replace(/\n+/g, ' ')
-          .split(/(?<=[.!?])\s+/)
-          .map(s => s.trim())
-          .find(s => s.length > 55 && s.length < 230 && scoreSentence(s) > -1);
-        if (first) allFacts.push({ text: first, score: scoreSentence(first) + 2 });
-      }
-    } catch(e) {}
-
-    if (!allFacts.length) {
+    if (!extract) {
       if (textEl) textEl.textContent = 'No local facts found for this area.';
       return;
     }
 
-    // Step 5: deduplicate, sort by score, take top 10
-    const seen   = new Set();
-    localFacts   = allFacts
-      .sort((a, b) => b.score - a.score)
-      .filter(f => { const k = f.text.slice(0, 50); if (seen.has(k)) return false; seen.add(k); return true; })
-      .slice(0, 10)
-      .map(f => f.text);
+    // Split into sentences, filter short ones, take up to 10
+    const sentences = extract
+      .replace(/\n/g, ' ')
+      .split(/(?<=[.!?])\s+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 60);
+    localFacts   = sentences.slice(0, 10);
     localFactIdx = 0;
     explorePlace = usedPlace;
     showLocalFact();
   } catch(e) {
     if (textEl) textEl.textContent = 'Local facts unavailable.';
   }
-}
-
-function summarizeFact(text) {
-  // Strip a boring "[Place] is/was a [city/town/county…]." opener so we skip to the interesting part
-  let s = text.replace(
-    /^(The\s+)?([\w\s,'\-]{1,40}?)\s+(is|was|are|were)\s+(a|an|the\s+)?(city|town|village|county|borough|municipality|settlement|community|unincorporated\s+community)[^.!]*[.!]\s*/i,
-    ''
-  ).trim();
-  if (s.length < 25) s = text.trim(); // fallback if strip removed too much
-  const words = s.split(/\s+/).filter(Boolean);
-  const slice = words.slice(0, 6);
-  const joined = slice.join(' ').replace(/[,;:]+$/, '');
-  return words.length > 6 ? joined + '…' : joined;
 }
 
 function showLocalFact() {
@@ -5112,62 +4393,15 @@ function showLocalFact() {
   const hintEl  = document.getElementById('explore-facts-hint');
   if (!textEl || !localFacts.length) return;
   if (placeEl) placeEl.textContent = explorePlace;
-  textEl.textContent = summarizeFact(localFacts[localFactIdx]);
+  textEl.textContent = localFacts[localFactIdx];
   if (progEl) progEl.textContent = `${localFactIdx + 1} / ${localFacts.length}`;
-  if (hintEl) { hintEl.textContent = 'tap to hear'; hintEl.classList.remove('speaking'); }
+  if (hintEl) hintEl.textContent = 'tap to cycle';
 }
 
-function _cancelUtter() {
-  // Clear handlers BEFORE cancelling so iOS onerror from cancel() doesn't increment
-  if (_currentUtter) {
-    _currentUtter.onend  = null;
-    _currentUtter.onerror = null;
-    _currentUtter = null;
-  }
-  if (window.speechSynthesis) window.speechSynthesis.cancel();
-}
-
-function tapLocalFact() {
+function cycleLocalFact() {
   if (!localFacts.length) return;
-  // If already speaking, stop and cycle to next
-  if (window.speechSynthesis && window.speechSynthesis.speaking) {
-    _cancelUtter();
-    localFactIdx = (localFactIdx + 1) % localFacts.length;
-    showLocalFact();
-    return;
-  }
-  speakLocalFact();
-}
-
-function speakLocalFact() {
-  if (!localFacts.length) return;
-  const hintEl = document.getElementById('explore-facts-hint');
-  const text = localFacts[localFactIdx];
-
-  if (!window.speechSynthesis) {
-    // No TTS support — just cycle
-    localFactIdx = (localFactIdx + 1) % localFacts.length;
-    showLocalFact();
-    return;
-  }
-
-  _cancelUtter();
-  const utter = new SpeechSynthesisUtterance(text);
-  _currentUtter = utter;
-  utter.rate  = 0.85;
-  utter.pitch = 1.0;
-
-  utter.onstart = () => {
-    if (hintEl) { hintEl.textContent = '▶ reading…'; hintEl.classList.add('speaking'); }
-  };
-  utter.onend = utter.onerror = () => {
-    if (_currentUtter !== utter) return; // was manually cancelled — don't increment
-    _currentUtter = null;
-    localFactIdx = (localFactIdx + 1) % localFacts.length;
-    showLocalFact(); // resets hint to "tap to hear" and removes .speaking
-  };
-
-  window.speechSynthesis.speak(utter);
+  localFactIdx = (localFactIdx + 1) % localFacts.length;
+  showLocalFact();
 }
 
 function wmoCondition(code) {
@@ -5206,48 +4440,102 @@ function haversineM(lat1, lng1, lat2, lng2) {
 
 // ── Internet / Network switching ──────────────────
 let currentUpstream = null;
+let currentNetState = 'unknown';  // 'tmobile'|'starlink'|'warming_up'|'reverting'|'unknown'
+let warmupTotal = 120;            // seconds (used to compute fill %)
+
+const NET_ICONS = {
+  tmobile:   '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg>',
+  starlink:  '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>',
+  warming_up:'<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>',
+  reverting: '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>',
+  unknown:   '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>',
+};
 
 function updateNetworkUI(upstream) {
   currentUpstream = upstream;
-  const label = document.getElementById('netStatusLabel');
-  const sub   = document.getElementById('netStatusSub');
-  const icon  = document.getElementById('netStatusIcon');
-  const btnT  = document.getElementById('netBtnTmobile');
-  const btnS  = document.getElementById('netBtnStarlink');
-  btnT.classList.remove('active', 'switching');
-  btnS.classList.remove('active', 'switching');
-  if (upstream === 'tmobile') {
+  // updateNetState() drives the main status card; this just updates the buttons
+  const btnT = document.getElementById('netBtnTmobile');
+  const btnS = document.getElementById('netBtnStarlink');
+  if (!btnT || !btnS) return;
+  btnT.classList.toggle('active', upstream === 'tmobile');
+  btnS.classList.toggle('active', upstream === 'starlink');
+}
+
+function updateNetState(newState) {
+  currentNetState = newState;
+  const label      = document.getElementById('netStatusLabel');
+  const sub        = document.getElementById('netStatusSub');
+  const icon       = document.getElementById('netStatusIcon');
+  const warmupWrap = document.getElementById('netWarmupWrap');
+  const btnT       = document.getElementById('netBtnTmobile');
+  const btnS       = document.getElementById('netBtnStarlink');
+  if (!label) return;
+
+  warmupWrap.hidden = true;
+  btnT.classList.remove('switching');
+  btnS.classList.remove('switching');
+  icon.className = 'net-status-icon';
+
+  if (newState === 'tmobile') {
     label.textContent = 'T-Mobile';
     sub.textContent   = 'Primary upstream active';
-    icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg>';
+    icon.innerHTML    = NET_ICONS.tmobile;
+    icon.classList.add('state-tmobile');
     btnT.classList.add('active');
-  } else if (upstream === 'starlink') {
+    btnS.classList.remove('active');
+  } else if (newState === 'starlink') {
     label.textContent = 'Starlink';
-    sub.textContent   = 'Fallback upstream active';
-    icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>';
+    sub.textContent   = 'Satellite upstream active';
+    icon.innerHTML    = NET_ICONS.starlink;
+    icon.classList.add('state-starlink');
+    btnT.classList.remove('active');
     btnS.classList.add('active');
+  } else if (newState === 'warming_up') {
+    label.textContent     = 'Starlink Warming Up';
+    sub.textContent       = 'Dish is booting — ready in about 2 minutes';
+    icon.innerHTML        = NET_ICONS.warming_up;
+    icon.classList.add('state-warmup');
+    warmupWrap.hidden     = false;
+    btnT.classList.add('switching');
+    btnS.classList.add('switching');
+  } else if (newState === 'reverting') {
+    label.textContent = 'Switching to T-Mobile…';
+    sub.textContent   = 'Connecting to primary upstream';
+    icon.innerHTML    = NET_ICONS.reverting;
+    icon.classList.add('state-reverting');
+    btnT.classList.add('switching');
+    btnS.classList.add('switching');
   } else {
-    label.textContent = 'Unknown';
-    sub.textContent   = 'Detecting upstream…';
-    icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>';
+    label.textContent = 'Detecting…';
+    sub.textContent   = 'Checking upstream connection';
+    icon.innerHTML    = NET_ICONS.unknown;
+  }
+}
+
+function updateWarmupEta(etaSecs) {
+  const fill = document.getElementById('netWarmupFill');
+  const etaEl = document.getElementById('netWarmupEta');
+  if (!fill || !etaEl) return;
+  // warmupTotal initialized to 120; if we get an ETA > total, the warmup just started
+  if (etaSecs > warmupTotal) warmupTotal = etaSecs;
+  const pct = warmupTotal > 0 ? Math.max(0, Math.min(100, (1 - etaSecs / warmupTotal) * 100)) : 100;
+  fill.style.width = pct + '%';
+  if (etaSecs <= 0) {
+    etaEl.textContent = 'Almost ready…';
+  } else {
+    const m = Math.floor(etaSecs / 60);
+    const s = etaSecs % 60;
+    etaEl.textContent = m > 0 ? `Ready in ~${m}m ${s}s` : `Ready in ~${s}s`;
   }
 }
 
 function switchNetwork(target) {
-  if (target === currentUpstream) return;
   if (!mqttClient?.connected) return;
-  const btnT = document.getElementById('netBtnTmobile');
-  const btnS = document.getElementById('netBtnStarlink');
-  btnT.classList.add('switching');
-  btnS.classList.add('switching');
-  document.getElementById('netStatusLabel').textContent = 'Switching…';
-  document.getElementById('netStatusSub').textContent   = target === 'starlink' ? 'May take ~1 minute' : 'Please wait…';
   mqttClient.publish('van/network/upstream', target);
 }
 
 // ── Speed test ────────────────────────────────────
 let speedTestRunning = false;
-let speedTestRanThisSession = false; // true once running=true is seen this session
 
 function runSpeedTest() {
   if (!mqttClient?.connected || speedTestRunning) return;
@@ -5256,9 +4544,6 @@ function runSpeedTest() {
   btn.disabled = true;
   btn.classList.add('running');
   btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:ptr-spin .75s linear infinite"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg> Testing… (~60s)`;
-  // Clear any previous error immediately
-  const errEl = document.getElementById('speedError');
-  if (errEl) errEl.style.display = 'none';
   mqttClient.publish('van/network/speedtest', 'run');
 }
 
@@ -5271,7 +4556,6 @@ function updateSpeedUI(payload) {
 
   if (payload === 'running') {
     speedTestRunning = true;
-    speedTestRanThisSession = true;
     btn.disabled = true; btn.classList.add('running');
     btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:ptr-spin .75s linear infinite"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg> Testing… (~60s)`;
     return;
@@ -5281,11 +4565,7 @@ function updateSpeedUI(payload) {
     const d = JSON.parse(payload);
     const errEl = document.getElementById('speedError');
     if (d.error) {
-      // Only surface errors from tests that ran this session — suppress stale retained errors on page load
-      if (!speedTestRanThisSession) { errEl.style.display = 'none'; return; }
-      // Truncate long Ookla error chains to the first 80 chars
-      const msg = d.error.length > 80 ? d.error.slice(0, 80).replace(/[;,\s]+$/, '') + '…' : d.error;
-      errEl.textContent = msg;
+      errEl.textContent = 'Test failed: ' + d.error;
       errEl.style.display = 'block';
       return;
     }
@@ -5327,34 +4607,7 @@ async function captureGPS() {
 }
 
 // ── Stats overlay ──────────────────────────────────
-let statsFilter    = 'all';
-let statsTimeRange = 'all';
-let _chartPts      = [];   // current rendered points with pixel coords, for tooltip
-let _chartVBW      = 1;    // viewBox width for coordinate scaling
-let _chartAbortCtrl = null; // AbortController for chart event listeners
-let _statsPage     = 1;    // current pagination page for stats list
-
-// Aggregate raw test entries into daily averages, grouped by carrier.
-// Returns array sorted by ts, one entry per carrier-day with avg down/up/ping.
-function aggregateDailyStats(data) {
-  const map = {};
-  data.forEach(d => {
-    const dt = new Date(d.ts);
-    const key = `${d.upstream}|${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`;
-    if (!map[key]) map[key] = { upstream: d.upstream, ts: d.ts, downs: [], ups: [], pings: [] };
-    map[key].downs.push(d.down);
-    if (d.up  != null) map[key].ups.push(d.up);
-    if (d.ping != null) map[key].pings.push(d.ping);
-  });
-  return Object.values(map).map(g => ({
-    ts:       g.ts,
-    upstream: g.upstream,
-    down:     +(g.downs.reduce((a, b) => a + b, 0) / g.downs.length).toFixed(1),
-    up:       g.ups.length   ? +(g.ups.reduce((a, b) => a + b, 0)   / g.ups.length).toFixed(1)   : null,
-    ping:     g.pings.length ? Math.round(g.pings.reduce((a, b) => a + b, 0) / g.pings.length)   : null,
-  })).sort((a, b) => a.ts - b.ts);
-}
-
+let statsFilter = 'all';
 function openStats() {
   document.getElementById('statsOverlay').removeAttribute('hidden');
   renderStats();
@@ -5367,305 +4620,99 @@ function setStatsFilter(f) {
   document.querySelectorAll('.stats-filter').forEach(b => b.classList.toggle('active', b.dataset.f === f));
   renderStats();
 }
-function setStatsTimeRange(tr) {
-  statsTimeRange = tr;
-  document.querySelectorAll('.stats-tr').forEach(b => b.classList.toggle('active', b.dataset.tr === tr));
-  renderStats();
-}
 function renderStats() {
-  _statsPage = 1;
-  let all = getSpeedHistory();
-  if (statsFilter !== 'all') all = all.filter(d => d.upstream === statsFilter);
-  const now = Date.now();
-  const cutoffs = { day: 864e5, week: 7*864e5, month: 30*864e5 };
-  if (statsTimeRange !== 'all') all = all.filter(d => d.ts >= now - cutoffs[statsTimeRange]);
-  renderStatsChart(all);
-  renderStatsList(all);
+  const all = getSpeedHistory();
+  const data = statsFilter === 'all' ? all : all.filter(d => d.upstream === statsFilter);
+  renderStatsChart(data);
+  renderStatsList(data);
 }
-
 function renderStatsChart(data) {
-  // Abort previous event listeners before attaching new ones
-  if (_chartAbortCtrl) _chartAbortCtrl.abort();
-  _chartAbortCtrl = new AbortController();
-
-  const svg   = document.getElementById('statsChart');
-  const wrap  = svg.parentElement;
-  const ttip  = document.getElementById('chartTooltip');
+  const svg = document.getElementById('statsChart');
   svg.innerHTML = '';
-  _chartPts = [];
-  if (ttip) ttip.style.display = 'none';
-
-  // Use individual points for day/week; daily aggregates for month/all
-  const useAgg = (statsTimeRange === 'month' || statsTimeRange === 'all');
-  const raw    = [...data].sort((a,b) => a.ts - b.ts).filter(d => d.down != null);
-  const pts    = useAgg ? aggregateDailyStats(raw) : raw;
-
-  if (!pts.length) {
-    svg.setAttribute('height', '90');
-    const ns = 'http://www.w3.org/2000/svg';
-    const el = document.createElementNS(ns, 'text');
+  const sorted = [...data].sort((a,b) => a.ts - b.ts).filter(d => d.down != null);
+  if (sorted.length < 2) {
+    svg.setAttribute('height', '80');
+    const el = document.createElementNS('http://www.w3.org/2000/svg','text');
     el.setAttribute('x','50%'); el.setAttribute('y','50%'); el.setAttribute('text-anchor','middle');
     el.setAttribute('dominant-baseline','middle'); el.setAttribute('fill','var(--txt2)'); el.setAttribute('font-size','13');
-    el.textContent = raw.length < 1 ? 'No tests recorded yet' : 'No tests in this time range';
+    el.textContent = sorted.length < 1 ? 'No tests recorded yet' : 'Run at least 2 tests to see chart';
     svg.appendChild(el); return;
   }
-
-  const W  = Math.max(200, (wrap.clientWidth || 320) - 16);
-  const H  = 240;
-  const P  = {t:16, r:14, b:32, l:46};
+  const W = Math.max(200, svg.parentElement.clientWidth - 16);
+  const H = 160;
+  const P = {t:14, r:12, b:28, l:42};
   const cW = W - P.l - P.r, cH = H - P.t - P.b;
-  _chartVBW = W;
-  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-  svg.setAttribute('height', H);
-
-  const maxY = Math.max(1, ...pts.map(d => Math.max(d.down||0, d.up||0))) * 1.15;
-  const minT = pts[0].ts, maxT = pts[pts.length-1].ts;
-  const tRange = maxT - minT || 1;
-  // Single point: center it horizontally instead of pinning to left edge
-  const xp = pts.length === 1
-    ? () => P.l + cW / 2
-    : t => P.l + (t - minT) / tRange * cW;
-  const yp = v => P.t + cH - Math.min(cH, Math.max(0, (v / maxY) * cH));
-
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('height', H);
+  const maxY = Math.max(1, ...sorted.map(d => Math.max(d.down||0, d.up||0))) * 1.2;
+  const minT = sorted[0].ts, maxT = sorted[sorted.length-1].ts;
+  const xp = t => P.l + (sorted.length < 2 ? cW/2 : (t-minT)/(maxT-minT)*cW);
+  const yp = v => P.t + cH - Math.min(cH, Math.max(0, (v/maxY)*cH));
   const ns = 'http://www.w3.org/2000/svg';
-  const mk = (tag, a) => { const e = document.createElementNS(ns, tag); Object.entries(a).forEach(([k,v]) => e.setAttribute(k,v)); return e; };
-
-  // Y grid + labels
-  [0, .25, .5, .75, 1].forEach(f => {
+  const mk = (tag, a) => { const e = document.createElementNS(ns,tag); Object.entries(a).forEach(([k,v])=>e.setAttribute(k,v)); return e; };
+  // Grid
+  [0,.25,.5,.75,1].forEach(f => {
     const gy = yp(maxY*f), val = Math.round(maxY*f);
-    svg.appendChild(mk('line', {x1:P.l, y1:gy, x2:P.l+cW, y2:gy, stroke:'rgba(255,255,255,0.07)', 'stroke-width':1}));
-    const t = mk('text', {x:P.l-5, y:gy+4, 'text-anchor':'end', fill:'var(--txt2)', 'font-size':9});
-    t.textContent = val >= 1000 ? (val/1000).toFixed(1)+'G' : val;
-    svg.appendChild(t);
+    svg.appendChild(mk('line',{x1:P.l,y1:gy,x2:P.l+cW,y2:gy,stroke:'rgba(255,255,255,0.07)','stroke-width':1}));
+    const t = mk('text',{x:P.l-4,y:gy+4,'text-anchor':'end',fill:'var(--txt2)','font-size':9}); t.textContent=val; svg.appendChild(t);
   });
-
-  // X labels — time-aware formatting
-  const lblCount = Math.min(5, pts.length);
-  for (let i = 0; i < lblCount; i++) {
-    const d  = pts[Math.round(i * (pts.length - 1) / Math.max(1, lblCount - 1))];
+  // X labels
+  const lblCount = Math.min(4, sorted.length);
+  for (let i=0;i<lblCount;i++) {
+    const d = sorted[Math.round(i*(sorted.length-1)/(lblCount-1))];
     const dt = new Date(d.ts);
-    let lbl;
-    if (statsTimeRange === 'day')        lbl = dt.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
-    else if (statsTimeRange === 'week')  lbl = dt.toLocaleDateString('en-US', {weekday:'short', month:'numeric', day:'numeric'});
-    else                                  lbl = dt.toLocaleDateString('en-US', {month:'short', day:'numeric'});
-    const t = mk('text', {x:xp(d.ts), y:H-4, 'text-anchor':'middle', fill:'var(--txt2)', 'font-size':9});
-    t.textContent = lbl;
-    svg.appendChild(t);
+    const lbl = `${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
+    const t = mk('text',{x:xp(d.ts),y:H-4,'text-anchor':'middle',fill:'var(--txt2)','font-size':8}); t.textContent=lbl; svg.appendChild(t);
   }
-
-  // Per-carrier: area fill + download line + upload dashed + dots
+  // Draw per-carrier lines
   const colors = {tmobile:'var(--amber)', starlink:'var(--blue)', unknown:'var(--txt2)'};
-  const showDots = pts.length <= 120;
-  const dotR     = pts.length > 40 ? 2 : 3.5;
-  [...new Set(pts.map(d => d.upstream))].forEach(carrier => {
-    const cp  = pts.filter(d => d.upstream === carrier);
-    if (!cp.length) return;
-    const col = colors[carrier] || 'var(--txt2)';
-    if (cp.length > 1) {
-      // Semi-transparent area under download
-      const areaStr = `${xp(cp[0].ts)},${P.t+cH} ` + cp.map(d => `${xp(d.ts)},${yp(d.down||0)}`).join(' ') + ` ${xp(cp[cp.length-1].ts)},${P.t+cH}`;
-      svg.appendChild(mk('polygon', {points:areaStr, fill:col, opacity:'0.10'}));
-      // Download solid
-      svg.appendChild(mk('polyline', {points:cp.map(d=>`${xp(d.ts)},${yp(d.down||0)}`).join(' '), fill:'none', stroke:col, 'stroke-width':2, 'stroke-linejoin':'round', 'stroke-linecap':'round'}));
+  const carriers = [...new Set(sorted.map(d=>d.upstream))];
+  carriers.forEach(carrier => {
+    const pts = sorted.filter(d=>d.upstream===carrier);
+    if (!pts.length) return;
+    const col = colors[carrier]||'var(--txt2)';
+    // Download solid line
+    if (pts.length > 1) {
+      svg.appendChild(mk('polyline',{points:pts.map(d=>`${xp(d.ts)},${yp(d.down||0)}`).join(' '),fill:'none',stroke:col,'stroke-width':2,'stroke-linejoin':'round','stroke-linecap':'round'}));
       // Upload dashed
-      svg.appendChild(mk('polyline', {points:cp.map(d=>`${xp(d.ts)},${yp(d.up||0)}`).join(' '), fill:'none', stroke:col, 'stroke-width':1.5, 'stroke-linejoin':'round', 'stroke-dasharray':'4 3', opacity:'.6'}));
+      svg.appendChild(mk('polyline',{points:pts.map(d=>`${xp(d.ts)},${yp(d.up||0)}`).join(' '),fill:'none',stroke:col,'stroke-width':1.5,'stroke-linejoin':'round','stroke-dasharray':'4 3',opacity:.65}));
     }
-    if (showDots) cp.forEach(d => {
-      svg.appendChild(mk('circle', {cx:xp(d.ts), cy:yp(d.down||0), r:dotR, fill:col, stroke:'var(--bg)', 'stroke-width':dotR > 2 ? 1.5 : 1}));
-    });
+    // Dots
+    pts.forEach(d => { svg.appendChild(mk('circle',{cx:xp(d.ts),cy:yp(d.down||0),r:3.5,fill:col,stroke:'var(--bg)','stroke-width':1.5})); });
   });
-
-  // Store point data for tooltip (with pixel X in viewBox coords)
-  _chartPts = pts.map(d => ({ ...d, _px: xp(d.ts) }));
-
-  // Crosshair line (hidden until touch/hover)
-  svg.appendChild(mk('line', {id:'chartCrosshair', x1:P.l, y1:P.t, x2:P.l, y2:P.t+cH,
-    stroke:'rgba(255,255,255,0.35)', 'stroke-width':1, 'stroke-dasharray':'3 3', opacity:'0'}));
-
-  // Transparent interaction overlay
-  svg.appendChild(mk('rect', {id:'chartOverlay', x:P.l, y:P.t, width:cW, height:cH, fill:'transparent', cursor:'crosshair'}));
-
-  // Attach touch/mouse events
-  function svgPixelX(e) {
-    const rect  = svg.getBoundingClientRect();
-    const clX   = e.touches ? e.touches[0].clientX : e.clientX;
-    return (clX - rect.left) * (_chartVBW / (svg.clientWidth || rect.width));
-  }
-  function nearestPt(vbX) {
-    if (!_chartPts.length) return null;
-    return _chartPts.reduce((b, p) => Math.abs(p._px - vbX) < Math.abs(b._px - vbX) ? p : b);
-  }
-  function showTip(e) {
-    if (e.cancelable) e.preventDefault();
-    const vbX = svgPixelX(e);
-    if (vbX < P.l || vbX > P.l + cW) { hideTip(); return; }
-    const p  = nearestPt(vbX);
-    if (!p) return;
-    const ch = document.getElementById('chartCrosshair');
-    if (ch) { ch.setAttribute('x1', p._px); ch.setAttribute('x2', p._px); ch.setAttribute('opacity','1'); }
-    const dt = new Date(p.ts);
-    let dateStr;
-    if (statsTimeRange === 'day')       dateStr = dt.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
-    else if (statsTimeRange === 'week') dateStr = dt.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'}) + ' ' + dt.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
-    else                                 dateStr = dt.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
-    const carrierName  = p.upstream==='tmobile'?'T-Mobile':p.upstream==='starlink'?'Starlink':'Unknown';
-    const carrierClass = p.upstream==='starlink'?'starlink':'';
-    if (ttip) {
-      ttip.innerHTML = `<div class="ctt-date">${dateStr}</div><div class="ctt-carrier ${carrierClass}">${carrierName}</div><div class="ctt-speeds">↓ ${p.down??'—'} / ↑ ${p.up??'—'} Mbps</div>${p.ping?`<div class="ctt-ping">${p.ping} ms ping</div>`:''}`;
-      // Position tooltip relative to chart-wrap; SVG left edge is at 8px (wrap left padding)
-      const svgW   = svg.clientWidth || (wrap.clientWidth - 18);
-      const screenX = p._px / _chartVBW * svgW + 8;
-      ttip.style.left = Math.max(0, Math.min(screenX, (wrap.clientWidth || 300) - 165)) + 'px';
-      ttip.style.display = 'block';
-    }
-  }
-  function hideTip() {
-    if (ttip) ttip.style.display = 'none';
-    const ch = document.getElementById('chartCrosshair');
-    if (ch) ch.setAttribute('opacity', '0');
-  }
-  const sig = _chartAbortCtrl.signal;
-  svg.addEventListener('mousemove',  showTip, { signal: sig });
-  svg.addEventListener('touchmove',  showTip, { passive: false, signal: sig });
-  svg.addEventListener('mouseleave', hideTip, { signal: sig });
-  svg.addEventListener('touchend',   hideTip, { signal: sig });
 }
-
-function statsEntryHtml(d) {
-  const dt = new Date(d.ts);
-  const dateStr = dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' · ' + dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-  const carrierLabel = d.upstream==='tmobile'?'T-Mobile':d.upstream==='starlink'?'Starlink':d.upstream||'Unknown';
-  const carrierClass = d.upstream==='tmobile'?'tmobile':d.upstream==='starlink'?'starlink':'unknown';
-  const gpsHtml = d.lat ? `<a class="stats-gps-link" href="https://maps.apple.com/?ll=${d.lat.toFixed(5)},${d.lng.toFixed(5)}" target="_blank"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> ${d.lat.toFixed(4)}, ${d.lng.toFixed(4)}</a>` : '';
-  return `<div class="stats-entry">
-    <div class="stats-entry-header">
-      <span class="stats-carrier-badge stats-carrier-${carrierClass}">${carrierLabel}</span>
-      <span class="stats-entry-date">${dateStr}</span>
-    </div>
-    <div class="stats-entry-vals">
-      <span class="stats-entry-down">${d.down??'—'}</span><span class="stats-entry-unit"> ↓</span>
-      <span class="stats-entry-sep">/</span>
-      <span class="stats-entry-up">${d.up??'—'}</span><span class="stats-entry-unit"> ↑ Mbps</span>
-      <span class="stats-entry-sep">·</span>
-      <span class="stats-entry-ping">${d.ping??'—'} ms</span>
-    </div>
-    <div class="stats-entry-meta">${d.server||''}${d.server&&gpsHtml?' · ':''}${gpsHtml}</div>
-  </div>`;
-}
-
-let _statsData = []; // sorted data for the current stats view (for pagination)
-
 function renderStatsList(data) {
-  const PAGE = 50;
-  _statsData  = [...data].sort((a,b) => b.ts - a.ts);
-  const el    = document.getElementById('statsList');
-  if (!_statsData.length) {
-    el.innerHTML = '<div class="stats-empty">No tests recorded yet.<br>Run a speed test to start tracking.</div>';
-    return;
-  }
-  const page = _statsData.slice(0, PAGE * _statsPage);
-  const more = _statsData.length > page.length;
-  el.innerHTML = page.map(statsEntryHtml).join('') +
-    (more ? `<button class="stats-load-more" onclick="_statsPage++;renderStatsList(_statsData)">Load ${Math.min(PAGE, _statsData.length - page.length)} more</button>` : '');
+  const el = document.getElementById('statsList');
+  const sorted = [...data].sort((a,b) => b.ts - a.ts);
+  if (!sorted.length) { el.innerHTML = '<div class="stats-empty">No tests recorded yet.<br>Run a speed test to start tracking.</div>'; return; }
+  el.innerHTML = sorted.map(d => {
+    const dt = new Date(d.ts);
+    const dateStr = dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' · ' + dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    const carrierLabel = d.upstream==='tmobile'?'T-Mobile':d.upstream==='starlink'?'Starlink':d.upstream||'Unknown';
+    const carrierClass = d.upstream==='tmobile'?'tmobile':d.upstream==='starlink'?'starlink':'unknown';
+    const gpsHtml = d.lat ? `<a class="stats-gps-link" href="https://maps.apple.com/?ll=${d.lat.toFixed(5)},${d.lng.toFixed(5)}" target="_blank"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> ${d.lat.toFixed(4)}, ${d.lng.toFixed(4)}</a>` : '';
+    return `<div class="stats-entry">
+      <div class="stats-entry-header">
+        <span class="stats-carrier-badge stats-carrier-${carrierClass}">${carrierLabel}</span>
+        <span class="stats-entry-date">${dateStr}</span>
+      </div>
+      <div class="stats-entry-vals">
+        <span class="stats-entry-down">${d.down??'—'}</span><span class="stats-entry-unit"> ↓</span>
+        <span class="stats-entry-sep">/</span>
+        <span class="stats-entry-up">${d.up??'—'}</span><span class="stats-entry-unit"> ↑ Mbps</span>
+        <span class="stats-entry-sep">·</span>
+        <span class="stats-entry-ping">${d.ping??'—'} ms</span>
+      </div>
+      <div class="stats-entry-meta">${d.server||''}${d.server&&gpsHtml?' · ':''}${gpsHtml}</div>
+    </div>`;
+  }).join('');
 }
 
 // ── Starlink power control ────────────────────────
 let starlinkOn        = null;   // true / false / null (unknown)
 let starlinkAuto      = false;
-let starlinkThreshold = 5;      // T-Mobile speed (Mbps) below which Starlink auto-switches on
+let starlinkThreshold = 35;     // T-Mobile signal level below which Starlink auto-switches on
 let starlinkQualityDismissed = false;
 let starlinkQualityLast = 'unknown';
-
-function starlinkSubLabel() {
-  if (!starlinkAuto) {
-    return starlinkOn ? 'Manual · dish powered on' : 'Manual · tap to power on';
-  }
-  return starlinkOn ? 'Plug is powered on' : 'Plug is powered off';
-}
-
-function updateOBDUI(key, val) {
-  switch (key) {
-    case 'connected': {
-      const pill = document.getElementById('engine-status-pill');
-      if (!pill) break;
-      if (val === 'ok') {
-        pill.textContent = '● Connected';
-        pill.className = 'connected';
-      } else if (val === 'error') {
-        pill.textContent = '● Error';
-        pill.className = 'error';
-      } else {
-        pill.textContent = '● Searching…';
-        pill.className = '';
-      }
-      break;
-    }
-    case 'rpm': {
-      const el = document.getElementById('engine-rpm');
-      if (el) el.textContent = parseInt(val).toLocaleString();
-      break;
-    }
-    case 'coolant-temp': {
-      const el = document.getElementById('engine-coolant');
-      if (!el) break;
-      const t = parseInt(val);
-      el.textContent = t + '°F';
-      el.className = 'engine-value' + (t >= 230 ? ' alert' : t >= 210 ? ' warn' : '');
-      break;
-    }
-    case 'fuel-level': {
-      const el = document.getElementById('engine-fuel');
-      if (!el) break;
-      const pct = parseInt(val);
-      el.textContent = pct + '%';
-      el.className = 'engine-value' + (pct <= 15 ? ' alert' : pct <= 25 ? ' warn' : '');
-      break;
-    }
-    case 'throttle-pos': {
-      const pct = parseInt(val);
-      const fill = document.getElementById('engine-throttle-fill');
-      const lbl  = document.getElementById('engine-throttle-val');
-      if (fill) fill.style.width = pct + '%';
-      if (lbl)  lbl.textContent  = pct + '%';
-      break;
-    }
-    case 'voltage': {
-      const el = document.getElementById('engine-voltage');
-      if (!el) break;
-      const v = parseFloat(val);
-      el.textContent = v.toFixed(1) + 'V';
-      el.className = 'engine-value' + (v < 12.0 ? ' alert' : v < 13.0 ? ' warn' : '');
-      break;
-    }
-    case 'mil': {
-      const icon = document.getElementById('engine-mil-icon');
-      if (!icon) break;
-      if (val === 'on') {
-        // Engine warning light SVG
-        icon.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>';
-      } else {
-        icon.innerHTML = '';
-      }
-      break;
-    }
-    case 'dtcs': {
-      const row  = document.getElementById('engine-dtc-row');
-      const text = document.getElementById('engine-dtc-text');
-      if (!row || !text) break;
-      try {
-        const codes = JSON.parse(val);
-        if (codes.length === 0) {
-          row.classList.remove('has-codes');
-          text.textContent = 'No fault codes';
-        } else {
-          row.classList.add('has-codes');
-          text.textContent = codes.join('  ·  ');
-        }
-      } catch {}
-      break;
-    }
-  }
-}
 
 function updateStarlinkPower(state) {
   starlinkOn = (state === 'on');
@@ -5674,7 +4721,7 @@ function updateStarlinkPower(state) {
   const sub   = document.getElementById('starlinkPowerSub');
   btn.classList.toggle('on', starlinkOn);
   label.textContent = starlinkOn ? 'Starlink On' : 'Starlink Off';
-  sub.textContent   = starlinkSubLabel();
+  sub.textContent   = starlinkOn ? 'Plug is powered on' : 'Plug is powered off';
 }
 
 function updateTmobileSignal(sig) {
@@ -5704,28 +4751,19 @@ function updateStarlinkAuto(on) {
   starlinkAuto = on;
   document.getElementById('starlinkAutoBtn').classList.toggle('on', on);
   document.getElementById('starlinkThreshRow').classList.toggle('disabled', !on);
-  document.getElementById('starlinkAutoHint').hidden   = !on;
-  document.getElementById('starlinkManualHint').hidden = on;
-  // Re-render power sub-label so it reflects manual vs auto mode
-  const sub = document.getElementById('starlinkPowerSub');
-  if (sub) sub.textContent = starlinkSubLabel();
 }
 
 function updateStarlinkThreshold(val) {
   starlinkThreshold = val;
   const el = document.getElementById('threshSlider');
-  if (el) {
-    el.value = val;
-    // slider range is 1–25 Mbps
-    el.style.setProperty('--pct', ((val - 1) / 24 * 100).toFixed(1) + '%');
-  }
+  if (el) { el.value = val; el.style.setProperty('--pct', val + '%'); }
   document.getElementById('threshVal').textContent = val;
   document.getElementById('threshHintVal').textContent = val;
 }
 
 function onThreshInput(el) {
   const val = parseInt(el.value);
-  el.style.setProperty('--pct', ((val - 1) / 24 * 100).toFixed(1) + '%');
+  el.style.setProperty('--pct', val + '%');
   document.getElementById('threshVal').textContent = val;
   document.getElementById('threshHintVal').textContent = val;
 }
@@ -5767,6 +4805,25 @@ function toggleStarlinkAuto() {
   const target = starlinkAuto ? 'off' : 'on';
   mqttClient.publish('van/starlink/auto', target);
   updateStarlinkAuto(!starlinkAuto);
+  // Enabling auto clears manual override on the Pi side; reflect that in UI
+  if (!starlinkAuto) updateManualOverride(false);  // starlinkAuto was true before toggle
+}
+
+// ── Manual override ───────────────────────────────
+let manualOverrideActive = false;
+
+function updateManualOverride(active) {
+  manualOverrideActive = active;
+  const chip = document.getElementById('netOverrideChip');
+  if (chip) chip.hidden = !active;
+}
+
+function clearManualOverride() {
+  if (!mqttClient?.connected) return;
+  // Re-enable auto to clear the override on the Pi
+  mqttClient.publish('van/starlink/auto', 'on');
+  updateStarlinkAuto(true);
+  updateManualOverride(false);
 }
 
 // ── MQTT ──────────────────────────────────────────
@@ -5843,7 +4900,6 @@ function updateSoc(val) {
   const bar = document.getElementById('battBar');
   if (bar) bar.style.width = pct + '%';
   recalcTTE();
-  checkBattFull(pct);
 }
 
 let battPower   = 0;
@@ -5983,15 +5039,6 @@ function updateSolar(val) {
   checkHighIdle();
 }
 
-function requestInverterData() {
-  if (!mqttClient?.connected) return;
-  mqttClient.publish(`R/${PORTAL_ID}/keepalive`, '');
-  mqttClient.publish(`R/${PORTAL_ID}/system/0/Serial`, '');
-  mqttClient.publish(`R/${PORTAL_ID}/vebus/276/Mode`, '');
-  mqttClient.publish(`R/${PORTAL_ID}/vebus/276/Ac/In/1/CurrentLimit`, '');
-  mqttClient.publish(`R/${PORTAL_ID}/vebus/276/Ac/In/1/L1/V`, '');
-}
-
 function connectMQTT() {
   const isHttps = window.location.protocol === 'https:';
   const mqttUrl = isHttps
@@ -6010,25 +5057,12 @@ function connectMQTT() {
     client.subscribe(`N/${PORTAL_ID}/#`);
     client.subscribe('van/status/light/+');
     client.subscribe('van/status/ac/+');
-    client.subscribe('van/status/rope-light/+');
-    client.subscribe('van/status/scene/+');
-    client.subscribe('van/status/scenes');
     client.subscribe('van/status/network/+');
-    // Bootstrap: wait for any retained van/status/scenes to arrive + merge,
-    // then publish our local scenes so other instances pick them up.
-    if (!connectMQTT._scenesBootstrapped) {
-      connectMQTT._scenesBootstrapped = true;
-      setTimeout(() => {
-        if (mqttClient?.connected)
-          mqttClient.publish('van/status/scenes', JSON.stringify(scenes), { retain: true, qos: 0 });
-      }, 1500);
-    }
     client.subscribe('van/status/starlink/+');
-    client.subscribe('van/status/obd/+');
-    // Request immediately — don't wait for sub callbacks (fragile, caused blank panels)
-    requestInverterData();
-    // 3-second retry in case the first keepalive is dropped
-    setTimeout(requestInverterData, 3000);
+    client.publish(`R/${PORTAL_ID}/keepalive`, '');
+    client.publish(`R/${PORTAL_ID}/system/0/Serial`, '');
+    client.publish(`R/${PORTAL_ID}/vebus/276/Mode`, '');
+    client.publish(`R/${PORTAL_ID}/vebus/276/Ac/In/1/CurrentLimit`, '');
   });
 
   client.on('message', (topic, msg) => {
@@ -6094,101 +5128,6 @@ function connectMQTT() {
       return;
     }
 
-    if (topic.startsWith('van/status/rope-light/')) {
-      const key = topic.split('/')[3];
-      const val = msg.toString().trim();
-      if (key === 'power') {
-        const newOn = val === 'on';
-        if (newOn !== ropeOn) {
-          ropeOn = newOn;
-          document.getElementById('ropeRow').classList.toggle('on', ropeOn);
-          document.getElementById('ropeIcon').setAttribute('stroke', ropeOn ? 'var(--amber)' : 'var(--txt2)');
-          if (!ropeOn) {
-            document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById('ropeSpeedRow').classList.remove('active');
-            ropeActiveColor = null;
-            ropeActiveEffect = null;
-          }
-        }
-      } else if (key === 'color' && val) {
-        if (val !== ropeActiveColor) {
-          ropeOn = true;
-          ropeActiveColor = val;
-          ropeActiveEffect = null;
-          document.getElementById('ropeRow').classList.add('on');
-          document.getElementById('ropeIcon').setAttribute('stroke', 'var(--amber)');
-          document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
-          const colorBtn = document.getElementById('rope' + val.charAt(0).toUpperCase() + val.slice(1));
-          if (colorBtn) colorBtn.classList.add('active');
-          document.getElementById('ropeSpeedRow').classList.remove('active');
-        }
-      } else if (key === 'effect' && val) {
-        if (val !== ropeActiveEffect) {
-          ropeOn = true;
-          ropeActiveEffect = val;
-          ropeActiveColor = null;
-          document.getElementById('ropeRow').classList.add('on');
-          document.getElementById('ropeIcon').setAttribute('stroke', 'var(--amber)');
-          document.querySelectorAll('.rope-color-btn').forEach(b => b.classList.remove('active'));
-          const effectBtn = document.getElementById('ropeEffect' + val.charAt(0).toUpperCase() + val.slice(1));
-          if (effectBtn) effectBtn.classList.add('active');
-          document.getElementById('ropeSpeedRow').classList.add('active');
-        }
-      } else if (key === 'brightness') {
-        const pct = parseInt(val);
-        if (!isNaN(pct) && pct !== ropeActiveBrightness) {
-          ropeActiveBrightness = pct;
-          document.getElementById('ropeBrightPct').textContent = pct + '%';
-          document.getElementById('ropeBrightness').value = pct;
-          document.getElementById('ropeBrightness').style.setProperty('--pct', pct + '%');
-        }
-      } else if (key === 'speed') {
-        const spd = parseInt(val);
-        if (!isNaN(spd) && spd !== ropeActiveSpeed) {
-          ropeActiveSpeed = spd;
-          document.getElementById('ropeSpeedPct').textContent = spd;
-          document.getElementById('ropeSpeed').value = spd;
-          document.getElementById('ropeSpeed').style.setProperty('--pct', ((spd - 1) / 9 * 100).toFixed(0) + '%');
-        }
-      }
-      return;
-    }
-
-    if (topic === 'van/status/scenes') {
-      try {
-        const mqttScenes = JSON.parse(msg.toString());
-        if (!Array.isArray(mqttScenes)) return;
-        // Merge: use MQTT as base, append any local-only scenes (by ID)
-        const merged = mqttScenes.map(migrateScene);
-        let added = false;
-        scenes.forEach(local => {
-          if (!merged.find(m => m.id === local.id)) {
-            merged.push(local);
-            added = true;
-          }
-        });
-        scenes = merged;
-        localStorage.setItem('scenes', JSON.stringify(scenes));
-        if (added) {
-          // Re-publish merged set so other instances get our local-only scenes
-          mqttClient.publish('van/status/scenes', JSON.stringify(scenes), { retain: true, qos: 0 });
-        }
-        renderScenes();
-      } catch {}
-      return;
-    }
-
-    if (topic === 'van/status/scene/active') {
-      const id = msg.toString().trim();
-      // Only update if this instance didn't just set it (avoid re-triggering applyScene)
-      if (id && id !== lastAppliedSceneId && scenes.find(s => s.id === id)) {
-        lastAppliedSceneId = id;
-        sceneIsDirty = false;
-        renderScenes();
-      }
-      return;
-    }
-
     if (topic.startsWith('van/status/network/')) {
       const key   = topic.split('/').slice(3).join('/');
       const val   = msg.toString().trim();
@@ -6210,13 +5149,9 @@ function connectMQTT() {
       else if (key === 'auto')           updateStarlinkAuto(val === 'on');
       else if (key === 'threshold')      updateStarlinkThreshold(parseInt(val));
       else if (key === 'quality')        updateStarlinkQuality(val);
-      return;
-    }
-
-    if (topic.startsWith('van/status/obd/')) {
-      const key = topic.split('/')[3];
-      const val = msg.toString().trim();
-      updateOBDUI(key, val);
+      else if (key === 'state')          updateNetState(val);
+      else if (key === 'warmup_eta')     updateWarmupEta(parseInt(val));
+      else if (key === 'manual-override') updateManualOverride(val === 'on');
       return;
     }
 
@@ -6267,8 +5202,7 @@ function connectMQTT() {
   client.on('offline',   () => setLiveStatus(false));
   client.on('reconnect', () => setConnecting());
 
-  // Every 30s: keepalive + re-request inverter values so the display stays in sync
-  setInterval(() => { requestInverterData(); }, 30000);
+  setInterval(() => { if (client.connected) client.publish(`R/${PORTAL_ID}/keepalive`, ''); }, 30000);
 }
 
 connectMQTT();
@@ -6306,7 +5240,10 @@ function refreshData() {
     connectMQTT();
     return;
   }
-  requestInverterData();
+  mqttClient.publish(`R/${PORTAL_ID}/keepalive`, '');
+  mqttClient.publish(`R/${PORTAL_ID}/system/0/Serial`, '');
+  mqttClient.publish(`R/${PORTAL_ID}/vebus/276/Mode`, '');
+  mqttClient.publish(`R/${PORTAL_ID}/vebus/276/Ac/In/1/CurrentLimit`, '');
 }
 
 (function setupPTR() {

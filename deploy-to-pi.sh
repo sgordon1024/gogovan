@@ -1,12 +1,11 @@
 #!/bin/bash
-# Deploy updated files to GoGoVan Pi
-# Dashboard URLs: http://vanpi.local  (on Apple Pi) | http://100.98.52.107 (via Tailscale)
+# Deploy GoGoVan dashboard files to Pi
+# URLs: http://vanpi.local  |  http://100.98.52.107  |  https://vanpi.tail27a0b4.ts.net
 
 PASS="windows"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Prefer CWD when it has an index.html (e.g. running from a worktree).
-# Fall back to the script's own directory.
 if [ -f "$(pwd)/index.html" ]; then
   DIR="$(pwd)"
 else
@@ -14,66 +13,123 @@ else
 fi
 echo "→ Source directory: $DIR"
 
-# Auto-detect Pi — try Tailscale first, fall back to local network
+# ── Detect Pi ──────────────────────────────────────────────────────────────
 echo "=== Detecting Pi connection ==="
+PI=""
+
+# 1. Tailscale (works from anywhere when both devices are logged in)
 if sshpass -p "$PASS" ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "sgordon1024@100.98.52.107" "echo ok" &>/dev/null; then
   PI="sgordon1024@100.98.52.107"
   echo "→ Using Tailscale (100.98.52.107)"
-elif sshpass -p "$PASS" ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "sgordon1024@vanpi.local" "echo ok" &>/dev/null; then
-  PI="sgordon1024@vanpi.local"
-  echo "→ Using local network (vanpi.local)"
-elif sshpass -p "$PASS" ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "sgordon1024@192.168.8.106" "echo ok" &>/dev/null; then
-  PI="sgordon1024@192.168.8.106"
-  echo "→ Using Apple Pi LAN (192.168.8.106)"
-else
-  echo "ERROR: Cannot reach Pi via Tailscale or local network."
-  echo "  - Via Tailscale: connect iPhone to Tailscale first"
-  echo "  - Via Apple Pi Wi-Fi: connect to Apple Pi network first"
+fi
+
+# 2. Known static IP on 'apple pi' router network
+if [ -z "$PI" ]; then
+  if sshpass -p "$PASS" ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "sgordon1024@192.168.8.106" "echo ok" &>/dev/null; then
+    PI="sgordon1024@192.168.8.106"
+    echo "→ Using apple pi network (192.168.8.106)"
+  fi
+fi
+
+# 3. mDNS — vanpi.local (works when Mac is on same LAN as Pi)
+if [ -z "$PI" ]; then
+  if sshpass -p "$PASS" ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "sgordon1024@vanpi.local" "echo ok" &>/dev/null; then
+    PI="sgordon1024@vanpi.local"
+    echo "→ Using local mDNS (vanpi.local)"
+  fi
+fi
+
+# 4. Try Pi's IP directly if caller set PI_IP env var
+if [ -z "$PI" ] && [ -n "$PI_IP" ]; then
+  if sshpass -p "$PASS" ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "sgordon1024@$PI_IP" "echo ok" &>/dev/null; then
+    PI="sgordon1024@$PI_IP"
+    echo "→ Using PI_IP=$PI_IP"
+  fi
+fi
+
+if [ -z "$PI" ]; then
+  echo ""
+  echo "ERROR: Cannot reach Pi. Try one of:"
+  echo "  1. Log into Tailscale on this Mac, then re-run"
+  echo "  2. Connect this Mac to the same Wi-Fi as the Pi (e.g. 'apple pi'), then re-run"
+  echo "  3. Run:  PI_IP=<pi-ip> ./deploy-to-pi.sh"
+  echo "     (find Pi IP in your router's device list, or run 'arp -a' on the Pi's network)"
   exit 1
 fi
 
+# ── Sudoers (nmcli without password) ──────────────────────────────────────
+echo "=== Ensuring sudoers entry for nmcli ==="
+sshpass -p "$PASS" ssh "$PI" \
+  'echo windows | sudo -S bash -c "echo \"sgordon1024 ALL=(ALL) NOPASSWD: /usr/bin/nmcli\" > /etc/sudoers.d/gogovan-nmcli && chmod 440 /etc/sudoers.d/gogovan-nmcli" && echo sudoers ok"' \
+  || echo "(sudoers entry may already exist — continuing)"
+
+# ── can-bridge.py ─────────────────────────────────────────────────────────
 echo "=== Copying can-bridge.py ==="
 CAN_SRC="$DIR/can-bridge.py"; [ -f "$CAN_SRC" ] || CAN_SRC="$SCRIPT_DIR/can-bridge.py"
 sshpass -p "$PASS" scp "$CAN_SRC" "$PI:~/can-bridge.py" || { echo "FAILED: can-bridge.py copy"; exit 1; }
 
-echo "=== Adding sudoers entry ==="
-sshpass -p "$PASS" ssh "$PI" 'echo windows | sudo -S bash -c "echo \"sgordon1024 ALL=(ALL) NOPASSWD: /usr/bin/nmcli\" > /etc/sudoers.d/gogovan-nmcli && chmod 440 /etc/sudoers.d/gogovan-nmcli" && echo "sudoers ok"' || echo "WARNING: sudoers may already exist"
+echo "=== Restarting can-bridge ==="
+sshpass -p "$PASS" ssh "$PI" 'echo windows | sudo -S systemctl restart can-bridge && echo "can-bridge restarted"' \
+  || { echo "FAILED: can-bridge restart"; exit 1; }
 
-echo "=== Restarting can-bridge service ==="
-sshpass -p "$PASS" ssh "$PI" 'echo windows | sudo -S systemctl restart can-bridge && echo "Service restarted"' || { echo "FAILED: service restart"; exit 1; }
+# ── starlink-bridge.py ────────────────────────────────────────────────────
+echo "=== Copying starlink-bridge.py ==="
+SL_SRC="$DIR/starlink-bridge.py"; [ -f "$SL_SRC" ] || SL_SRC="$SCRIPT_DIR/starlink-bridge.py"
+sshpass -p "$PASS" scp "$SL_SRC" "$PI:~/starlink-bridge.py" || { echo "FAILED: starlink-bridge.py copy"; exit 1; }
 
+echo "=== Installing starlink-bridge systemd service ==="
+sshpass -p "$PASS" ssh "$PI" 'bash -s' << 'REMOTE'
+set -e
+PASS="windows"
+# Write the service file (correct path — home dir, not gogovan subdir)
+echo "$PASS" | sudo -S tee /etc/systemd/system/starlink-bridge.service > /dev/null << 'UNIT'
+[Unit]
+Description=Starlink smart plug + network routing bridge
+After=network.target mosquitto.service
+Wants=mosquitto.service
+
+[Service]
+ExecStart=/usr/bin/python3 /home/sgordon1024/starlink-bridge.py
+WorkingDirectory=/home/sgordon1024
+Restart=always
+RestartSec=10
+User=sgordon1024
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+echo "$PASS" | sudo -S systemctl daemon-reload
+echo "$PASS" | sudo -S systemctl enable starlink-bridge
+echo "$PASS" | sudo -S systemctl restart starlink-bridge
+echo "starlink-bridge installed and started"
+REMOTE
+
+# ── index.html ────────────────────────────────────────────────────────────
 echo "=== Copying index.html ==="
 sshpass -p "$PASS" scp "$DIR/index.html" "$PI:~/index.html" || { echo "FAILED: index.html copy"; exit 1; }
 
+# ── rope-light.py ─────────────────────────────────────────────────────────
 echo "=== Copying rope-light.py ==="
 ROPE_SRC="$DIR/rope-light.py"; [ -f "$ROPE_SRC" ] || ROPE_SRC="$SCRIPT_DIR/rope-light.py"
 sshpass -p "$PASS" scp "$ROPE_SRC" "$PI:~/rope-light.py" || { echo "FAILED: rope-light.py copy"; exit 1; }
 
-echo "=== Restarting rope-light service ==="
-sshpass -p "$PASS" ssh "$PI" 'echo windows | sudo -S systemctl restart rope-light && echo "rope-light restarted"' || echo "WARNING: rope-light restart failed"
+echo "=== Restarting rope-light ==="
+sshpass -p "$PASS" ssh "$PI" 'echo windows | sudo -S systemctl restart rope-light && echo "rope-light restarted"' \
+  || echo "WARNING: rope-light restart failed"
 
-echo "=== Copying starlink-bridge.py ==="
-STARLINK_SRC="$DIR/starlink-bridge.py"; [ -f "$STARLINK_SRC" ] || STARLINK_SRC="$SCRIPT_DIR/starlink-bridge.py"
-sshpass -p "$PASS" scp "$STARLINK_SRC" "$PI:~/starlink-bridge.py" || { echo "FAILED: starlink-bridge.py copy"; exit 1; }
-
-echo "=== Restarting starlink-bridge service ==="
-sshpass -p "$PASS" ssh "$PI" 'echo windows | sudo -S systemctl restart starlink-bridge && echo "starlink-bridge restarted"' || echo "WARNING: starlink-bridge restart failed"
-
-echo "=== Copying run-speedtest.py ==="
-SPEEDTEST_SRC="$DIR/run-speedtest.py"; [ -f "$SPEEDTEST_SRC" ] || SPEEDTEST_SRC="$SCRIPT_DIR/run-speedtest.py"
-if [ -f "$SPEEDTEST_SRC" ]; then
-  sshpass -p "$PASS" scp "$SPEEDTEST_SRC" "$PI:~/run-speedtest.py" && chmod +x run-speedtest.py || echo "WARNING: run-speedtest.py copy failed"
-fi
-
-echo "=== Copying obd-bridge.py ==="
-OBD_SRC="$DIR/obd-bridge.py"; [ -f "$OBD_SRC" ] || OBD_SRC="$SCRIPT_DIR/obd-bridge.py"
-if [ -f "$OBD_SRC" ]; then
-  sshpass -p "$PASS" scp "$OBD_SRC" "$PI:~/obd-bridge.py" || echo "WARNING: obd-bridge.py copy failed"
-  sshpass -p "$PASS" ssh "$PI" 'echo windows | sudo -S systemctl restart obd-bridge 2>/dev/null && echo "obd-bridge restarted"' || echo "WARNING: obd-bridge not yet installed — run pi-setup/setup-obd.sh first"
-fi
-
-echo "=== Verifying services ==="
+# ── Status check ──────────────────────────────────────────────────────────
+echo ""
+echo "=== Service status ==="
 sleep 3
-sshpass -p "$PASS" ssh "$PI" 'sudo systemctl is-active can-bridge starlink-bridge rope-light'
+sshpass -p "$PASS" ssh "$PI" '
+  echo "--- can-bridge ---"
+  sudo systemctl status can-bridge --no-pager -l | head -8
+  echo "--- starlink-bridge ---"
+  sudo systemctl status starlink-bridge --no-pager -l | head -8
+  echo "--- starlink-bridge recent logs ---"
+  sudo journalctl -u starlink-bridge -n 20 --no-pager
+'
 
+echo ""
 echo "=== DONE ==="
+echo "Dashboard: http://vanpi.local | https://vanpi.tail27a0b4.ts.net"
