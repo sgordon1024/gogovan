@@ -70,7 +70,7 @@ Pi CAN HAT (Waveshare 2-CH CAN HAT+)
 | Profile | SSID | Subnet | Use |
 |---|---|---|---|
 | `preconfigured` | T-Mobile Home Internet | 192.168.12.x | Primary internet uplink; Cerbo GX (192.168.12.140) is only reachable on this subnet |
-| `wifi-blaster` | Starlink WiFi | 192.168.1.x | Fallback internet uplink when T-Mobile has no coverage |
+| `PhiladelphiaCollins` | Starlink WiFi | 192.168.1.x | Fallback internet uplink when T-Mobile has no coverage |
 
 **Critical wlan0 routing fix (applied):** The T-Mobile Home Internet DHCP server injects a default route at metric 50 via RFC 3442, which breaks Tailscale by creating duplicate routes. Fixed permanently:
 ```bash
@@ -490,7 +490,7 @@ The Pi has two internet paths via wlan0 and a watchdog that auto-recovers from o
 **Watchdog (`gogovan-watchdog.timer`):**
 - Runs every 2 minutes via systemd timer (starts 90s after boot)
 - Script: `/usr/local/bin/gogovan-watchdog.sh`
-- If `ping 8.8.8.8` fails: switches wlan0 to the other connection (preconfigured↔wifi-blaster)
+- If `ping 8.8.8.8` fails: switches wlan0 to the other connection (preconfigured↔PhiladelphiaCollins)
 - If Tailscale is not in `Running` state: restarts `tailscaled` and runs `tailscale up`
 - Logs to syslog tag `gogovan-watchdog` — check with `journalctl -t gogovan-watchdog`
 
@@ -512,7 +512,7 @@ tailscale status                # should show vanpi as connected
 # Check which connection is active
 nmcli -g NAME,DEVICE connection show --active | grep wlan0
 # Switch to the other one
-sudo nmcli connection up wifi-blaster   # or: preconfigured
+sudo nmcli connection up PhiladelphiaCollins   # or: preconfigured
 ping -c 3 8.8.8.8
 ```
 

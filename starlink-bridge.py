@@ -110,7 +110,7 @@ def get_current_upstream() -> str:
                 conn = parts[1].strip()
                 if conn == "preconfigured":
                     return "tmobile"
-                elif conn == "wifi-blaster":
+                elif conn == "PhiladelphiaCollins":
                     return "starlink"
                 return "unknown"
     except Exception as e:
@@ -405,23 +405,23 @@ def _warmup_then_route():
             return
 
     pub("van/status/starlink/warmup_eta", 0)
-    ok = nmcli_connect("wifi-blaster")
+    ok = nmcli_connect("PhiladelphiaCollins")
     if ok:
         set_state("starlink")
         pub("van/status/network/upstream", "starlink")
     else:
         # Connection failed — wait 30s and retry once
-        print("nmcli wifi-blaster failed, retrying in 30s…")
+        print("nmcli PhiladelphiaCollins failed, retrying in 30s…")
         time.sleep(30)
         with _state_lock:
             if state != "warming_up":
                 return
-        ok = nmcli_connect("wifi-blaster")
+        ok = nmcli_connect("PhiladelphiaCollins")
         if ok:
             set_state("starlink")
             pub("van/status/network/upstream", "starlink")
         else:
-            print("nmcli wifi-blaster retry failed — staying in warmup")
+            print("nmcli PhiladelphiaCollins retry failed — staying in warmup")
             # Reset to let auto logic try again
             set_state("unknown")
 
@@ -634,7 +634,7 @@ def on_message(client, userdata, msg):
                 return
             _set_manual_override()
             if starlink_plug == "on":
-                ok = nmcli_connect("wifi-blaster")
+                ok = nmcli_connect("PhiladelphiaCollins")
                 if ok:
                     set_state("starlink")
                     pub("van/status/network/upstream", "starlink")
