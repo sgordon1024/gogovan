@@ -81,9 +81,16 @@ This tells NM to ignore DHCP-provided routes and use only the explicit static ro
 **GL.iNet router (Apple Pi network):**
 - SSID: `Apple Pi` — this is the main network for phones, MacBook, and all van clients
 - Admin panel: `http://192.168.8.1` (from any device on Apple Pi Wi-Fi)
-- SSH: `ssh root@192.168.8.1` (from Pi, for starlink-bridge.py to control upstream switching)
-- Handles DHCP, NAT, and WAN upstream between T-Mobile ("tmobile" SSID) and Starlink ("WiFi Blaster" SSID)
+- **Admin / SSH password: `Windows1024`** (same for the web panel and `ssh root@192.168.8.1`; runs OpenWrt 21.02 / model GL-MT3000 "Beryl AX")
+- SSH: `ssh root@192.168.8.1` (OpenWrt — use `uci` here, NOT on the Pi)
+- Handles DHCP, NAT, and WAN upstream between T-Mobile ("tmobile" SSID) and Starlink ("PhiladelphiaCollins" SSID, formerly "WiFi Blaster")
 - Pi's ethernet MAC gets a stable DHCP lease at `192.168.8.106`
+- **DHCP hands out the Pi (`192.168.8.106`) as the gateway** so all client internet traffic routes through the Pi (which NATs out to the active wlan0 upstream). Set via:
+  ```bash
+  uci add_list dhcp.lan.dhcp_option='3,192.168.8.106'   # gateway = Pi
+  uci add_list dhcp.lan.dhcp_option='6,8.8.8.8,1.1.1.1'  # DNS
+  uci commit dhcp && /etc/init.d/dnsmasq restart
+  ```
 
 **Disabled on Pi (no longer used):**
 - `hostapd` — masked (`systemctl mask hostapd`); GoGoVan SSID is gone
@@ -434,28 +441,47 @@ Interior accent LED rope lights, controlled via Bluetooth LE. The `rope-light` s
 
 ## Starlink Automation (starlink-bridge.py)
 
-`starlink-bridge.py` runs as `starlink-bridge.service` on the Pi. It:
-1. Controls a Tuya X5P smart plug (Starlink power outlet) via **tinytuya** (local control, no cloud)
-2. Controls the GL.iNet router's upstream Wi-Fi connection via SSH + GL.iNet UCI commands
+`starlink-bridge.py` runs as `starlink-bridge.service` on the Pi. It is the **single
+authority** for dual-WAN failover — it directly switches the Pi's `wlan0` between the
+two NetworkManager profiles (`preconfigured` = T-Mobile, `PhiladelphiaCollins` =
+Starlink) via `sudo nmcli connection up <name>`, and controls the Starlink dish power
+via a Tuya plug.
 
-**Tuya smart plug:**
-- Device ID: `eb21e6caef01e8582972u9`
-- Local key: `knGT9!<jN3jA~npU`
-- Version: 3.3
-- tinytuya installed: `pip3 install tinytuya`
+**It does NOT touch the GL.iNet's config** (no UCI/SSH to the router). The GL.iNet just
+provides the LAN and routes clients to the Pi (DHCP option 3 → 192.168.8.106). All WAN
+switching is the Pi's `wlan0`.
 
-**GL.iNet router control (from Pi via SSH):**
-- `ssh root@192.168.8.1` (no password — Pi's SSH key is authorized)
-- Switches upstream SSID via UCI: `uci set wireless.@wifi-iface[1].ssid=...`
-- T-Mobile: SSID `tmobile`, Starlink: SSID `WiFi Blaster`
+**Tuya smart plug (dish power, best-effort):**
+- Device ID: `eb21e6caef01e8582972u9`, key `knGT9!<jN3jA~npU`, version 3.3
+- IP auto-discovered via `tinytuya.deviceScan()`; falls back to `~/.starlink_plug_address`
+- Plug control is **best-effort**: if the plug is unreachable, failover still happens.
+  The plug was on the old GoGoVan hotspot subnet; until it's re-homed onto Apple Pi it
+  won't be found, but that does NOT break failover.
 
-**Auto-switch logic:**
-- Default state: GL.iNet on T-Mobile, Starlink plug OFF
-- On startup: if on T-Mobile, immediately run a speed test
-  - If < threshold (default 5 Mbps) → switch to Starlink automatically
-  - If >= threshold → stay on T-Mobile
-- While on Starlink: test T-Mobile via wlan0 every 30 min (no Starlink data used)
-  - If T-Mobile >= threshold → switch GL.iNet back to T-Mobile, power off Starlink
+**Failover logic (Peplink-style, INTERNET-based — never signal-bars alone):**
+- **T-Mobile is the default.** When happily on T-Mobile, the Starlink dish is powered off.
+- Health check every **20s** = real ping to 8.8.8.8 / 1.1.1.1 through the active link.
+- On T-Mobile, **3 consecutive failed checks (~60s)** → power dish on, wait for warmup
+  (Starlink SSID to appear, up to 180s), switch routing to Starlink, verify.
+- On Starlink, every **20 min** (`TMOBILE_RECHECK_INTERVAL`): if T-Mobile has signal
+  (≥ `min_signal`, default 20 — the `threshold` topic), briefly switch to it and test
+  REAL internet. If good → stay on T-Mobile + power dish off. If not → fall back to
+  Starlink (no flapping). If Starlink itself fails and T-Mobile has signal → try T-Mobile now.
+- **Manual override** (`van/network/upstream` = tmobile/starlink) forces a side and
+  suspends auto for 30 min. Never powers the dish off unless the target's internet is
+  confirmed (no stranding).
+- `auto_mode` is persisted to `~/.starlink_auto` (survives restart); default ON.
+
+**Why decisions are internet-based, not signal-based:** the original bug was switching
+on signal bars. T-Mobile's MiFi shows full bars even when its upstream is dead, so the
+old logic (and the old watchdog) kept dumping the van onto a T-Mobile with no internet.
+Every switch decision now requires an actual ping test to pass.
+
+**5 GHz lock (speed fix):** `PhiladelphiaCollins` is pinned to 5 GHz in its NM profile
+(`802-11-wireless.band a`). The Pi was associating on Starlink's 2.4 GHz (~24 Mbps cap);
+forcing 5 GHz raised the Pi→Starlink link to ~88 Mbps. Trade-off: 5 GHz has shorter range.
+If the connection gets flaky after moving the van, revert with:
+`sudo nmcli connection modify PhiladelphiaCollins 802-11-wireless.band "" && sudo nmcli connection up PhiladelphiaCollins`
 
 **History: Why tuya-convert was abandoned:**
 - tuya-convert hijacks `wlan0` entirely (creates a hostapd AP), losing Tailscale connectivity
@@ -485,14 +511,19 @@ The engine panel in drive mode reads these topics and displays them. OBD data on
 
 ## Network Resilience
 
-The Pi has two internet paths via wlan0 and a watchdog that auto-recovers from outages.
+The Pi has two internet paths via wlan0. Failover is handled entirely by
+`starlink-bridge.py` (see "Starlink Automation" above).
 
-**Watchdog (`gogovan-watchdog.timer`):**
-- Runs every 2 minutes via systemd timer (starts 90s after boot)
-- Script: `/usr/local/bin/gogovan-watchdog.sh`
-- If `ping 8.8.8.8` fails: switches wlan0 to the other connection (preconfigured↔PhiladelphiaCollins)
-- If Tailscale is not in `Running` state: restarts `tailscaled` and runs `tailscale up`
-- Logs to syslog tag `gogovan-watchdog` — check with `journalctl -t gogovan-watchdog`
+**`gogovan-watchdog.timer` — DISABLED (do not re-enable).**
+- It was the old failover mechanism: every 2 min, on ping failure it flipped wlan0 to
+  the "other" connection. It still referenced the dead name `wifi-blaster`, so once
+  Starlink was renamed to `PhiladelphiaCollins` it would dump the van onto dead T-Mobile
+  and be unable to get back — a flapping loop. It also fought `starlink-bridge` for
+  control of wlan0.
+- `deploy-to-pi.sh` runs `systemctl disable --now gogovan-watchdog.timer` on every deploy.
+- Its only other job (restart Tailscale if not Running) is minor; fold into starlink-bridge
+  later if needed. Manual Tailscale recovery steps are below.
+- Script still on disk at `/usr/local/bin/gogovan-watchdog.sh` for reference; inert.
 
 **NM dispatcher scripts in `/etc/NetworkManager/dispatcher.d/`:**
 - `99-clean-routes` — when any interface comes up, removes wlan0 default routes with metric < 200 (belt-and-suspenders backup for the ignore-auto-routes fix)

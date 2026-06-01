@@ -104,6 +104,11 @@ echo "$PASS" | sudo -S systemctl restart starlink-bridge
 echo "starlink-bridge installed and started"
 REMOTE
 
+# ── Disable old watchdog (superseded by starlink-bridge failover) ──────────
+echo "=== Disabling old gogovan-watchdog (replaced by starlink-bridge) ==="
+sshpass -p "$PASS" ssh "$PI" 'echo windows | sudo -S systemctl disable --now gogovan-watchdog.timer 2>/dev/null; echo "watchdog disabled"' \
+  || echo "(watchdog already disabled or not present — continuing)"
+
 # ── index.html ────────────────────────────────────────────────────────────
 echo "=== Copying index.html ==="
 sshpass -p "$PASS" scp "$DIR/index.html" "$PI:~/index.html" || { echo "FAILED: index.html copy"; exit 1; }
