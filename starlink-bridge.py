@@ -66,10 +66,10 @@ MQTT_HOST = "localhost"
 MQTT_PORT = 1883
 
 # ── Tuya plug (Starlink dish power) ──────────────────────────────────────────
-PLUG_DEV_ID           = "eb21e6caef01e8582972u9"
-PLUG_LOCAL_KEY        = "knGT9!<jN3jA~npU"
+PLUG_DEV_ID           = "eb21e6caef01e8582972u9"   # LAN/local id it broadcasts; cloud calls it "Smart Socket 3"
+PLUG_LOCAL_KEY        = "HlYX{/Y-Pv-M':)7"          # refreshed from Tuya cloud after a re-pair (Jun 2026)
 PLUG_VERSION          = 3.3
-PLUG_ADDRESS_FALLBACK = "192.168.8.34"
+PLUG_ADDRESS_FALLBACK = "192.168.8.248"             # plug's current DHCP IP on the Apple Pi network
 PLUG_ADDRESS_FILE     = os.path.expanduser("~/.starlink_plug_address")
 
 # ── Persistence ──────────────────────────────────────────────────────────────
@@ -255,7 +255,7 @@ def discover_plug_address() -> str:
         return _plug_address
     try:
         print("Scanning for Starlink plug…")
-        found = tinytuya.deviceScan(verbose=False, maxretry=2)
+        found = tinytuya.deviceScan(verbose=False, maxretry=5)
         for ip, info in found.items():
             if info.get("gwId") == PLUG_DEV_ID or info.get("id") == PLUG_DEV_ID:
                 print(f"Plug found at {ip}")

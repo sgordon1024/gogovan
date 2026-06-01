@@ -2527,7 +2527,7 @@ safe-buffer/index.js:
       </div>
       <!-- Threshold slider — only active when auto is on -->
       <div class="starlink-thresh-row disabled" id="starlinkThreshRow">
-        <span class="thresh-label">Switch on below</span>
+        <span class="thresh-label">Min signal to recheck</span>
         <div class="thresh-slider-wrap">
           <span class="thresh-end-label">0</span>
           <input type="range" class="dim-slider" id="threshSlider"
@@ -2538,7 +2538,7 @@ safe-buffer/index.js:
         </div>
         <span class="thresh-val-label" id="threshVal">35</span>
       </div>
-      <div class="net-hint" style="padding:0 16px 14px;text-align:left">When on, Starlink powers up if T-Mobile signal drops below <span id="threshHintVal">35</span>.</div>
+      <div class="net-hint" style="padding:0 16px 14px;text-align:left">Auto-switch uses real internet checks, not signal. While on Starlink, the van only re-tests T-Mobile to switch back when its signal is at least <span id="threshHintVal">35</span>%.</div>
     </div>
   </div>
 
@@ -3045,13 +3045,14 @@ const DEFAULT_SCENES = [
 let scenes = [];
 let lastAppliedSceneId = null;
 let sceneIsDirty = false;
+let _suppressDirty = false;   // true while applyScene / drive-restore programmatically sets state
 
 const SCENE_ID_ICONS = { sleep:'moon', movie:'film', morning:'sun', dinner:'utensils' };
 
 function migrateScene(s) {
   const name = s.name.replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}]️?\s*/u, '').trim() || s.name;
   const icon = s.icon || SCENE_ID_ICONS[s.id] || 'star';
-  const rope = s.rope || { on: false, color: null, effect: null };
+  const rope = s.rope || { on: false, color: null, effect: null, brightness: 100, speed: 5 };
   return { ...s, name, icon, rope };
 }
 
@@ -3268,6 +3269,7 @@ function _reRenderEditTiles(dragSceneId) {
 function applyScene(id) {
   const scene = scenes.find(s => s.id === id);
   if (!scene) return;
+  _suppressDirty = true;
   allLights().forEach(l => {
     const s = scene.lights[l.id];
     if (!s) return;
@@ -3281,10 +3283,20 @@ function applyScene(id) {
       if (scene.rope.effect) setRopeEffect(scene.rope.effect);
       else if (scene.rope.color) setRopeColor(scene.rope.color);
       else if (!ropeOn) toggleRopeLight();
+      // Brightness + speed (sync slider position, then publish; default for old presets)
+      const rb = scene.rope.brightness ?? 100;
+      const rs = scene.rope.speed ?? 5;
+      const bEl = document.getElementById('ropeBrightness');
+      if (bEl) bEl.value = rb;
+      setRopeBrightness(rb);
+      const spEl = document.getElementById('ropeSpeed');
+      if (spEl) spEl.value = rs;
+      setRopeSpeed(rs);
     } else if (ropeOn) {
       toggleRopeLight();
     }
   }
+  _suppressDirty = false;
   lastAppliedSceneId = id;
   sceneIsDirty = false;
   renderLights();
@@ -3295,20 +3307,34 @@ function saveToScene(id) {
   const scene = scenes.find(s => s.id === id);
   if (!scene) return;
   allLights().forEach(l => { scene.lights[l.id] = { on: l.on, level: l.level }; });
-  scene.rope = { on: ropeOn, color: ropeActiveColor, effect: ropeActiveEffect };
+  scene.rope = { on: ropeOn, color: ropeActiveColor, effect: ropeActiveEffect,
+                 brightness: ropeActiveBrightness, speed: ropeActiveSpeed };
   sceneIsDirty = false;
   saveScenes();
   renderScenes();
 }
 
 function markSceneDirty() {
+  if (_suppressDirty) return;
   if (!lastAppliedSceneId) return;
   const scene = scenes.find(s => s.id === lastAppliedSceneId);
   if (!scene) return;
-  const dirty = allLights().some(l => {
+  const lightsDirty = allLights().some(l => {
     const s = scene.lights[l.id];
     return s && (s.on !== l.on || (l.on && s.level !== l.level));
   });
+  // Rope is part of the scene too (on / color / animation)
+  const sr = scene.rope || { on: false, color: null, effect: null };
+  let ropeDirty = (!!sr.on !== !!ropeOn)
+    || ((sr.color  || null) !== (ropeActiveColor  || null))
+    || ((sr.effect || null) !== (ropeActiveEffect || null));
+  // Brightness/speed only matter when the rope is on in both the scene and now
+  if (sr.on && ropeOn) {
+    ropeDirty = ropeDirty
+      || ((sr.brightness ?? 100) !== ropeActiveBrightness)
+      || ((sr.speed ?? 5) !== ropeActiveSpeed);
+  }
+  const dirty = lightsDirty || ropeDirty;
   if (dirty !== sceneIsDirty) {
     sceneIsDirty = dirty;
     renderScenes();
@@ -3414,6 +3440,8 @@ function updateAcFanUI() {
 let ropeOn = false;
 let ropeActiveColor = null;
 let ropeActiveEffect = null;
+let ropeActiveBrightness = 100;
+let ropeActiveSpeed = 5;
 
 function toggleRopeLight() {
   ropeOn = !ropeOn;
@@ -3427,6 +3455,7 @@ function toggleRopeLight() {
     ropeActiveEffect = null;
   }
   if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', ropeOn ? 'on' : 'off');
+  markSceneDirty();
 }
 
 function setRopeColor(color) {
@@ -3439,6 +3468,7 @@ function setRopeColor(color) {
   ropeActiveColor = color;
   ropeActiveEffect = null;
   if (mqttClient?.connected) mqttClient.publish('van/rope-light/color', color);
+  markSceneDirty();
 }
 
 function setRopeEffect(effect) {
@@ -3452,20 +3482,25 @@ function setRopeEffect(effect) {
   ropeActiveColor = null;
   ropeActiveEffect = effect;
   if (mqttClient?.connected) mqttClient.publish('van/rope-light/effect', effect);
+  markSceneDirty();
 }
 
 function setRopeBrightness(val) {
   const pct = Math.round(val);
+  ropeActiveBrightness = pct;
   document.getElementById('ropeBrightPct').textContent = pct + '%';
   document.getElementById('ropeBrightness').style.setProperty('--pct', pct + '%');
   if (mqttClient?.connected) mqttClient.publish('van/rope-light/brightness', String(pct));
+  markSceneDirty();
 }
 
 function setRopeSpeed(val) {
+  ropeActiveSpeed = parseInt(val);
   document.getElementById('ropeSpeedPct').textContent = val;
   const pct = ((val - 1) / 9 * 100).toFixed(0) + '%';
   document.getElementById('ropeSpeed').style.setProperty('--pct', pct);
   if (mqttClient?.connected) mqttClient.publish('van/rope-light/speed', String(val));
+  markSceneDirty();
 }
 
 // ── Shore power ───────────────────────────────────
@@ -3696,6 +3731,7 @@ function exitDrivingMode() {
 
   // Restore rope lights if they were on before driving
   if (predriveRope) {
+    _suppressDirty = true;
     const r = predriveRope;
     predriveRope = null;
     const brightnessEl = document.getElementById('ropeBrightness');
@@ -3712,6 +3748,7 @@ function exitDrivingMode() {
       document.getElementById('ropeIcon')?.setAttribute('stroke', 'var(--amber)');
       if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', 'on');
     }
+    _suppressDirty = false;
   }
 
   // Show "Arrived?" toast if any lights were on before driving
@@ -4460,6 +4497,7 @@ function updateNetworkUI(upstream) {
   if (!btnT || !btnS) return;
   btnT.classList.toggle('active', upstream === 'tmobile');
   btnS.classList.toggle('active', upstream === 'starlink');
+  renderStarlinkPower();
 }
 
 function updateNetState(newState) {
@@ -4511,6 +4549,7 @@ function updateNetState(newState) {
     sub.textContent   = 'Checking upstream connection';
     icon.innerHTML    = NET_ICONS.unknown;
   }
+  renderStarlinkPower();
 }
 
 function updateWarmupEta(etaSecs) {
@@ -4715,14 +4754,33 @@ let starlinkThreshold = 35;     // T-Mobile signal level below which Starlink au
 let starlinkQualityDismissed = false;
 let starlinkQualityLast = 'unknown';
 
+let starlinkPlugState = 'unknown';   // last reported plug status: on/off/unknown
 function updateStarlinkPower(state) {
-  starlinkOn = (state === 'on');
+  starlinkPlugState = state;
+  renderStarlinkPower();
+}
+function renderStarlinkPower() {
   const btn   = document.getElementById('starlinkToggleBtn');
   const label = document.getElementById('starlinkPowerLabel');
   const sub   = document.getElementById('starlinkPowerSub');
-  btn.classList.toggle('on', starlinkOn);
-  label.textContent = starlinkOn ? 'Starlink On' : 'Starlink Off';
-  sub.textContent   = starlinkOn ? 'Plug is powered on' : 'Plug is powered off';
+  if (!btn) return;
+  // If we're routing through Starlink (or warming up), the dish is ON — even
+  // when the plug itself can't be read on the network (status 'unknown').
+  const inUse = currentNetState === 'starlink' || currentNetState === 'warming_up' || currentUpstream === 'starlink';
+  let on, lbl, subtxt;
+  if (starlinkPlugState === 'on') {
+    on = true;  lbl = 'Starlink On';  subtxt = inUse ? 'Dish on · in use' : 'Dish powered on';
+  } else if (inUse) {
+    on = true;  lbl = 'Starlink On';  subtxt = starlinkPlugState === 'unknown' ? 'In use · plug not reachable' : 'In use';
+  } else if (starlinkPlugState === 'off') {
+    on = false; lbl = 'Starlink Off'; subtxt = 'Dish powered off';
+  } else {
+    on = false; lbl = 'Starlink Off'; subtxt = 'Plug not reachable';
+  }
+  starlinkOn = on;
+  btn.classList.toggle('on', on);
+  label.textContent = lbl;
+  sub.textContent   = subtxt;
 }
 
 function updateTmobileSignal(sig) {

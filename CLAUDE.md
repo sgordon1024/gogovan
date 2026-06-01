@@ -39,7 +39,7 @@ Pi CAN HAT (Waveshare 2-CH CAN HAT+)
 | Lithionics Battery | SA=0x46 | |
 | MultiPlus-II inverter | SA=0xE1 | |
 | SmartSolar MPPT | SA=0x24 | |
-| Tuya X5P smart plug | Local IP via GL.iNet | Controls Starlink power outlet |
+| Tuya X5P smart plug | 192.168.8.248 (reserved, MAC fc:67:1f:dd:67:b2) | Controls Starlink dish power; local id eb21…, key rotates on re-pair |
 | vGate iCar Pro BT3 | Bluetooth → /dev/rfcomm0 | OBD-II adapter, plugged into Sprinter's OBD port |
 
 **Pi CAN HAT wiring:** Red=DC+, Black=DC−, White=CAN_H, Yellow=CAN_L into CAN_0 physical terminals. Physical CAN_0 = Linux `can1` (kernel assigns in reverse).
@@ -365,7 +365,7 @@ When AC mode is **off**, the Firefly LCD always displays fan as "Auto" regardles
 | `van/rope-light/speed` | Dashboard → rope-light.py | `1`–`10` (cycle speed) |
 | `van/starlink/power` | Dashboard → starlink-bridge.py | `on`, `off` |
 | `van/starlink/auto` | Dashboard → starlink-bridge.py | `on`, `off` |
-| `van/starlink/threshold` | Dashboard → starlink-bridge.py | Mbps value (default 5) |
+| `van/starlink/threshold` | Dashboard → starlink-bridge.py | `0`-`100` min T-Mobile signal % to re-test for switch-back (default 25) |
 | `van/network/speedtest` | Dashboard → run-speedtest.py | `run` (triggers manual test) |
 
 | Topic (publish, retained) | Direction | Payload |
@@ -377,7 +377,7 @@ When AC mode is **off**, the Firefly LCD always displays fan as "Auto" regardles
 | `van/status/ac/temp` | Bridge → Dashboard | integer °F |
 | `van/status/starlink/power` | starlink-bridge → Dashboard | `on`, `off`, `unknown` |
 | `van/status/starlink/auto` | starlink-bridge → Dashboard | `on`, `off` |
-| `van/status/starlink/threshold` | starlink-bridge → Dashboard | Mbps value |
+| `van/status/starlink/threshold` | starlink-bridge → Dashboard | min T-Mobile signal % for recheck |
 | `van/status/starlink/quality` | starlink-bridge → Dashboard | `good`, `poor`, `unknown` |
 | `van/status/network/upstream` | starlink-bridge → Dashboard | `tmobile`, `starlink` |
 | `van/status/network/speedtest` | run-speedtest → Dashboard | JSON: `{download, upload, ping, server, upstream, timestamp, error}` |
@@ -452,11 +452,32 @@ provides the LAN and routes clients to the Pi (DHCP option 3 → 192.168.8.106).
 switching is the Pi's `wlan0`.
 
 **Tuya smart plug (dish power, best-effort):**
-- Device ID: `eb21e6caef01e8582972u9`, key `knGT9!<jN3jA~npU`, version 3.3
-- IP auto-discovered via `tinytuya.deviceScan()`; falls back to `~/.starlink_plug_address`
-- Plug control is **best-effort**: if the plug is unreachable, failover still happens.
-  The plug was on the old GoGoVan hotspot subnet; until it's re-homed onto Apple Pi it
-  won't be found, but that does NOT break failover.
+- Local device ID (broadcast on LAN): `eb21e6caef01e8582972u9`, version **3.3**
+- Local key: `HlYX{/Y-Pv-M':)7` — **rotates whenever the plug is re-paired in the Smart Life app.**
+- IP: **192.168.8.248** on the Apple Pi network (MAC `fc:67:1f:dd:67:b2`, reserved via GL.iNet DHCP).
+  The bridge also auto-discovers it via `tinytuya.deviceScan()` and caches to `~/.starlink_plug_address`.
+- In the Tuya **cloud** the plug is now registered as **"Smart Socket 3"** (`eb826ee30e0fd77018gwq2`)
+  after a re-pair — but LAN control still uses the broadcast id `eb21…` above.
+- Plug control is **best-effort**: if the plug is ever unreachable, failover still happens
+  (the dish may already be powered); we just can't toggle dish power for power-saving.
+
+**If the plug stops responding (err 901/904/914 = wrong key after a re-pair), refresh the key:**
+```bash
+ssh sgordon1024@192.168.8.106
+python3 - << 'PY'
+import tinytuya, json, os
+c = json.load(open(os.path.expanduser("~/tinytuya.json")))   # saved Tuya cloud API creds
+cloud = tinytuya.Cloud(apiRegion=c["apiRegion"], apiKey=c["apiKey"], apiSecret=c["apiSecret"])
+res = cloud.getdevices(True); devs = res.get("result", res)
+for d in devs:
+    k = d.get("local_key") or d.get("key")
+    dd = tinytuya.OutletDevice("eb21e6caef01e8582972u9", "192.168.8.248", k, version=3.3)
+    dd.set_socketTimeout(4)
+    if isinstance(dd.status(), dict) and "dps" in dd.status():
+        print("WORKING KEY:", k); break
+PY
+```
+Put the printed key in `PLUG_LOCAL_KEY` in `starlink-bridge.py` and redeploy.
 
 **Failover logic (Peplink-style, INTERNET-based — never signal-bars alone):**
 - **T-Mobile is the default.** When happily on T-Mobile, the Starlink dish is powered off.
@@ -581,6 +602,10 @@ server {
     index index.html;
 
     location / {
+        # Force revalidation so the iOS home-screen app picks up deploys without
+        # reinstalling. nginx returns 304 when unchanged, full file after a deploy.
+        # If it ever still serves stale, change this to "no-store".
+        add_header Cache-Control "no-cache, must-revalidate" always;
         try_files $uri $uri/ =404;
     }
 
