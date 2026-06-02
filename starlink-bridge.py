@@ -66,11 +66,14 @@ MQTT_HOST = "localhost"
 MQTT_PORT = 1883
 
 # ── Tuya plug (Starlink dish power) ──────────────────────────────────────────
-PLUG_DEV_ID           = "eb21e6caef01e8582972u9"   # LAN/local id it broadcasts; cloud calls it "Smart Socket 3"
-PLUG_LOCAL_KEY        = "HlYX{/Y-Pv-M':)7"          # refreshed from Tuya cloud after a re-pair (Jun 2026)
+PLUG_CLOUD_NAME       = "Smart Socket 3"            # Tuya cloud name of the dish plug — used to auto-refresh id+key
+PLUG_DEV_ID           = "eb826ee30e0fd77018gwq2"    # local id (rotates on re-pair; auto-refreshed from cloud at startup)
+PLUG_LOCAL_KEY        = "HlYX{/Y-Pv-M':)7"          # fallback key; auto-refreshed from cloud at startup
 PLUG_VERSION          = 3.3
-PLUG_ADDRESS_FALLBACK = "192.168.8.248"             # plug's current DHCP IP on the Apple Pi network
+PLUG_ADDRESS_FALLBACK = "192.168.8.248"             # plug's reserved DHCP IP on the Apple Pi network
 PLUG_ADDRESS_FILE     = os.path.expanduser("~/.starlink_plug_address")
+PLUG_CREDS_FILE       = os.path.expanduser("~/.starlink_plug_creds")   # cached {id,key} from last cloud fetch
+TUYA_CFG_FILE         = os.path.expanduser("~/tinytuya.json")          # saved Tuya cloud API creds
 
 # ── Persistence ──────────────────────────────────────────────────────────────
 THRESH_FILE = os.path.expanduser("~/.starlink_threshold")   # min T-Mobile signal
@@ -248,6 +251,46 @@ def starlink_ssid_visible() -> bool:
 # ── Tuya plug (best-effort) ──────────────────────────────────────────────────
 
 _plug_address = None
+
+def refresh_plug_creds():
+    """
+    Re-pairing the plug in the Smart Life app rotates its local id AND key.
+    On startup, fetch the current id+key from the Tuya cloud (matched by the
+    device's cloud name) so we auto-recover from re-pairs. Falls back to a
+    cached file, then the hardcoded constants. Best-effort — never raises.
+    """
+    global PLUG_DEV_ID, PLUG_LOCAL_KEY
+    import json
+    # 1. Try the cloud (needs internet + saved API creds in tinytuya.json)
+    try:
+        c = json.load(open(TUYA_CFG_FILE))
+        cloud = tinytuya.Cloud(apiRegion=c["apiRegion"], apiKey=c["apiKey"], apiSecret=c["apiSecret"])
+        res = cloud.getdevices(True)
+        devs = res.get("result", []) if isinstance(res, dict) else res
+        for d in devs:
+            if d.get("name") == PLUG_CLOUD_NAME:
+                i = d.get("id"); k = d.get("local_key") or d.get("key")
+                if i and k:
+                    PLUG_DEV_ID, PLUG_LOCAL_KEY = i, k
+                    try:
+                        open(PLUG_CREDS_FILE, "w").write(json.dumps({"id": i, "key": k}))
+                    except Exception:
+                        pass
+                    print(f"Plug creds refreshed from cloud: id={i}")
+                    return
+        print(f"Cloud reachable but '{PLUG_CLOUD_NAME}' not found — keeping current creds")
+    except Exception as e:
+        print(f"Cloud plug-cred refresh skipped ({e}) — using cached/hardcoded")
+    # 2. Fall back to cached creds from the last successful cloud fetch
+    try:
+        cached = json.load(open(PLUG_CREDS_FILE))
+        if cached.get("id") and cached.get("key"):
+            PLUG_DEV_ID, PLUG_LOCAL_KEY = cached["id"], cached["key"]
+            print(f"Using cached plug creds: id={PLUG_DEV_ID}")
+            return
+    except Exception:
+        pass
+    print(f"Using hardcoded plug creds: id={PLUG_DEV_ID}")
 
 def discover_plug_address() -> str:
     global _plug_address
@@ -606,6 +649,7 @@ def on_message(client, userdata, msg):
 
 min_signal = load_threshold()
 auto_mode  = load_auto()
+refresh_plug_creds()   # pull current plug id+key from Tuya cloud (auto-recovers from re-pairs)
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
 client.on_connect = on_connect

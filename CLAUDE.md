@@ -39,7 +39,7 @@ Pi CAN HAT (Waveshare 2-CH CAN HAT+)
 | Lithionics Battery | SA=0x46 | |
 | MultiPlus-II inverter | SA=0xE1 | |
 | SmartSolar MPPT | SA=0x24 | |
-| Tuya X5P smart plug | 192.168.8.248 (reserved, MAC fc:67:1f:dd:67:b2) | Controls Starlink dish power; local id eb21…, key rotates on re-pair |
+| Tuya X5P smart plug | 192.168.8.248 (reserved, MAC fc:67:1f:dd:67:b2) | Controls Starlink dish power; id+key auto-refreshed from Tuya cloud on bridge start (cloud name "Smart Socket 3") |
 | vGate iCar Pro BT3 | Bluetooth → /dev/rfcomm0 | OBD-II adapter, plugged into Sprinter's OBD port |
 
 **Pi CAN HAT wiring:** Red=DC+, Black=DC−, White=CAN_H, Yellow=CAN_L into CAN_0 physical terminals. Physical CAN_0 = Linux `can1` (kernel assigns in reverse).
@@ -451,33 +451,20 @@ via a Tuya plug.
 provides the LAN and routes clients to the Pi (DHCP option 3 → 192.168.8.106). All WAN
 switching is the Pi's `wlan0`.
 
-**Tuya smart plug (dish power, best-effort):**
-- Local device ID (broadcast on LAN): `eb21e6caef01e8582972u9`, version **3.3**
-- Local key: `HlYX{/Y-Pv-M':)7` — **rotates whenever the plug is re-paired in the Smart Life app.**
-- IP: **192.168.8.248** on the Apple Pi network (MAC `fc:67:1f:dd:67:b2`, reserved via GL.iNet DHCP).
-  The bridge also auto-discovers it via `tinytuya.deviceScan()` and caches to `~/.starlink_plug_address`.
-- In the Tuya **cloud** the plug is now registered as **"Smart Socket 3"** (`eb826ee30e0fd77018gwq2`)
-  after a re-pair — but LAN control still uses the broadcast id `eb21…` above.
-- Plug control is **best-effort**: if the plug is ever unreachable, failover still happens
-  (the dish may already be powered); we just can't toggle dish power for power-saving.
-
-**If the plug stops responding (err 901/904/914 = wrong key after a re-pair), refresh the key:**
-```bash
-ssh sgordon1024@192.168.8.106
-python3 - << 'PY'
-import tinytuya, json, os
-c = json.load(open(os.path.expanduser("~/tinytuya.json")))   # saved Tuya cloud API creds
-cloud = tinytuya.Cloud(apiRegion=c["apiRegion"], apiKey=c["apiKey"], apiSecret=c["apiSecret"])
-res = cloud.getdevices(True); devs = res.get("result", res)
-for d in devs:
-    k = d.get("local_key") or d.get("key")
-    dd = tinytuya.OutletDevice("eb21e6caef01e8582972u9", "192.168.8.248", k, version=3.3)
-    dd.set_socketTimeout(4)
-    if isinstance(dd.status(), dict) and "dps" in dd.status():
-        print("WORKING KEY:", k); break
-PY
-```
-Put the printed key in `PLUG_LOCAL_KEY` in `starlink-bridge.py` and redeploy.
+**Tuya smart plug (dish power) — SELF-HEALING across re-pairs:**
+- Cloud name **"Smart Socket 3"** (`PLUG_CLOUD_NAME`), version **3.3**, IP **192.168.8.248**
+  (MAC `fc:67:1f:dd:67:b2`, reserved via GL.iNet DHCP; also auto-discovered via `tinytuya.deviceScan()`).
+- Re-pairing the plug in the Smart Life app **rotates both its local id and key**. To handle this,
+  `starlink-bridge.py` calls `refresh_plug_creds()` on startup: it pulls the current id+key from the
+  **Tuya cloud** (matched by `PLUG_CLOUD_NAME`), caches them to `~/.starlink_plug_creds`, and falls
+  back to that cache, then the hardcoded `PLUG_DEV_ID`/`PLUG_LOCAL_KEY`, if the cloud is unreachable.
+- **So after a re-pair, just restart the bridge — no code change:**
+  `ssh sgordon1024@192.168.8.106 'echo windows | sudo -S systemctl restart starlink-bridge'`
+- Current (auto-managed) values: id `eb826ee30e0fd77018gwq2`, key `HlYX{/Y-Pv-M':)7`.
+- If you **rename** the plug in the app, update `PLUG_CLOUD_NAME` to match.
+- Cloud API creds live in `~/tinytuya.json` (apiKey/apiSecret/apiRegion). Re-run `python3 -m tinytuya wizard` if they ever expire.
+- Plug control is **best-effort**: if the plug is unreachable, failover still happens (the dish may
+  already be powered); only the power-saving toggle-off is lost.
 
 **Failover logic (Peplink-style, INTERNET-based — never signal-bars alone):**
 - **T-Mobile is the default.** When happily on T-Mobile, the Starlink dish is powered off.
