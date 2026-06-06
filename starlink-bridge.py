@@ -597,9 +597,10 @@ def on_connect(client, userdata, flags, rc):
     mqtt_client = client
     print(f"MQTT connected (rc={rc})")
 
-    # Don't disrupt a working link immediately on (re)start — let the first
-    # periodic T-Mobile recheck happen after the normal interval.
-    last_tmobile_recheck = time.time()
+    # On (re)start, recover toward the T-Mobile default reasonably soon if we
+    # come up on Starlink — short grace (~3 min) to avoid disrupting a freshly
+    # established link on every restart, then recheck T-Mobile.
+    last_tmobile_recheck = time.time() - TMOBILE_RECHECK_INTERVAL + 180
 
     min_signal   = load_threshold()
     auto_mode    = load_auto()
@@ -701,13 +702,17 @@ def on_message(client, userdata, msg):
         manual_test_pending = 0.0   # consume this request
         dl  = res.get("download")
         err = res.get("error")
-        bad = bool(err) or (isinstance(dl, (int, float)) and dl < MANUAL_BAD_MBPS)
-        if bad:
-            why = f"error: {err}" if err else f"only {dl} Mbps"
+        low_speed   = isinstance(dl, (int, float)) and dl < MANUAL_BAD_MBPS
+        # An error may be a genuinely dead link OR just a tooling/transient hiccup.
+        # Only treat it as "bad" if a real ping ALSO fails — never false-failover.
+        no_internet = bool(err) and not internet_up()
+        if low_speed or no_internet:
+            why = "no internet" if no_internet else f"only {dl} Mbps"
             print(f"Manual speed test BAD ({why}) — switching source")
             threading.Thread(target=handle_bad_connection, args=(why,), daemon=True).start()
         else:
-            print(f"Manual speed test OK ({dl} Mbps) — no switch needed")
+            note = f"error but internet OK ({err})" if err else f"{dl} Mbps"
+            print(f"Manual speed test not actionable ({note}) — no switch")
         return
 
 

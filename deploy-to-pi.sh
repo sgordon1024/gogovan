@@ -122,6 +122,19 @@ echo "=== Restarting rope-light ==="
 sshpass -p "$PASS" ssh "$PI" 'echo windows | sudo -S systemctl restart rope-light && echo "rope-light restarted"' \
   || echo "WARNING: rope-light restart failed"
 
+# ── run-speedtest.py (no service restart — run on demand by timer/can-bridge) ──
+echo "=== Copying run-speedtest.py ==="
+RS_SRC="$DIR/run-speedtest.py"; [ -f "$RS_SRC" ] || RS_SRC="$SCRIPT_DIR/run-speedtest.py"
+sshpass -p "$PASS" scp "$RS_SRC" "$PI:~/run-speedtest.py" 2>/dev/null && echo "run-speedtest.py copied" \
+  || echo "WARNING: run-speedtest.py copy failed"
+
+# ── obd-bridge.py ──────────────────────────────────────────────────────────
+echo "=== Copying obd-bridge.py ==="
+OBD_SRC="$DIR/obd-bridge.py"; [ -f "$OBD_SRC" ] || OBD_SRC="$SCRIPT_DIR/obd-bridge.py"
+sshpass -p "$PASS" scp "$OBD_SRC" "$PI:~/obd-bridge.py" 2>/dev/null && echo "obd-bridge.py copied" \
+  || echo "WARNING: obd-bridge.py copy failed"
+sshpass -p "$PASS" ssh "$PI" 'echo windows | sudo -S systemctl restart obd-bridge 2>/dev/null && echo "obd-bridge restarted" || echo "(obd-bridge service not installed — run pi-setup/setup-obd.sh)"'
+
 # ── Status check ──────────────────────────────────────────────────────────
 echo ""
 echo "=== Service status ==="

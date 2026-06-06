@@ -2321,7 +2321,8 @@
     .sig-bar.lit { background:var(--green); }
     .sig-bar.warn { background:var(--amber); }
     .sig-bar.bad  { background:var(--red); }
-    .starlink-signal-val { font-size:13px; color:var(--txt2); font-variant-numeric:tabular-nums; min-width:28px; }
+    .starlink-signal-val { font-size:14px; font-weight:600; color:var(--txt); font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .starlink-signal-val.dim { font-weight:500; color:var(--txt2); }
     .starlink-auto-toggle-wrap { display:flex; align-items:center; gap:10px; }
     .starlink-auto-label { font-size:14px; color:var(--txt2); }
     .starlink-auto-btn { width:44px; height:26px; border-radius:13px; background:var(--tog-off); border:none; cursor:pointer; position:relative; transition:background .2s; flex-shrink:0; -webkit-tap-highlight-color:transparent; }
@@ -2778,13 +2779,7 @@ safe-buffer/index.js:
     <div class="card">
       <div class="starlink-auto-row">
         <div class="starlink-signal-wrap">
-          <div class="starlink-signal-label">T-Mobile signal</div>
-          <div class="starlink-signal-bars" id="starlinkSignalBars">
-            <div class="sig-bar" id="sigBar1"></div>
-            <div class="sig-bar" id="sigBar2"></div>
-            <div class="sig-bar" id="sigBar3"></div>
-            <div class="sig-bar" id="sigBar4"></div>
-          </div>
+          <div class="starlink-signal-label">T-Mobile</div>
           <div class="starlink-signal-val" id="starlinkSignalVal">—</div>
         </div>
         <div class="starlink-auto-toggle-wrap">
@@ -5312,8 +5307,8 @@ function updateSpeedUI(payload) {
       const ago = Math.round((Date.now() - new Date(d.timestamp)) / 60000);
       document.getElementById('speedTime').textContent = ago < 1 ? 'Just now' : `${ago}m ago`;
     }
-    // Save to history with GPS
-    captureGPS().then(gps => saveSpeedEntry(d, gps?.lat, gps?.lng));
+    // Save to history with GPS, then refresh the T-Mobile readout
+    captureGPS().then(gps => { saveSpeedEntry(d, gps?.lat, gps?.lng); renderTmobileReadout(); });
   } catch(e) {}
 }
 
@@ -5688,27 +5683,43 @@ function updateStarlinkPower(state) {
   sub.textContent   = starlinkSubLabel();
 }
 
-function updateTmobileSignal(sig) {
-  const valEl = document.getElementById('starlinkSignalVal');
-  const bars  = [
-    document.getElementById('sigBar1'),
-    document.getElementById('sigBar2'),
-    document.getElementById('sigBar3'),
-    document.getElementById('sigBar4'),
-  ];
-  if (sig < 0) {
-    valEl.textContent = '—';
-    bars.forEach(b => b.className = 'sig-bar');
+// Live T-Mobile signal: used only to know whether it's in range (-1 = out of range).
+let _tmobileSig = -1;
+
+function _agoStr(ts) {
+  const s = Math.max(0, (Date.now() - ts) / 1000);
+  if (s < 90)  return 'just now';
+  const m = Math.round(s / 60);
+  if (m < 60)  return m + 'm ago';
+  const h = Math.round(m / 60);
+  if (h < 48)  return h + 'h ago';
+  return Math.round(h / 24) + 'd ago';
+}
+
+// Show the last-measured T-Mobile download speed (meaningful), or "No signal"
+// when T-Mobile is actually out of range.
+function renderTmobileReadout() {
+  const el = document.getElementById('starlinkSignalVal');
+  if (!el) return;
+  if (_tmobileSig < 0) {
+    el.textContent = 'No signal';
+    el.classList.add('dim');
     return;
   }
-  valEl.textContent = sig;
-  // Determine colour class based on thresholds
-  const cls = sig < 35 ? 'bad' : sig < 55 ? 'warn' : 'lit';
-  // Light up bars proportionally: 0-25 → 1 bar, 26-50 → 2, 51-75 → 3, 76-100 → 4
-  const lit = sig <= 0 ? 0 : sig <= 25 ? 1 : sig <= 50 ? 2 : sig <= 75 ? 3 : 4;
-  bars.forEach((b, i) => {
-    b.className = 'sig-bar' + (i < lit ? ` ${cls}` : '');
-  });
+  const hist = getSpeedHistory().filter(e => e.upstream === 'tmobile' && typeof e.down === 'number');
+  if (!hist.length) {
+    el.textContent = 'in range · not tested';
+    el.classList.add('dim');
+    return;
+  }
+  const last = hist[hist.length - 1];
+  el.textContent = `${last.down} Mbps · ${_agoStr(last.ts)}`;
+  el.classList.remove('dim');
+}
+
+function updateTmobileSignal(sig) {
+  _tmobileSig = sig;
+  renderTmobileReadout();
 }
 
 function updateStarlinkAuto(on) {

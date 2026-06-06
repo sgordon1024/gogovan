@@ -32,22 +32,8 @@ MQTT_PORT     = 1883
 UPSTREAM_FILE = '/tmp/gogovan_upstream'
 
 def get_upstream():
-    """
-    Detect current upstream (tmobile / starlink / unknown).
-
-    Primary: read /tmp/gogovan_upstream written by starlink-bridge.py —
-    this is always accurate because starlink-bridge owns the switching logic.
-
-    Fallback: nmcli connection name on wlan0 (for edge cases where
-    starlink-bridge hasn't written the file yet).
-    """
-    try:
-        val = open(UPSTREAM_FILE).read().strip().lower()
-        if val in ('tmobile', 'starlink'):
-            return val
-    except Exception:
-        pass
-    # Fallback: check nmcli
+    """Detect current upstream (tmobile / starlink / unknown) from the live
+    wlan0 NetworkManager connection name (starlink-bridge owns the switching)."""
     try:
         r = subprocess.run(['nmcli', '-g', 'DEVICE,CONNECTION', 'device', 'status'],
                            capture_output=True, text=True, timeout=10)
@@ -57,7 +43,7 @@ def get_upstream():
                 conn = parts[1].lower()
                 if conn == 'preconfigured':
                     return 'tmobile'
-                if 'blaster' in conn or 'starlink' in conn:
+                if any(k in conn for k in ('philadelphia', 'collins', 'blaster', 'starlink')):
                     return 'starlink'
     except Exception:
         pass

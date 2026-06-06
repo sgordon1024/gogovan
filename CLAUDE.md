@@ -142,7 +142,7 @@ Adding the dashboard to iPhone home screen (Safari → Share → Add to Home Scr
 | `rope-light.py` | Pi: `/home/sgordon1024/rope-light.py` | BLE↔MQTT bridge for rope lights (bleak + paho-mqtt) |
 | `starlink-bridge.py` | Pi: `/home/sgordon1024/starlink-bridge.py` | Starlink smart plug (tinytuya) + GL.iNet repeater switching |
 | `obd-bridge.py` | Pi: `/home/sgordon1024/obd-bridge.py` | OBD-II data bridge (python-obd via /dev/rfcomm0) |
-| `run-speedtest.py` | Pi: `/home/sgordon1024/run-speedtest.py` | Runs `speedtest-cli --json --secure`, publishes result to MQTT |
+| `run-speedtest.py` | Pi: `/home/sgordon1024/run-speedtest.py` | Runs the official Ookla `speedtest --format=json`; used by BOTH the 4h timer and manual taps (deploy-to-pi.sh now copies it) |
 | `deploy-to-pi.sh` | Dev: project root | Main deploy script — auto-detects Tailscale or Apple Pi LAN |
 | `deploy-local.sh` | Dev: project root | Deploy when offline (tries 192.168.8.106, 192.168.4.1, Tailscale) |
 | `fix-hostapd.sh` | Dev: project root | One-time: adds auto-restart + country code to hostapd (legacy) |
@@ -382,6 +382,7 @@ When AC mode is **off**, the Firefly LCD always displays fan as "Auto" regardles
 | `van/status/network/upstream` | starlink-bridge → Dashboard | `tmobile`, `starlink` |
 | `van/status/network/speedtest` | run-speedtest → Dashboard | JSON: `{download, upload, ping, server, upstream, timestamp, error}` |
 | `van/status/network/speedtest/running` | run-speedtest → Dashboard | `true` / `false` |
+| `van/status/network/alert` | starlink-bridge → Dashboard | warning text (e.g. both WANs down) → red toast; empty string clears |
 | `van/status/obd/connected` | obd-bridge → Dashboard | `ok`, `searching`, `error` |
 | `van/status/obd/rpm` | obd-bridge → Dashboard | integer |
 | `van/status/obd/speed` | obd-bridge → Dashboard | integer mph |
@@ -399,7 +400,9 @@ All status topics use `retain=True` so the dashboard gets current state immediat
 
 `upstream` values: `tmobile` (GL.iNet on T-Mobile "tmobile" SSID), `starlink` (GL.iNet on "WiFi Blaster" SSID), `unknown`.
 
-Speed test results are stored in **`localStorage` key `gogovan-speed-history`** as a JSON array. Each entry: `{ts, isoTs, upstream, down, up, ping, server, lat, lng}`. Max 500 entries (oldest pruned on save). Automatic tests run every 30 minutes via systemd timer.
+Speed test results are stored in **`localStorage` key `gogovan-speed-history`** as a JSON array. Each entry: `{ts, isoTs, upstream, down, up, ping, server, lat, lng}`. Max 500 entries (oldest pruned on save). **Automatic tests run every 4 hours** via `speedtest.timer` (`OnUnitActiveSec=4h`) — ≈9 GB/month (~49 MB/test on T-Mobile, ~150 MB on the faster Starlink). Each test runs on whichever WAN is active and tags the result `upstream` (detected live via `nmcli`, recognizing `preconfigured`=tmobile and `PhiladelphiaCollins`=starlink).
+
+**Manual speed test → failover:** when you tap "Test Now", `starlink-bridge.py` watches the result and switches sources if the current link is bad — i.e. an **error with a failed ping** (genuinely no internet, never a tooling hiccup) **or a download below `MANUAL_BAD_MBPS` (2 Mbps)**. If the other source ALSO has no usable internet, it publishes `van/status/network/alert` and the dashboard shows a red warning toast (`showNetworkAlert`). The bridge only reacts to *manual* tests (gated by a recent `van/network/speedtest=run`), not the periodic ones. Both the manual tap (via `can-bridge.py`) and the timer run the same `run-speedtest.py` (Ookla binary) — the old broken `speedtest-cli` path is gone.
 
 GPS is captured with `navigator.geolocation.getCurrentPosition()` (8s timeout, 2min cache) at the time of each test result and stored as `{lat, lng}` in the history entry. Each result in the stats list links to `maps.apple.com/?ll=lat,lng`.
 
@@ -505,7 +508,15 @@ If the connection gets flaky after moving the van, revert with:
 
 ## OBD-II Integration (obd-bridge.py)
 
-`obd-bridge.py` connects to the vGate iCar Pro BT3 Bluetooth OBD adapter via `/dev/rfcomm0` (Bluetooth Classic SPP, bound by `rfcomm-obd.service`). Run `pi-setup/setup-obd.sh` once to pair the adapter and install the service.
+`obd-bridge.py` connects to the vGate iCar Pro BT3 Bluetooth OBD adapter via `/dev/rfcomm0` (Bluetooth Classic SPP, bound by `rfcomm-obd.service`).
+
+**Connected & installed (Jun 2026):**
+- Adapter Bluetooth name **`V-LINK`**, Classic MAC **`10:21:3E:4F:04:B4`**, pairing **PIN `1234`** (the nearby `10:21:3E:50:04:B4` "BLE Device" is the same unit's BLE side — not used).
+- Paired + trusted in BlueZ; `rfcomm-obd.service` binds `/dev/rfcomm0` to that MAC on boot; `obd-bridge.service` (After/Requires rfcomm-obd) runs the bridge. Both **enabled** (start on boot).
+- `python-obd` installed (`pip3 install --break-system-packages obd`); user `sgordon1024` is in the `dialout` group.
+- Verified live at idle: rpm ~770, coolant 167°F, voltage 13.6V, fuel 76%, MIL off.
+- **Re-pair note:** if the adapter is reset/re-paired, its MAC may change — re-run `pi-setup/setup-obd.sh` (it scans, pairs with PIN 1234, rebinds). To pair manually, scan + pair in ONE `bluetoothctl` session (the device goes "not available" once scanning stops) and feed `1234` when it asks for the PIN.
+- `deploy-to-pi.sh` now copies `obd-bridge.py` and restarts the service.
 
 **Data published (all retain=True):**
 - `van/status/obd/connected` — `ok` / `searching` / `error`
