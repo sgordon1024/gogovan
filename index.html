@@ -1707,6 +1707,35 @@
     }
     #drive-engine-panel.active { display: flex; }
 
+    #engine-all-btn {
+      flex-shrink: 0; margin: 8px 16px calc(8px + env(safe-area-inset-bottom));
+      padding: 11px; border: 1px solid var(--border); border-radius: 12px;
+      background: var(--surface2); color: var(--txt); font-size: 14px; font-weight: 600;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    #engine-all-btn:active { opacity: 0.7; }
+    #obd-all-overlay {
+      position: fixed; inset: 0; z-index: 60; background: var(--bg);
+      padding-top: env(safe-area-inset-top); display: flex; flex-direction: column;
+    }
+    #obd-all-overlay[hidden] { display: none; }
+    #obd-all-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+      font-size: 17px; font-weight: 700; color: var(--txt);
+    }
+    #obd-all-close {
+      background: none; border: none; color: var(--txt2); font-size: 22px;
+      cursor: pointer; padding: 0 6px; -webkit-tap-highlight-color: transparent;
+    }
+    #obd-all-list { flex: 1; overflow-y: auto; padding: 6px 0 calc(20px + env(safe-area-inset-bottom)); }
+    .obd-row { display: flex; align-items: baseline; justify-content: space-between; padding: 11px 18px; border-bottom: 1px solid var(--border); }
+    .obd-row .k { font-size: 14px; color: var(--txt2); }
+    .obd-row .v { font-size: 16px; font-weight: 600; color: var(--txt); font-variant-numeric: tabular-nums; }
+    .obd-row .v.warn { color: var(--amber); }
+    .obd-row .v.alert { color: var(--red); }
+    .obd-section { padding: 14px 18px 4px; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--txt2); }
+
     #engine-header {
       display: flex;
       align-items: center;
@@ -2300,6 +2329,35 @@
     .stats-load-more:active { opacity:.7; }
     .stats-no-chart { display:flex; align-items:center; justify-content:center; height:120px; color:var(--txt2); font-size:13px; }
 
+    /* ── Coverage map overlay ─────────────────────────── */
+    .cov-map-wrap { flex:1; position:relative; min-height:0; }
+    #coverageMap { position:absolute; inset:0; background:var(--surface2); }
+    .cov-map-status { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; padding:32px 28px; color:var(--txt2); font-size:14px; line-height:1.5; background:var(--bg); z-index:5; }
+    .cov-legend { position:absolute; left:12px; bottom:12px; z-index:600; background:rgba(0,0,0,.62); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,.18); border-radius:10px; padding:7px 11px; display:flex; gap:13px; align-items:center; font-size:12px; color:#fff; }
+    .cov-dot { display:inline-block; width:10px; height:10px; border-radius:50%; vertical-align:-1px; margin-right:2px; }
+    .cov-dot.tmo { background:var(--amber); }
+    .cov-dot.sl { background:var(--blue); }
+    .cov-legend-note { color:rgba(255,255,255,.55); }
+    /* speed-test pin markers (Leaflet divIcon) */
+    .cov-divicon { background:none!important; border:none!important; width:0!important; height:0!important; overflow:visible; }
+    .cov-marker { position:absolute; left:0; top:0; transform:translate(-50%,-50%); display:inline-flex; align-items:stretch; white-space:nowrap; border-radius:8px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.55); border:1.5px solid rgba(255,255,255,.9); font-weight:800; font-size:12px; font-variant-numeric:tabular-nums; line-height:1; }
+    .cov-seg { padding:4px 6px; display:flex; align-items:center; }
+    .cov-seg.tmo { background:var(--amber); color:#000; }
+    .cov-seg.sl { background:var(--blue); color:#000; }
+    .cov-seg.unknown { background:#7a7a7a; color:#fff; }
+    .cov-seg + .cov-seg { border-left:1.5px solid rgba(255,255,255,.9); }
+    .leaflet-popup-content-wrapper { background:var(--surface); color:var(--txt); border-radius:12px; box-shadow:0 4px 18px rgba(0,0,0,.5); }
+    .leaflet-popup-tip { background:var(--surface); }
+    .leaflet-popup-content { margin:11px 13px; }
+    .leaflet-container a.leaflet-popup-close-button { color:var(--txt2); }
+    .cov-pop-title { font-size:11px; color:var(--txt2); margin-bottom:5px; }
+    .cov-pop-row { font-size:13px; color:var(--txt); margin-top:5px; font-variant-numeric:tabular-nums; }
+    .cov-pop-row b { font-weight:800; margin-right:4px; }
+    .cov-pop-row b.tmo { color:var(--amber); }
+    .cov-pop-row b.sl { color:var(--blue); }
+    .cov-pop-row b.unknown { color:var(--txt2); }
+    .cov-pop-sub { font-size:11px; color:var(--txt2); margin-top:1px; }
+
     /* ── Starlink power card ──────────────────────────── */
     .starlink-power-row { display:flex; align-items:center; justify-content:space-between; padding:16px; }
     .starlink-power-label { font-size:17px; font-weight:600; color:var(--txt); }
@@ -2762,6 +2820,11 @@ safe-buffer/index.js:
       View All-Time Stats
     </button>
 
+    <button class="view-history-btn" onclick="openCoverageMap()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/></svg>
+      Coverage Map
+    </button>
+
     <!-- Starlink power section -->
     <span class="section-label section-label-solo">Starlink</span>
     <div class="card" style="margin-bottom:12px">
@@ -2843,6 +2906,31 @@ safe-buffer/index.js:
     </div>
   </div>
 
+  <!-- COVERAGE MAP OVERLAY -->
+  <div id="mapOverlay" class="stats-overlay" hidden>
+    <div class="stats-nav">
+      <button class="stats-back" onclick="closeCoverageMap()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+      </button>
+      <span class="stats-nav-title">Coverage Map</span>
+    </div>
+    <div class="stats-filters">
+      <button class="stats-filter active" data-cf="all" onclick="setCoverageFilter('all')">All</button>
+      <button class="stats-filter" data-cf="tmobile" onclick="setCoverageFilter('tmobile')">T-Mobile</button>
+      <button class="stats-filter" data-cf="starlink" onclick="setCoverageFilter('starlink')">Starlink</button>
+    </div>
+    <div class="cov-map-wrap">
+      <div id="coverageMap"></div>
+      <div id="coverageMapStatus" class="cov-map-status">Loading map…</div>
+      <div class="cov-legend">
+        <span><i class="cov-dot tmo"></i> T-Mobile</span>
+        <span><i class="cov-dot sl"></i> Starlink</span>
+        <span class="cov-legend-note">↓ Mbps · tap a pin</span>
+      </div>
+    </div>
+  </div>
+
   <!-- THEME PICKER -->
   <div class="overlay" id="overlay" onclick="overlayClick(event)">
     <div class="theme-sheet" id="themeSheet">
@@ -2907,7 +2995,7 @@ safe-buffer/index.js:
       Internet
     </button>
     <button class="drive-nav-btn" id="driveNavEngine" onclick="switchDriveTab('engine')">
-      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"/><path d="m15 5 3 3"/></svg>
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a1 1 0 0 1 1-1h2l2-2h3v2h3l2 2h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1l-2 2H9l-2-2H5a1 1 0 0 1-1-1z"/><path d="M10 8V5h4"/><path d="M2 12v2"/></svg>
       Engine
     </button>
   </nav>
@@ -2932,7 +3020,7 @@ safe-buffer/index.js:
       </div>
       <div id="drive-speed-box">
         <div id="drive-speed-number">—</div>
-        <div id="drive-speed-unit">mph</div>
+        <div id="drive-speed-unit">mi left</div>
       </div>
     </div>
     <!-- Bottom row: state + weather for current GPS location -->
@@ -2982,6 +3070,14 @@ safe-buffer/index.js:
         <div class="engine-value" id="engine-voltage">—</div>
         <div class="engine-label">Alternator</div>
       </div>
+      <div class="engine-cell" id="engine-load-cell">
+        <div class="engine-value" id="engine-load">—</div>
+        <div class="engine-label">Engine Load</div>
+      </div>
+      <div class="engine-cell" id="engine-mpg-cell">
+        <div class="engine-value" id="engine-mpg">—</div>
+        <div class="engine-label">MPG</div>
+      </div>
     </div>
     <div id="engine-throttle-row">
       <span class="engine-label">Throttle</span>
@@ -2992,6 +3088,16 @@ safe-buffer/index.js:
       <span id="engine-mil-icon"></span>
       <span id="engine-dtc-text">No fault codes</span>
     </div>
+    <button id="engine-all-btn" onclick="openObdEverything()">All engine data →</button>
+  </div>
+
+  <!-- Full OBD data overlay -->
+  <div id="obd-all-overlay" hidden>
+    <div id="obd-all-header">
+      <span>All Engine Data</span>
+      <button id="obd-all-close" onclick="closeObdEverything()" aria-label="Close">✕</button>
+    </div>
+    <div id="obd-all-list"></div>
   </div>
 
 <script>
@@ -4194,6 +4300,32 @@ function setGPSStatus(msg) {
   if (el) el.textContent = msg;
 }
 
+// Engine state from OBD when available: true = running, false = off, null = unknown (no OBD).
+// Used to refine park detection — don't auto-park at a stop light while the engine runs,
+// and park promptly once the engine is actually shut off.
+function engineRunning() {
+  if (!obdData || obdData.connected !== 'ok') return null;
+  const rpm = parseInt(obdData.rpm, 10);
+  if (isNaN(rpm)) return null;
+  return rpm > 0;
+}
+
+// React to engine state changes independent of GPS ticks (e.g. engine shut off while
+// already stopped). Called from updateOBDUI when rpm / connected change.
+function evaluateEnginePark() {
+  if (!drivingMode || manualDriveMode) return;
+  const eng = engineRunning();
+  const stopped = (currentSpeedMph == null) || (currentSpeedMph < STOP_SPEED_MPH);
+  if (eng === false && stopped) {
+    // Engine off and stopped → genuinely parked. Exit now.
+    if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
+    exitDrivingMode();
+  } else if (eng === true && stopTimer) {
+    // Engine confirmed running — cancel any pending GPS grace-period exit.
+    clearTimeout(stopTimer); stopTimer = null;
+  }
+}
+
 function onGPSUpdate(pos) {
   const raw = pos.coords.speed; // m/s — only populated with enableHighAccuracy: true
   lastGPSLat = pos.coords.latitude;
@@ -4210,6 +4342,12 @@ function onGPSUpdate(pos) {
   }
   updateDriveModeToggle();
 
+  // Warm the POI cache the first time we have a fix so cycling is instant in drive mode.
+  if (!poiInitialPreloaded && lastGPSLat && lastGPSLng) {
+    poiInitialPreloaded = true;
+    preloadAllPOIs();
+  }
+
   if (currentSpeedMph >= DRIVE_SPEED_MPH) {
     // Moving — cancel any pending stop exit, start drive confirm if needed
     if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
@@ -4218,9 +4356,19 @@ function onGPSUpdate(pos) {
   } else {
     // Below driving threshold — cancel drive-entry timer
     if (drivingTimer) { clearTimeout(drivingTimer); drivingTimer = null; }
-    // Only auto-exit after staying stopped for STOP_EXIT_MS (e.g. red light grace period)
-    if (drivingMode && !manualDriveMode && currentSpeedMph < STOP_SPEED_MPH && !stopTimer) {
-      stopTimer = setTimeout(() => { stopTimer = null; exitDrivingMode(); }, STOP_EXIT_MS);
+    if (drivingMode && !manualDriveMode && currentSpeedMph < STOP_SPEED_MPH) {
+      const eng = engineRunning();
+      if (eng === true) {
+        // Engine running but stopped — red light / traffic. Never auto-park here.
+        if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
+      } else if (eng === false) {
+        // Engine off and stopped — genuinely parked. Exit immediately.
+        if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
+        exitDrivingMode();
+      } else if (!stopTimer) {
+        // No OBD signal — fall back to the GPS-only grace period before parking.
+        stopTimer = setTimeout(() => { stopTimer = null; exitDrivingMode(); }, STOP_EXIT_MS);
+      }
     }
   }
   refreshModeChip();
@@ -4480,50 +4628,8 @@ function refreshModeChip() {
   const chip  = document.getElementById('modeChip');
   const icon  = document.getElementById('modeChipIcon');
   const label = document.getElementById('modeChipLabel');
-  const speedEl = document.getElementById('drive-speed-number');
-
-  // Update large speed panel when driving
-  if (speedEl) {
-    const speedVal = (drivingMode && currentSpeedMph != null) ? Math.round(currentSpeedMph) : null;
-    speedEl.textContent = speedVal != null ? speedVal : '—';
-    // Multi-stop color ramp: dim white → white → yellow → orange → red → red+blink
-    if (speedVal != null) {
-      const stops = [
-        { v:  0, r: 255, g: 255, b: 255, a: 0.18 },  // stopped  — faint white
-        { v: 30, r: 255, g: 255, b: 255, a: 1.00 },  // cruising — white
-        { v: 70, r: 255, g: 255, b: 140, a: 1.00 },  // highway  — light yellow
-        { v: 80, r: 255, g:  80, b:   5, a: 1.00 },  // fast     — red/orange
-        { v: 90, r: 255, g:   0, b:   0, a: 1.00 },  // too fast — red
-      ];
-      let r, g, b, a;
-      if (speedVal <= stops[0].v) {
-        ({ r, g, b, a } = stops[0]);
-      } else if (speedVal >= stops[stops.length - 1].v) {
-        ({ r, g, b, a } = stops[stops.length - 1]);
-      } else {
-        for (let i = 1; i < stops.length; i++) {
-          if (speedVal <= stops[i].v) {
-            const t = (speedVal - stops[i-1].v) / (stops[i].v - stops[i-1].v);
-            r = Math.round(stops[i-1].r + t * (stops[i].r - stops[i-1].r));
-            g = Math.round(stops[i-1].g + t * (stops[i].g - stops[i-1].g));
-            b = Math.round(stops[i-1].b + t * (stops[i].b - stops[i-1].b));
-            a = +(stops[i-1].a + t * (stops[i].a - stops[i-1].a)).toFixed(3);
-            break;
-          }
-        }
-      }
-      const col = `rgba(${r},${g},${b},${a})`;
-      speedEl.style.color = col;
-      speedEl.style.textShadow = a < 0.25
-        ? 'none'
-        : `0 0 8px ${col}, 0 0 24px rgba(${r},${g},${b},${+(a*0.5).toFixed(2)}), 0 0 48px rgba(${r},${g},${b},${+(a*0.2).toFixed(2)})`;
-      speedEl.classList.toggle('blinking', speedVal >= 90);
-    } else {
-      speedEl.style.color = '';
-      speedEl.style.textShadow = '';
-      speedEl.classList.remove('blinking');
-    }
-  }
+  // Explore top-right shows distance-to-empty (range), not speed
+  renderExploreRange();
 
   if (!chip) return;
 
@@ -4700,6 +4806,9 @@ out center;`,
 
 let poiCategoryIdx  = 0;
 let currentPoiResult = null; // {lat, lng, name} — drives the Directions button
+const poiCache = {};            // cat.id -> { result, ts } — preloaded so cycling is instant
+let poiPreloading = false;      // guard against overlapping full-preload passes
+let poiInitialPreloaded = false; // fire the first preload once GPS is acquired
 
 // ── Rest stop finder ──────────────────────────────
 let restStopInterval  = null;
@@ -4729,9 +4838,26 @@ function handleRestBoxClick(e) {
   currentPoiResult = null;
   const dirBtn = document.getElementById('drive-rest-dir-btn');
   if (dirBtn) dirBtn.hidden = true;
-  restStopHasData = false;
-  setRestStopUI('search', 'Searching…', null, null, null);
-  updateRestStop();
+
+  const cached = poiCache[cat.id];
+  if (cached) {
+    // Instant — show the preloaded result; only refetch in the background if stale.
+    renderPOIResult(cached.result);
+    if (Date.now() - cached.ts > REST_STOP_CACHE_MS) {
+      fetchPOICategory(cat).then(r => {
+        if (r && POI_CATEGORIES[poiCategoryIdx].id === cat.id) renderPOIResult(r);
+      });
+    }
+  } else {
+    // Not preloaded yet — fetch this one now.
+    restStopHasData = false;
+    setRestStopUI('search', 'Searching…', null, null, null);
+    showRestSpinner();
+    fetchPOICategory(cat).then(r => {
+      if (POI_CATEGORIES[poiCategoryIdx].id === cat.id)
+        renderPOIResult(r || poiCache[cat.id]?.result);
+    });
+  }
 }
 
 function openPOIDirections(e) {
@@ -4746,8 +4872,10 @@ function startRestStopUpdates() {
   poiCategoryIdx = 0;
   const catEl = document.getElementById('drive-rest-category');
   if (catEl) catEl.textContent = POI_CATEGORIES[0].label;
-  restStopHasData = false;
-  updateRestStop();
+  const cached = poiCache[POI_CATEGORIES[0].id];
+  if (cached) renderPOIResult(cached.result);  // instant if already preloaded
+  else restStopHasData = false;
+  preloadAllPOIs();   // warm any categories not yet cached + refresh the current one
   restStopInterval = setInterval(updateRestStop, REST_STOP_CACHE_MS);
 }
 function stopRestStopUpdates() {
@@ -4796,13 +4924,10 @@ function clearRestStopState() {
   if (el) el.style.display = 'none';
 }
 
-async function updateRestStop() {
-  if (!lastGPSLat || !lastGPSLng) return;
-  const cat = POI_CATEGORIES[poiCategoryIdx];
-  if (!restStopHasData) {
-    setRestStopUI('search', 'Searching ahead…', null, null, null);
-  }
-  showRestSpinner();
+// Fetch one POI category from Overpass, compute the nearest-ahead result, and cache it.
+// Returns the result object (also stored in poiCache[cat.id]); null on failure.
+async function fetchPOICategory(cat) {
+  if (!lastGPSLat || !lastGPSLng) return null;
   try {
     const query = cat.query(cat.radius, lastGPSLat, lastGPSLng);
     const resp = await fetch('https://overpass-api.de/api/interpreter', {
@@ -4826,28 +4951,79 @@ async function updateRestStop() {
       return { lat, lng, name, ref, bearing, angDiff, distM };
     }).filter(c => c && c.distM > 100 && (lastGPSHeading == null || Math.abs(c.angDiff) <= 90));
 
+    let result;
     if (!candidates.length) {
-      setRestStopUI(cat.icon, cat.emptyMsg, null, null, null);
-      restStopHasData = true;
-      hideRestSpinner();
-      return;
+      result = { kind: 'empty', icon: cat.icon, name: cat.emptyMsg };
+    } else {
+      candidates.sort((a, b) => a.distM - b.distM);
+      const best = candidates[0];
+      result = {
+        kind: 'result', icon: cat.icon,
+        name: best.name || cat.defaultName,
+        distMi: best.distM / 1609.34,
+        exitStr: best.ref ? 'Exit ' + best.ref : '',
+        lat: best.lat, lng: best.lng
+      };
     }
-    candidates.sort((a, b) => a.distM - b.distM);
-    const best = candidates[0];
-    const distMi  = best.distM / 1609.34;
-    const speedMph = (currentSpeedMph && currentSpeedMph > 5) ? currentSpeedMph : 55;
-    const timeMin  = (distMi / speedMph) * 60;
-    const exitStr  = best.ref ? 'Exit ' + best.ref : '';
-    const displayName = best.name || cat.defaultName;
-    setRestStopUI(cat.icon, displayName, distMi, timeMin, exitStr, best.lat, best.lng);
-    restStopHasData = true;
-    hideRestSpinner();
-  } catch(e) {
-    if (!restStopHasData) {
-      setRestStopUI(cat.icon, 'Unavailable', null, null, null);
+    poiCache[cat.id] = { result, ts: Date.now() };
+    return result;
+  } catch (e) {
+    // Keep any previous good result; only seed an error placeholder if nothing is cached.
+    if (!poiCache[cat.id]) {
+      poiCache[cat.id] = { result: { kind: 'error', icon: cat.icon, name: 'Unavailable' }, ts: Date.now() };
     }
-    hideRestSpinner();
+    return null;
   }
+}
+
+// Paint a cached / just-fetched result into the rest-stop box.
+function renderPOIResult(result) {
+  if (!result) return;
+  if (result.kind === 'result') {
+    setRestStopUI(result.icon, result.name, result.distMi, null, result.exitStr, result.lat, result.lng);
+  } else {
+    setRestStopUI(result.icon, result.name, null, null, null);
+  }
+  restStopHasData = true;
+  hideRestSpinner();
+}
+
+// Preload every POI category so cycling is instant. Current category first, then the
+// rest sequentially (gentle on the Overpass public API). Only the category currently
+// being viewed ever repaints the UI.
+async function preloadAllPOIs() {
+  if (poiPreloading || !lastGPSLat || !lastGPSLng) return;
+  poiPreloading = true;
+  try {
+    const order = [];
+    for (let i = 0; i < POI_CATEGORIES.length; i++)
+      order.push(POI_CATEGORIES[(poiCategoryIdx + i) % POI_CATEGORIES.length]);
+    for (const cat of order) {
+      const isCurrent = POI_CATEGORIES[poiCategoryIdx].id === cat.id;
+      if (isCurrent && !poiCache[cat.id]) showRestSpinner();
+      const r = await fetchPOICategory(cat);
+      if (POI_CATEGORIES[poiCategoryIdx].id === cat.id) renderPOIResult(r || poiCache[cat.id]?.result);
+    }
+  } finally {
+    poiPreloading = false;
+  }
+}
+
+// Periodic refresh (and fallback) for the category currently on screen.
+async function updateRestStop() {
+  if (!lastGPSLat || !lastGPSLng) return;
+  const cat = POI_CATEGORIES[poiCategoryIdx];
+  const cached = poiCache[cat.id];
+  if (cached) {
+    renderPOIResult(cached.result);
+    if (Date.now() - cached.ts <= REST_STOP_CACHE_MS) return; // still fresh — skip refetch
+  } else if (!restStopHasData) {
+    setRestStopUI('search', 'Searching ahead…', null, null, null);
+  }
+  showRestSpinner();
+  const before = poiCategoryIdx;
+  const r = await fetchPOICategory(cat);
+  if (poiCategoryIdx === before) renderPOIResult(r || poiCache[cat.id]?.result);
 }
 
 function clearRestStopWeather() {
@@ -5575,6 +5751,183 @@ function renderStatsList(data) {
     (more ? `<button class="stats-load-more" onclick="_statsPage++;renderStatsList(_statsData)">Load ${Math.min(PAGE, _statsData.length - page.length)} more</button>` : '');
 }
 
+// ── Coverage map (speed tests plotted by GPS location) ──────────────
+const COV_DARK_TILES  = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+const COV_LIGHT_TILES = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+const COV_CLUSTER_M   = 250;   // tests within this many metres are treated as the same place
+let _covMap = null, _covLayer = null, _covTileLayer = null, _covFilter = 'all';
+let _leafletLoading = null;
+
+// Lazy-load Leaflet from CDN only when the map is first opened (keeps initial
+// page load fully offline-capable — the map itself needs internet for tiles).
+function loadLeaflet() {
+  if (window.L) return Promise.resolve();
+  if (_leafletLoading) return _leafletLoading;
+  _leafletLoading = new Promise((resolve, reject) => {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(css);
+    const js = document.createElement('script');
+    js.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    js.onload = () => resolve();
+    js.onerror = () => { _leafletLoading = null; reject(new Error('Leaflet failed to load')); };
+    document.head.appendChild(js);
+  });
+  return _leafletLoading;
+}
+
+function _colorLuminance(str) {
+  str = (str || '').trim();
+  let r, g, b;
+  if (str.startsWith('#')) {
+    let h = str.slice(1);
+    if (h.length === 3) h = h.split('').map(c => c + c).join('');
+    if (h.length >= 6) { r = parseInt(h.slice(0,2),16); g = parseInt(h.slice(2,4),16); b = parseInt(h.slice(4,6),16); }
+  } else {
+    const m = str.match(/[\d.]+/g);
+    if (m && m.length >= 3) { r = +m[0]; g = +m[1]; b = +m[2]; }
+  }
+  if (r == null) return 0; // assume dark
+  return (0.2126*r + 0.7152*g + 0.0722*b) / 255;
+}
+function _isDarkMapTheme() {
+  let bg = getComputedStyle(document.body).getPropertyValue('--bg');
+  if (!bg) bg = getComputedStyle(document.documentElement).getPropertyValue('--bg');
+  return _colorLuminance(bg) < 0.5;
+}
+function _applyCovTheme() {
+  if (_covTileLayer) _covTileLayer.setUrl(_isDarkMapTheme() ? COV_DARK_TILES : COV_LIGHT_TILES);
+}
+
+function initCoverageMap() {
+  if (_covMap) return;
+  _covMap = L.map('coverageMap', { zoomControl: true, attributionControl: true }).setView([39.5, -98.35], 4);
+  _covTileLayer = L.tileLayer(_isDarkMapTheme() ? COV_DARK_TILES : COV_LIGHT_TILES, {
+    maxZoom: 19, subdomains: 'abcd',
+    attribution: '&copy; OpenStreetMap &copy; CARTO'
+  }).addTo(_covMap);
+  _covLayer = L.layerGroup().addTo(_covMap);
+}
+
+// Greedy distance-based clustering: co-located tests (any carriers) group together,
+// so a place tested on both T-Mobile and Starlink shows up as one pin with two numbers.
+function clusterSpeedEntries(entries) {
+  const clusters = [];
+  for (const e of entries) {
+    let best = null, bestD = Infinity;
+    for (const c of clusters) {
+      const d = haversineM(c.lat, c.lng, e.lat, e.lng);
+      if (d < COV_CLUSTER_M && d < bestD) { best = c; bestD = d; }
+    }
+    if (best) {
+      best.entries.push(e);
+      best.latSum += e.lat; best.lngSum += e.lng;
+      best.lat = best.latSum / best.entries.length;
+      best.lng = best.lngSum / best.entries.length;
+    } else {
+      clusters.push({ lat: e.lat, lng: e.lng, latSum: e.lat, lngSum: e.lng, entries: [e] });
+    }
+  }
+  return clusters;
+}
+
+function _covCarrierKey(u) { return (u === 'tmobile' || u === 'starlink') ? u : 'unknown'; }
+function _covGroupByCarrier(entries) {
+  const g = {};
+  for (const e of entries) { const k = _covCarrierKey(e.upstream); (g[k] = g[k] || []).push(e); }
+  return g;
+}
+const _COV_LABELS = { tmobile: ['T-Mobile', 'tmo'], starlink: ['Starlink', 'sl'], unknown: ['Unknown', 'unknown'] };
+
+function coveragePopupHtml(cluster, byCarrier) {
+  const lastTs  = Math.max(...cluster.entries.map(e => e.ts || 0));
+  const lastStr = lastTs ? new Date(lastTs).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : '—';
+  const avg = a => a.length ? a.reduce((x,y) => x+y, 0) / a.length : null;
+  let rows = '';
+  for (const car of ['tmobile','starlink','unknown']) {
+    const list = byCarrier[car]; if (!list) continue;
+    const downs = list.map(e => e.down).filter(v => v != null);
+    const ups   = list.map(e => e.up).filter(v => v != null);
+    const pings = list.map(e => e.ping).filter(v => v != null);
+    const ad = avg(downs), au = avg(ups), ap = avg(pings);
+    const best = downs.length ? Math.max(...downs) : null;
+    const [lab, cls] = _COV_LABELS[car];
+    rows += `<div class="cov-pop-row"><b class="${cls}">${lab}</b> ↓${ad!=null?ad.toFixed(1):'—'} ↑${au!=null?au.toFixed(1):'—'} Mbps · ${ap!=null?Math.round(ap):'—'}ms` +
+            `<div class="cov-pop-sub">${list.length} test${list.length>1?'s':''} · best ↓${best!=null?best.toFixed(1):'—'} Mbps</div></div>`;
+  }
+  return `<div class="cov-pop"><div class="cov-pop-title">Last tested ${lastStr}</div>${rows}</div>`;
+}
+
+function renderCoverageMarkers() {
+  if (!_covMap || !_covLayer) return;
+  _covLayer.clearLayers();
+  _covMap.invalidateSize();
+  const statusEl = document.getElementById('coverageMapStatus');
+
+  let entries = getSpeedHistory().filter(e => e.lat != null && e.lng != null && e.down != null);
+  if (_covFilter !== 'all') entries = entries.filter(e => _covCarrierKey(e.upstream) === _covFilter);
+
+  if (!entries.length) {
+    if (statusEl) {
+      statusEl.style.display = 'flex';
+      const anyTests = getSpeedHistory().some(e => e.down != null);
+      statusEl.textContent = _covFilter !== 'all'
+        ? `No location-tagged ${_covFilter === 'tmobile' ? 'T-Mobile' : 'Starlink'} tests yet.`
+        : (anyTests ? 'No location-tagged tests yet. Run a speed test with location enabled.'
+                    : 'No speed tests recorded yet.');
+    }
+    return;
+  }
+  if (statusEl) statusEl.style.display = 'none';
+
+  const clusters = clusterSpeedEntries(entries);
+  const bounds = [];
+  for (const c of clusters) {
+    const byCarrier = _covGroupByCarrier(c.entries);
+    const segs = [];
+    for (const car of ['tmobile','starlink','unknown']) {
+      const list = byCarrier[car]; if (!list) continue;
+      const downs = list.map(e => e.down).filter(v => v != null);
+      if (!downs.length) continue;
+      const avgDown = downs.reduce((a,b) => a+b, 0) / downs.length;
+      segs.push(`<span class="cov-seg ${_COV_LABELS[car][1]}">${Math.round(avgDown)}</span>`);
+    }
+    if (!segs.length) continue;
+    const icon = L.divIcon({ className: 'cov-divicon', html: `<div class="cov-marker">${segs.join('')}</div>`, iconSize: [0,0], iconAnchor: [0,0] });
+    L.marker([c.lat, c.lng], { icon }).addTo(_covLayer).bindPopup(coveragePopupHtml(c, byCarrier));
+    bounds.push([c.lat, c.lng]);
+  }
+  if (bounds.length) {
+    try { _covMap.fitBounds(bounds, { padding: [55,55], maxZoom: bounds.length === 1 ? 13 : 12 }); } catch (e) {}
+  }
+}
+
+async function openCoverageMap() {
+  const ov = document.getElementById('mapOverlay');
+  ov.removeAttribute('hidden');
+  const statusEl = document.getElementById('coverageMapStatus');
+  if (statusEl) { statusEl.style.display = 'flex'; statusEl.textContent = 'Loading map…'; }
+  try {
+    await loadLeaflet();
+  } catch (e) {
+    if (statusEl) statusEl.textContent = 'Map needs an internet connection to load. Connect, then reopen.';
+    return;
+  }
+  initCoverageMap();
+  _applyCovTheme();   // match current dark/light theme on each open
+  // Container just became visible — let layout settle before Leaflet measures it.
+  setTimeout(renderCoverageMarkers, 60);
+}
+function closeCoverageMap() {
+  document.getElementById('mapOverlay').setAttribute('hidden', '');
+}
+function setCoverageFilter(f) {
+  _covFilter = f;
+  document.querySelectorAll('#mapOverlay .stats-filter').forEach(b => b.classList.toggle('active', b.dataset.cf === f));
+  renderCoverageMarkers();
+}
+
 // ── Starlink power control ────────────────────────
 let starlinkOn        = null;   // true / false / null (unknown)
 let starlinkAuto      = false;
@@ -5589,7 +5942,11 @@ function starlinkSubLabel() {
   return starlinkOn ? 'Plug is powered on' : 'Plug is powered off';
 }
 
+let obdData = {};            // every OBD value, for the "All engine data" page
+let obdEverythingOpen = false;
 function updateOBDUI(key, val) {
+  obdData[key] = val;
+  if (obdEverythingOpen) renderObdEverything();
   switch (key) {
     case 'connected': {
       const pill = document.getElementById('engine-status-pill');
@@ -5604,11 +5961,13 @@ function updateOBDUI(key, val) {
         pill.textContent = '● Searching…';
         pill.className = '';
       }
+      evaluateEnginePark();
       break;
     }
     case 'rpm': {
       const el = document.getElementById('engine-rpm');
       if (el) el.textContent = parseInt(val).toLocaleString();
+      evaluateEnginePark();
       break;
     }
     case 'coolant-temp': {
@@ -5670,7 +6029,116 @@ function updateOBDUI(key, val) {
       } catch {}
       break;
     }
+    case 'engine-load': {
+      const el = document.getElementById('engine-load');
+      if (el) {
+        const p = parseInt(val);
+        el.textContent = p + '%';
+        el.className = 'engine-value' + (p >= 90 ? ' alert' : p >= 75 ? ' warn' : '');
+      }
+      break;
+    }
+    case 'mpg': {
+      const el = document.getElementById('engine-mpg');
+      if (el) el.textContent = (parseFloat(val) || 0).toFixed(1);
+      break;
+    }
+    case 'range': {
+      renderExploreRange();   // explore top-right shows distance-to-empty
+      break;
+    }
   }
+}
+
+// Explore panel top-right: distance-to-empty (replaces the old mph readout)
+function renderExploreRange() {
+  const el = document.getElementById('drive-speed-number');
+  const unit = document.getElementById('drive-speed-unit');
+  if (!el) return;
+  if (unit) unit.textContent = 'mi left';
+  const range = obdData.range != null ? parseInt(obdData.range) : NaN;
+  if (isNaN(range)) {
+    el.textContent = '—';
+    el.style.color = ''; el.style.textShadow = ''; el.classList.remove('blinking');
+    return;
+  }
+  el.textContent = range;
+  // Color by remaining range: plenty = white, getting low = amber, low = red (blink if critical)
+  let c;
+  if (range <= 30)       c = [255, 40, 40];
+  else if (range <= 70)  c = [255, 90, 10];
+  else if (range <= 120) c = [255, 235, 130];
+  else                   c = [255, 255, 255];
+  const col = `rgb(${c[0]},${c[1]},${c[2]})`;
+  el.style.color = col;
+  el.style.textShadow = `0 0 8px ${col}, 0 0 24px rgba(${c[0]},${c[1]},${c[2]},0.5)`;
+  el.classList.toggle('blinking', range <= 25);
+}
+
+// ── All engine data page ──────────────────────────
+const OBD_FIELDS = [
+  { sec: 'Live' },
+  ['rpm', 'Engine RPM', ''],
+  ['speed', 'Speed', ' mph'],
+  ['mpg', 'MPG (now)', ''],
+  ['avg-mpg', 'MPG (avg)', ''],
+  ['range', 'Range to empty', ' mi'],
+  ['engine-load', 'Engine load', '%'],
+  ['throttle-pos', 'Throttle', '%'],
+  ['accel-pos', 'Accelerator', '%'],
+  { sec: 'Fuel' },
+  ['fuel-level', 'Fuel level', '%'],
+  ['fuel-remaining', 'Fuel remaining', ' gal'],
+  ['fuel-rate', 'Fuel rate', ' gph'],
+  { sec: 'Temps & power' },
+  ['coolant-temp', 'Coolant', '°F'],
+  ['oil-temp', 'Oil temp', '°F'],
+  ['ambient-temp', 'Outside air', '°F'],
+  ['voltage', 'System voltage', ' V'],
+  ['barometric', 'Barometric', ' kPa'],
+  { sec: 'Engine status' },
+  ['run-time', 'Run time', '__runtime'],
+  ['mil', 'Check engine', '__mil'],
+  ['dtcs', 'Fault codes', '__dtcs'],
+  ['distance-mil', 'Dist. w/ check-engine', ' mi'],
+  ['distance-since-clear', 'Dist. since cleared', ' mi'],
+];
+
+function _fmtRuntime(s) {
+  s = parseInt(s) || 0;
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  return h ? `${h}h ${m}m` : `${m}m`;
+}
+
+function renderObdEverything() {
+  const list = document.getElementById('obd-all-list');
+  if (!list) return;
+  let html = '';
+  for (const f of OBD_FIELDS) {
+    if (f.sec) { html += `<div class="obd-section">${f.sec}</div>`; continue; }
+    const [key, label, unit] = f;
+    const raw = obdData[key];
+    if (raw == null) continue;   // skip values the vehicle hasn't reported
+    let v;
+    if (unit === '__runtime')   v = _fmtRuntime(raw);
+    else if (unit === '__mil')  v = (raw === 'on') ? 'ON' : 'Off';
+    else if (unit === '__dtcs') { try { const c = JSON.parse(raw); v = c.length ? c.join(', ') : 'None'; } catch { v = 'None'; } }
+    else                        v = raw + unit;
+    const cls = (key === 'mil' && raw === 'on') ? ' alert' : '';
+    html += `<div class="obd-row"><span class="k">${label}</span><span class="v${cls}">${v}</span></div>`;
+  }
+  if (!html) html = '<div class="obd-row"><span class="k">Waiting for engine data…</span></div>';
+  list.innerHTML = html;
+}
+
+function openObdEverything() {
+  obdEverythingOpen = true;
+  renderObdEverything();
+  document.getElementById('obd-all-overlay').hidden = false;
+}
+function closeObdEverything() {
+  obdEverythingOpen = false;
+  document.getElementById('obd-all-overlay').hidden = true;
 }
 
 function updateStarlinkPower(state) {
@@ -6406,6 +6874,7 @@ loadScenes();
 renderLights();
 renderScenes();
 watchGPS();
+renderExploreRange();
 </script>
 </body>
 </html>

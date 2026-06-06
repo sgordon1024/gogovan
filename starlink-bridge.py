@@ -643,7 +643,7 @@ def _arm_manual_override():
 
 
 def on_message(client, userdata, msg):
-    global auto_mode, min_signal, manual_override, manual_test_pending
+    global auto_mode, min_signal, manual_override, manual_test_pending, last_tmobile_recheck
     topic   = msg.topic
     payload = msg.payload.decode().strip().lower()
 
@@ -710,9 +710,22 @@ def on_message(client, userdata, msg):
             why = "no internet" if no_internet else f"only {dl} Mbps"
             print(f"Manual speed test BAD ({why}) — switching source")
             threading.Thread(target=handle_bad_connection, args=(why,), daemon=True).start()
+            return
+
+        # Current link tested OK. T-Mobile is the *preferred* default, so if we're on the
+        # Starlink fallback a manual test is also our cue to re-check T-Mobile and switch
+        # back to it when it has real internet. switch_to_tmobile() pings to verify and
+        # reverts to Starlink on its own if T-Mobile is actually dead (never strands us).
+        cur = get_current_upstream()
+        if cur == "starlink" and auto_mode and not manual_override:
+            print(f"Manual test OK on Starlink ({dl} Mbps) — re-checking T-Mobile to switch back…")
+            last_tmobile_recheck = time.time()          # reset the periodic recheck clock
+            set_state("checking_tmobile")
+            threading.Thread(target=switch_to_tmobile,
+                             args=("manual test: prefer T-Mobile",), daemon=True).start()
         else:
             note = f"error but internet OK ({err})" if err else f"{dl} Mbps"
-            print(f"Manual speed test not actionable ({note}) — no switch")
+            print(f"Manual speed test not actionable ({note}, on {cur}) — no switch")
         return
 
 

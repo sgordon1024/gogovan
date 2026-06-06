@@ -188,7 +188,15 @@ Drive mode activates automatically when GPS speed stays above 5 mph for 4 consec
 5. Awning retracted (G12 stops at limit switch if already retracted)
 6. UI locked to drive layout: Speed, Internet, and Climate tabs via bottom drive nav
 
-### What happens on exit (parked — speed drops below 2 mph)
+### When it exits to "parked" (OBD-informed)
+Exit is decided by **engine state first, GPS second** (`engineRunning()` reads `obdData`):
+- **Engine running (`connected==='ok'` and `rpm>0`) + stopped** → this is a stop light / traffic. **Never auto-park.** Any pending exit timer is cancelled. This is the fix for "don't switch to parked at a red light."
+- **Engine off (`connected==='ok'` and `rpm===0`) + stopped** → genuinely parked. **Exit immediately** (no 60s wait).
+- **OBD unavailable / transient dropout (`connected!=='ok'`, so `engineRunning()` returns `null`)** → fall back to the GPS-only grace timer: must stay below `STOP_SPEED_MPH` for `STOP_EXIT_MS` (60s) before exiting. A Bluetooth hiccup returns `null` (not `false`), so a dropout won't false-park while driving.
+
+`evaluateEnginePark()` also runs whenever OBD `rpm`/`connected` change (via `updateOBDUI`), so shutting the engine off while already stopped parks promptly even if GPS isn't ticking.
+
+### What happens on exit
 1. Water pump always restored to ON
 2. Rope lights restored to exact pre-drive state: color or effect re-published, brightness/speed re-applied
 3. "Arrived?" toast shown if any G12 lights were on before driving — user taps to restore them
@@ -206,13 +214,25 @@ Drive mode activates automatically when GPS speed stays above 5 mph for 4 consec
 
 ### Key constants
 ```javascript
-DRIVE_SPEED_MPH  = 5     // enter threshold
-STOP_SPEED_MPH   = 2     // exit threshold
+DRIVE_SPEED_MPH  = 5     // enter threshold (held DRIVE_CONFIRM_MS before activating)
+STOP_SPEED_MPH   = 2     // below this = stopped
 DRIVE_CONFIRM_MS = 4000  // must hold above threshold before activating
+STOP_EXIT_MS     = 60000 // GPS-only grace before parking — used ONLY when OBD engine state is unknown
 ```
+Entry is still GPS-only (5 mph for 4s) — we don't auto-enter drive mode just because the
+engine started, so warming up in the driveway with lights on won't kill them. OBD only
+refines **exit** (see "When it exits to parked" above).
 
-### Rest Stop Finder
-Displayed in the top-left box of the drive Speed tab. Uses Overpass API (OpenStreetMap) to find nearby rest stops, gas stations, and amenities based on current GPS coordinates. Updates every time GPS updates significantly. Shows name, type, distance/direction.
+### Rest Stop Finder (preloaded POIs)
+Top-left box of the drive Speed tab. Tapping the box cycles through `POI_CATEGORIES`
+(Rest Areas → Cracker Barrel → Walmart → BLM Land), each an Overpass API (OpenStreetMap)
+query around the current GPS fix. Shows the nearest-ahead match's name, distance, and exit.
+
+**All categories are preloaded so cycling is instant:**
+- `preloadAllPOIs()` fetches every category sequentially (current one first, then the rest — gentle on the public Overpass instance) and stores each result in `poiCache` (`{cat.id: {result, ts}}`).
+- It fires once on the **first GPS fix** (`poiInitialPreloaded` guard in `onGPSUpdate`) so the cache is warm before drive mode even starts, and again from `startRestStopUpdates()` when drive mode begins.
+- `handleRestBoxClick()` renders the cached result **immediately**, then background-refreshes only if the cache entry is older than `REST_STOP_CACHE_MS` (60s). Categories not yet cached fall back to a live fetch with a "Searching…" placeholder.
+- `fetchPOICategory(cat)` does the fetch + nearest-ahead computation and caches; `renderPOIResult(result)` paints a cached/fresh result into the box. The 60s interval (`updateRestStop`) keeps the currently-viewed category fresh.
 
 ### Engine Panel (OBD-II)
 Displayed in the drive Speed tab below the speedometer. Shows live data from the Sprinter's OBD-II port via the vGate iCar Pro BT3 adapter:
@@ -404,6 +424,8 @@ Speed test results are stored in **`localStorage` key `gogovan-speed-history`** 
 
 **Manual speed test → failover:** when you tap "Test Now", `starlink-bridge.py` watches the result and switches sources if the current link is bad — i.e. an **error with a failed ping** (genuinely no internet, never a tooling hiccup) **or a download below `MANUAL_BAD_MBPS` (2 Mbps)**. If the other source ALSO has no usable internet, it publishes `van/status/network/alert` and the dashboard shows a red warning toast (`showNetworkAlert`). The bridge only reacts to *manual* tests (gated by a recent `van/network/speedtest=run`), not the periodic ones. Both the manual tap (via `can-bridge.py`) and the timer run the same `run-speedtest.py` (Ookla binary) — the old broken `speedtest-cli` path is gone.
 
+**Manual speed test → T-Mobile recheck (prefer-default):** T-Mobile is the preferred source; Starlink is only the fallback. So when a manual test is run **while on Starlink and the Starlink link tests OK**, the bridge also fires `switch_to_tmobile("manual test: prefer T-Mobile")` (if `auto_mode` and not `manual_override`). That does a **real connect-and-ping test of T-Mobile** and switches back to it (powering the dish off) when it has internet — otherwise it reverts to Starlink on its own (never strands). This is deliberately **independent of the T-Mobile signal scan**, which reads `-1` while associated to Starlink's 5 GHz and was blocking the automatic 20-min recheck (`get_tmobile_signal()` → periodic recheck gated on `sig >= min_signal`). Tapping "Test Now" is therefore the reliable way to force a T-Mobile recovery; the periodic auto-recheck still depends on the (sometimes blind) signal scan.
+
 GPS is captured with `navigator.geolocation.getCurrentPosition()` (8s timeout, 2min cache) at the time of each test result and stored as `{lat, lng}` in the history entry. Each result in the stats list links to `maps.apple.com/?ll=lat,lng`.
 
 ---
@@ -414,6 +436,19 @@ Opened via "View All-Time Stats" button on the Internet tab. Renders as a full-s
 - **Carrier filter**: All / T-Mobile / Starlink
 - **SVG polyline chart**: amber=T-Mobile (solid=download, dashed=upload), blue=Starlink. Plots daily averages (aggregated by `aggregateDailyStats()`) to keep the DOM lean.
 - **Test Results list**: Sorted newest-first, 50 entries per page with "Load more". Shows carrier badge, date, speeds, ping, and GPS link.
+
+---
+
+## Coverage Map (speed tests plotted by location)
+
+Opened via the **"Coverage Map"** button on the Internet tab (`openCoverageMap()`), a full-screen overlay (`#mapOverlay`) that plots every GPS-tagged speed test on a map so you can see where you have good internet.
+
+- **Leaflet, lazy-loaded from CDN** (`unpkg.com/leaflet@1.9.4`) only when the map is first opened — keeps initial page load fully offline-capable. If there's no internet, it shows "Map needs an internet connection to load." (Tiles inherently need internet.)
+- **Theme-aware tiles** via `_isDarkMapTheme()` (luminance of `--bg`): CARTO `dark_all` on dark themes, `voyager` on light. Re-applied on every open (`_applyCovTheme`).
+- **Clustering** (`clusterSpeedEntries`, greedy distance-based, `COV_CLUSTER_M = 250 m` using `haversineM`): co-located tests group into one pin so a place tested on **both** carriers shows a single pin with **two numbers** — amber (T-Mobile) + blue (Starlink), each the average download (Mbps) at that spot. Single-carrier spots show one colored pill.
+- **Markers** are Leaflet `divIcon`s (`.cov-marker` / `.cov-seg.tmo|.sl|.unknown`); tapping one opens a popup (`coveragePopupHtml`) with per-carrier avg ↓/↑/ping, test count, and best download.
+- **Carrier filter** (All / T-Mobile / Starlink) via `setCoverageFilter()`; `_covFilter` drives `renderCoverageMarkers()`.
+- Entries without `lat`/`lng` are excluded (empty state prompts to run a test with location enabled). Map auto-fits to the plotted points (`fitBounds`).
 
 ---
 
@@ -518,17 +553,23 @@ If the connection gets flaky after moving the van, revert with:
 - **Re-pair note:** if the adapter is reset/re-paired, its MAC may change — re-run `pi-setup/setup-obd.sh` (it scans, pairs with PIN 1234, rebinds). To pair manually, scan + pair in ONE `bluetoothctl` session (the device goes "not available" once scanning stops) and feed `1234` when it asks for the PIN.
 - `deploy-to-pi.sh` now copies `obd-bridge.py` and restarts the service.
 
-**Data published (all retain=True):**
-- `van/status/obd/connected` — `ok` / `searching` / `error`
-- `van/status/obd/rpm`, `van/status/obd/speed` (mph)
-- `van/status/obd/coolant-temp` (°F), `van/status/obd/fuel-level` (%)
-- `van/status/obd/throttle-pos` (%), `van/status/obd/voltage` (V)
-- `van/status/obd/mil` — `on` / `off` (check engine light)
-- `van/status/obd/dtcs` — JSON array of fault codes
+**Data published (all retain=True), under `van/status/obd/`:**
+- `connected` (ok/searching/error), `rpm`, `speed` (mph), `coolant-temp` (°F), `fuel-level` (%),
+  `throttle-pos` (%), `voltage` (V), `mil` (on/off), `dtcs` (JSON array)
+- **Derived/added (Jun 2026):** `engine-load` (%), `fuel-rate` (gph), `mpg` (instant = speed÷fuel-rate, 0 at idle),
+  `avg-mpg` (rolling EMA, updates only while moving ≥10 mph), `range` (miles to empty), `fuel-remaining` (gal),
+  `oil-temp` (°F), `ambient-temp` (°F), `run-time` (s), `barometric` (kPa), `accel-pos` (%),
+  `distance-mil` (mi), `distance-since-clear` (mi)
 
-**Poll rates:** Fast gauges every 2 seconds, MIL + DTCs every 30 seconds.
+**Range / distance-to-empty math** (`obd-bridge.py`): `fuel-remaining = fuel% × TANK_GALLONS (24.5)`;
+`range = fuel-remaining × avg-mpg`. `avg-mpg` is an EMA (α=0.05) of instant MPG, seeded with `DEFAULT_MPG=18`
+until it converges from real driving. The vehicle exposes 89 PIDs total (`conn.supported_commands`); we poll the
+useful subset. **Poll rates:** fast gauges + MPG/range every 2s; slow values + MIL/DTCs every 30s.
 
-The engine panel in drive mode reads these topics and displays them. OBD data only updates when the vehicle ignition is on.
+**Dashboard:** the drive-mode **Engine panel** shows RPM/Fuel/Coolant/Alternator + **Engine Load + MPG**, with an
+**"All engine data →"** button opening a full overlay (`#obd-all-overlay`, `renderObdEverything()` from the `obdData`
+cache). The **Explore panel top-right shows distance-to-empty** (`renderExploreRange()`, color-ramped red→white by
+miles left) instead of mph — `refreshModeChip()` no longer writes speed there. OBD data only updates with the ignition on.
 
 ---
 
