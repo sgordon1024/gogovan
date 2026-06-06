@@ -796,6 +796,10 @@
       z-index: 95;
       white-space: nowrap;
     }
+    #scene-toast.toast-warn {
+      background: #b00020; color: #fff; border-color: #ff5252;
+      white-space: normal; max-width: 82vw; text-align: center; line-height: 1.35;
+    }
     #scene-toast.show {
       opacity: 1;
       transform: translateX(-50%) translateY(0);
@@ -2603,9 +2607,6 @@ safe-buffer/index.js:
         <button class="rope-color-btn" id="ropeWhite"  onclick="setRopeColor('white')"  style="background:#ffffff" title="White"></button>
         <button class="rope-color-btn" id="ropeEffectCycle"   onclick="setRopeEffect('cycle')"   style="background:conic-gradient(from 0deg,hsl(0,100%,55%) 0deg,hsl(45,100%,55%) 45deg,hsl(90,100%,45%) 90deg,hsl(150,100%,45%) 135deg,hsl(180,100%,50%) 180deg,hsl(210,100%,55%) 225deg,hsl(270,100%,60%) 270deg,hsl(300,100%,55%) 315deg,hsl(360,100%,55%) 360deg)" title="Color Cycle"></button>
         <button class="rope-color-btn" id="ropeEffectCandle"  onclick="setRopeEffect('candle')"  style="background:radial-gradient(circle at 50% 65%, #ffee55 0%, #ff8800 45%, #993300 100%)" title="Candle"></button>
-        <button class="rope-color-btn" id="ropeEffectBreathe" onclick="setRopeEffect('breathe')" style="background:radial-gradient(circle, #e8f0ff 0%, #6688ff 55%, #1133cc 100%)" title="Breathe"></button>
-        <button class="rope-color-btn" id="ropeEffectAurora"  onclick="setRopeEffect('aurora')"  style="background:conic-gradient(from 160deg, #003322, #00bb55, #0055cc, #6600aa, #003322)" title="Aurora"></button>
-        <button class="rope-color-btn" id="ropeEffectStrobe"  onclick="setRopeEffect('strobe')"  style="background:repeating-linear-gradient(90deg,#ffffff 0px,#ffffff 5px,#111111 5px,#111111 10px)" title="Strobe"></button>
       </div>
       <div class="rope-slider-row" style="padding-top:8px;padding-bottom:4px">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--txt2)" stroke-width="2" stroke-linecap="round">
@@ -2795,18 +2796,18 @@ safe-buffer/index.js:
       </div>
       <!-- Threshold slider — only active when auto is on -->
       <div class="starlink-thresh-row disabled" id="starlinkThreshRow">
-        <span class="thresh-label">Switch when below</span>
+        <span class="thresh-label">Min signal to recheck</span>
         <div class="thresh-slider-wrap">
-          <span class="thresh-end-label">1</span>
+          <span class="thresh-end-label">0</span>
           <input type="range" class="dim-slider" id="threshSlider"
-            min="1" max="25" value="5" style="--pct:20%"
+            min="0" max="100" value="25" style="--pct:25%"
             oninput="onThreshInput(this)" onchange="onThreshChange(this)"
-            aria-label="T-Mobile speed threshold (Mbps)">
-          <span class="thresh-end-label">25</span>
+            aria-label="T-Mobile signal threshold (%)">
+          <span class="thresh-end-label">100</span>
         </div>
-        <span class="thresh-val-label" id="threshVal">5</span><span style="font-size:11px;color:var(--txt2);margin-left:2px">Mbps</span>
+        <span class="thresh-val-label" id="threshVal">25</span><span style="font-size:11px;color:var(--txt2);margin-left:2px">%</span>
       </div>
-      <div class="net-hint" id="starlinkAutoHint" style="padding:0 16px 14px;text-align:left">When on, Starlink powers up if T-Mobile speed drops below <span id="threshHintVal">5</span> Mbps.</div>
+      <div class="net-hint" id="starlinkAutoHint" style="padding:0 16px 14px;text-align:left">Auto-switch uses real internet checks, not signal. While on Starlink, the van only re-tests T-Mobile to switch back when its signal is at least <span id="threshHintVal">25</span>%.</div>
       <div class="net-hint" id="starlinkManualHint" style="padding:0 16px 14px;text-align:left" hidden>Auto-switch off — the power button controls the dish directly. No automatic switching or loops.</div>
     </div>
   </div>
@@ -3529,6 +3530,16 @@ function showSceneToast(msg) {
   el.classList.add('show');
   clearTimeout(el._timer);
   el._timer = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// Prominent warning toast (e.g. "both connections down"), ~7s, red
+function showNetworkAlert(msg) {
+  const el = document.getElementById('scene-toast');
+  if (!el) return;
+  el.textContent = '⚠️ ' + msg;
+  el.classList.add('show', 'toast-warn');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove('show', 'toast-warn'), 7000);
 }
 
 function renderScenes() {
@@ -5717,7 +5728,7 @@ function updateStarlinkThreshold(val) {
   if (el) {
     el.value = val;
     // slider range is 1–25 Mbps
-    el.style.setProperty('--pct', ((val - 1) / 24 * 100).toFixed(1) + '%');
+    el.style.setProperty('--pct', val + '%');
   }
   document.getElementById('threshVal').textContent = val;
   document.getElementById('threshHintVal').textContent = val;
@@ -5725,7 +5736,7 @@ function updateStarlinkThreshold(val) {
 
 function onThreshInput(el) {
   const val = parseInt(el.value);
-  el.style.setProperty('--pct', ((val - 1) / 24 * 100).toFixed(1) + '%');
+  el.style.setProperty('--pct', val + '%');
   document.getElementById('threshVal').textContent = val;
   document.getElementById('threshHintVal').textContent = val;
 }
@@ -6198,6 +6209,8 @@ function connectMQTT() {
         updateSpeedUI(val);
       } else if (key === 'speedtest/running') {
         if (val === 'true') updateSpeedUI('running');
+      } else if (key === 'alert') {
+        if (val) showNetworkAlert(val);
       }
       return;
     }

@@ -14,7 +14,7 @@ iPhone / Browser
 Pi mosquitto broker (192.168.8.106 :1883 / :9001)
      │  MQTT bridge
      ▼
-Victron Cerbo GX (192.168.12.140 :1883)   ← Victron telemetry only (read)
+Victron Cerbo GX (192.168.8.147 :1883, on Apple Pi)   ← Victron telemetry only (read)
      │
      └── CAN bus (VE.Can / can0, RV-C 250kbps) ← LISTEN ONLY on Cerbo
 
@@ -33,7 +33,7 @@ Pi CAN HAT (Waveshare 2-CH CAN HAT+)
 |---|---|---|
 | Raspberry Pi 4 | 192.168.8.106 (Apple Pi LAN) / 100.98.52.107 (Tailscale) | Dashboard host, SSH: sgordon1024 / windows |
 | GL.iNet GL-MT3000 (Beryl AX) | 192.168.8.1 | Travel router, SSID: Apple Pi |
-| Victron Cerbo GX | 192.168.12.140 | VRM Portal ID: 48e7da875e6c |
+| Victron Cerbo GX | 192.168.8.147 (Apple Pi, reserved; MAC 14:d4:24:06:86:8f) | MQTT broker :1883; VRM Portal 48e7da875e6c, MQTT portal c0619ab5dcfb |
 | Firefly G12 controller | SA=0x9B | Controls lights, HVAC, awning, pump, tank heater |
 | G12 LCD ("Bed Wall") | SA=0x9F | Touchscreen panel, Bluetooth to VegaTouch Mira |
 | Lithionics Battery | SA=0x46 | |
@@ -69,7 +69,7 @@ Pi CAN HAT (Waveshare 2-CH CAN HAT+)
 
 | Profile | SSID | Subnet | Use |
 |---|---|---|---|
-| `preconfigured` | T-Mobile Home Internet | 192.168.12.x | Primary internet uplink; Cerbo GX (192.168.12.140) is only reachable on this subnet |
+| `preconfigured` | T-Mobile Home Internet | 192.168.12.x | Primary internet uplink |
 | `PhiladelphiaCollins` | Starlink WiFi | 192.168.1.x | Fallback internet uplink when T-Mobile has no coverage |
 
 **Critical wlan0 routing fix (applied):** The T-Mobile Home Internet DHCP server injects a default route at metric 50 via RFC 3442, which breaks Tailscale by creating duplicate routes. Fixed permanently:
@@ -99,7 +99,7 @@ This tells NM to ignore DHCP-provided routes and use only the explicit static ro
 
 **Avahi mDNS** restricted to `allow-interfaces=eth0` in `/etc/avahi/avahi-daemon.conf` — `vanpi.local` resolves to `192.168.8.106` on the Apple Pi network.
 
-**Cerbo GX MQTT access — important:** The Cerbo GX does **not** expose port 1883 on the Apple Pi network. It only exposes MQTT on the T-Mobile subnet where both the Pi and Cerbo connect as clients of the T-Mobile MiFi. On T-Mobile: Pi is `192.168.12.122` (wlan0), Cerbo is `192.168.12.140`. The mosquitto bridge must use `192.168.12.140:1883`. If upstream switches to Starlink or campground Wi-Fi, the Cerbo may get a different IP and the bridge will drop — check `mosquitto_sub -h localhost -t 'N/c0619ab5dcfb/#' -C 1 -W 5` to confirm data is flowing.
+**Cerbo GX MQTT access:** The Cerbo now lives on the **Apple Pi network at `192.168.8.147`** (hostname `cerbo`/`einstein`, MAC `14:d4:24:06:86:8f`, reserved via GL.iNet DHCP). The Pi reaches it over `eth0` regardless of which WAN `wlan0` is on, so **battery/power data works on both T-Mobile and Starlink** (previously it only worked on the T-Mobile subnet). The mosquitto bridge (`/etc/mosquitto/conf.d/gogovan.conf`) uses `address 192.168.8.147:1883`. Victron MQTT only publishes after a keepalive (the dashboard sends these); to test manually: `mosquitto_pub -h localhost -t R/c0619ab5dcfb/keepalive -m '' && mosquitto_sub -h localhost -t 'N/c0619ab5dcfb/#' -C 1 -W 5`.
 
 ---
 
@@ -467,7 +467,11 @@ switching is the Pi's `wlan0`.
   already be powered); only the power-saving toggle-off is lost.
 
 **Failover logic (Peplink-style, INTERNET-based — never signal-bars alone):**
-- **T-Mobile is the default.** When happily on T-Mobile, the Starlink dish is powered off.
+- **T-Mobile is the default.** When happily on T-Mobile, the Starlink dish is powered off. The
+  control loop does this **proactively**: after T-Mobile internet is stable for ~3 checks (~60s),
+  if the plug is on it powers the dish off (`tmobile_stable_count >= 3`) — not just on the
+  switch-back transition. Gated by `auto_mode` and suppressed during manual override. To keep the
+  dish on while on T-Mobile (e.g. pre-warming), turn auto off.
 - Health check every **20s** = real ping to 8.8.8.8 / 1.1.1.1 through the active link.
 - On T-Mobile, **3 consecutive failed checks (~60s)** → power dish on, wait for warmup
   (Starlink SSID to appear, up to 180s), switch routing to Starlink, verify.
@@ -620,7 +624,7 @@ per_listener_settings true
 listener 9001 0.0.0.0   # WebSocket (dashboard)
 listener 1883 0.0.0.0   # TCP (bridge → Cerbo)
 ```
-With a bridge configured to forward Victron telemetry from Cerbo at 192.168.12.140:1883.
+With a bridge configured to forward Victron telemetry from Cerbo at 192.168.8.147:1883 (Apple Pi).
 
 ---
 

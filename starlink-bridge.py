@@ -89,6 +89,7 @@ WARMUP_MAX_SECS          = 180       # max wait for Starlink dish to boot
 WARMUP_POLL_SECS         = 10        # seconds between SSID scans during warmup
 ROUTING_TIMEOUT          = 25        # seconds for an nmcli 'up' to succeed
 MANUAL_OVERRIDE_SECS     = 30 * 60   # manual switch suspends auto this long
+MANUAL_BAD_MBPS          = 2.0       # a manual speed test below this (or an error) triggers a source switch
 
 # ── Module state ─────────────────────────────────────────────────────────────
 state                   = "unknown"  # see States above
@@ -99,9 +100,11 @@ tmobile_signal          = -1
 tmobile_ssid            = ""
 warmup_start            = 0.0
 fail_count              = 0          # consecutive internet failures on current link
+tmobile_stable_count    = 0          # consecutive good T-Mobile checks (gates dish power-off)
 last_tmobile_recheck    = 0.0
 manual_override         = False
 manual_override_expires = 0.0
+manual_test_pending     = 0.0       # epoch of last manual speed-test request (gates failover-on-result)
 transitioning           = False     # True while a switch is in progress
 
 _state_lock = threading.Lock()
@@ -380,12 +383,12 @@ def _end_transition():
 
 # ── Transitions ──────────────────────────────────────────────────────────────
 
-def switch_to_starlink(reason: str):
-    """Power on dish (best-effort) → wait for warmup → route to Starlink → verify."""
+def switch_to_starlink(reason: str) -> bool:
+    """Power on dish → warmup → route to Starlink → verify. Returns True if Starlink has internet."""
     global warmup_start, fail_count
     if not _begin_transition():
         print("switch_to_starlink: already transitioning, skip")
-        return
+        return False
     try:
         print(f"FAILOVER → Starlink ({reason})")
 
@@ -414,15 +417,18 @@ def switch_to_starlink(reason: str):
         if not ok:
             time.sleep(10)
             ok = nmcli_up(STARLINK_CONN)
+        result = False
         if ok:
             set_state("starlink")
             pub("van/status/network/upstream", "starlink")
             time.sleep(4)
-            pub("van/status/starlink/quality", "good" if internet_up() else "poor")
+            result = internet_up()
+            pub("van/status/starlink/quality", "good" if result else "poor")
         else:
             print("Could not connect to Starlink — leaving state unknown")
             set_state("unknown")
         fail_count = 0
+        return result
     finally:
         _end_transition()
 
@@ -465,11 +471,35 @@ def switch_to_tmobile(reason: str, power_off_dish: bool = True) -> bool:
     finally:
         _end_transition()
 
+def handle_bad_connection(reason: str):
+    """
+    A manual speed test reported the current link is bad/down. Switch to the
+    OTHER source. If that source also has no usable internet, raise an alert
+    toast on the dashboard. Works with no internet on the current link (the
+    switch + verification are all local nmcli/ping).
+    """
+    with _state_lock:
+        if transitioning:
+            print("handle_bad_connection: transition in progress — skipping")
+            return
+    cur = get_current_upstream()
+    print(f"Manual speed test says current link ({cur}) is bad ({reason}) — switching source")
+    if cur == "starlink":
+        ok = switch_to_tmobile(f"manual test: {reason}")
+    else:
+        ok = switch_to_starlink(f"manual test: {reason}")
+    if ok:
+        pub("van/status/network/alert", "", retain=False)   # clear any warning
+    else:
+        msg = "Both T-Mobile and Starlink have no usable internet right now."
+        print("ALERT: " + msg)
+        pub("van/status/network/alert", msg, retain=False)
+
 
 # ── Control loop ─────────────────────────────────────────────────────────────
 
 def control_loop():
-    global tmobile_signal, fail_count, last_tmobile_recheck
+    global tmobile_signal, fail_count, last_tmobile_recheck, tmobile_stable_count
     global manual_override, manual_override_expires
 
     while True:
@@ -505,8 +535,15 @@ def control_loop():
             if cur == "tmobile":
                 if internet_up():
                     fail_count = 0
+                    tmobile_stable_count += 1
+                    # Power-saving: once T-Mobile has been solidly up (~1 min), the
+                    # Starlink dish isn't needed — power it off (best-effort).
+                    if starlink_plug == "on" and tmobile_stable_count >= 3:
+                        print("T-Mobile stable — powering Starlink dish off (power saving)")
+                        plug_set(False)
                 else:
                     fail_count += 1
+                    tmobile_stable_count = 0
                     print(f"T-Mobile internet check failed ({fail_count}/{FAIL_CONFIRM})")
                     if fail_count >= FAIL_CONFIRM:
                         fail_count = 0
@@ -573,6 +610,8 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe("van/starlink/auto")
     client.subscribe("van/starlink/threshold")
     client.subscribe("van/network/upstream")
+    client.subscribe("van/network/speedtest")          # manual test trigger ("run")
+    client.subscribe("van/status/network/speedtest")   # test result (react to manual ones)
 
     # Initial plug + upstream snapshot
     plug_state    = plug_get_state()
@@ -603,7 +642,7 @@ def _arm_manual_override():
 
 
 def on_message(client, userdata, msg):
-    global auto_mode, min_signal, manual_override
+    global auto_mode, min_signal, manual_override, manual_test_pending
     topic   = msg.topic
     payload = msg.payload.decode().strip().lower()
 
@@ -642,6 +681,33 @@ def on_message(client, userdata, msg):
         elif payload == "tmobile":
             # Manual T-Mobile: don't power dish off unless T-Mobile internet confirmed.
             threading.Thread(target=switch_to_tmobile, args=("manual override",), daemon=True).start()
+        return
+
+    if topic == "van/network/speedtest":
+        if payload == "run":
+            manual_test_pending = time.time()
+            print("Manual speed test requested — will check its result for failover")
+        return
+
+    if topic == "van/status/network/speedtest":
+        # Only react to a RECENT manual test — ignore the retained/periodic results
+        if time.time() - manual_test_pending > 150:
+            return
+        try:
+            import json as _json
+            res = _json.loads(msg.payload.decode())   # raw payload (not lowercased)
+        except Exception:
+            return
+        manual_test_pending = 0.0   # consume this request
+        dl  = res.get("download")
+        err = res.get("error")
+        bad = bool(err) or (isinstance(dl, (int, float)) and dl < MANUAL_BAD_MBPS)
+        if bad:
+            why = f"error: {err}" if err else f"only {dl} Mbps"
+            print(f"Manual speed test BAD ({why}) — switching source")
+            threading.Thread(target=handle_bad_connection, args=(why,), daemon=True).start()
+        else:
+            print(f"Manual speed test OK ({dl} Mbps) — no switch needed")
         return
 
 
