@@ -2358,6 +2358,26 @@
     .cov-pop-row b.unknown { color:var(--txt2); }
     .cov-pop-sub { font-size:11px; color:var(--txt2); margin-top:1px; }
 
+    /* ── Confirm dialog ───────────────────────────────── */
+    .confirm-overlay { position:fixed; inset:0; z-index:400; background:rgba(0,0,0,.55); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); display:flex; align-items:center; justify-content:center; padding:28px; }
+    .confirm-overlay[hidden] { display:none; }
+    .confirm-box { background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:24px 22px 18px; max-width:340px; width:100%; box-shadow:0 12px 40px rgba(0,0,0,.55); text-align:center; }
+    .confirm-icon { display:flex; justify-content:center; margin-bottom:12px; }
+    .confirm-title { font-size:18px; font-weight:700; color:var(--txt); margin-bottom:8px; }
+    .confirm-msg { font-size:14px; line-height:1.5; color:var(--txt2); margin-bottom:20px; }
+    .confirm-actions { display:flex; gap:10px; }
+    .confirm-cancel, .confirm-ok { flex:1; padding:13px; border-radius:12px; font-size:15px; font-weight:600; cursor:pointer; border:none; -webkit-tap-highlight-color:transparent; }
+    .confirm-cancel { background:var(--surface2); color:var(--txt); border:1px solid var(--border); }
+    .confirm-ok { background:var(--amber); color:#000; }
+    .confirm-cancel:active, .confirm-ok:active { opacity:.75; }
+
+    /* ── Climate sleep timer ──────────────────────────── */
+    .clim-timer { padding:14px 2px 2px; margin-top:8px; border-top:1px solid var(--border); }
+    .clim-timer-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; }
+    .clim-timer-val { font-size:15px; font-weight:700; color:var(--txt); font-variant-numeric:tabular-nums; }
+    .clim-timer-countdown { font-size:12.5px; color:var(--txt2); margin-top:10px; text-align:center; }
+    .clim-timer-countdown #climTimerRemain { color:var(--amber); font-weight:700; font-variant-numeric:tabular-nums; }
+
     /* ── Starlink power card ──────────────────────────── */
     .starlink-power-row { display:flex; align-items:center; justify-content:space-between; padding:16px; }
     .starlink-power-label { font-size:17px; font-weight:600; color:var(--txt); }
@@ -2725,6 +2745,17 @@ safe-buffer/index.js:
           </div>
         </div>
       </div>
+      <div class="clim-timer" id="climTimerWrap">
+        <div class="clim-timer-head">
+          <span class="clim-group-label">Sleep Timer</span>
+          <span class="clim-timer-val" id="climTimerVal">Off</span>
+        </div>
+        <input type="range" class="dim-slider clim-timer-slider" id="climTimerSlider"
+               min="0" max="11" step="1" value="0" style="--pct:0%"
+               oninput="onClimTimerInput(this)" onchange="onClimTimerChange(this)"
+               aria-label="AC sleep timer">
+        <div class="clim-timer-countdown" id="climTimerCountdown" hidden>Turns off in <span id="climTimerRemain">—</span></div>
+      </div>
     </div>
   </div>
 
@@ -2927,6 +2958,21 @@ safe-buffer/index.js:
         <span><i class="cov-dot tmo"></i> T-Mobile</span>
         <span><i class="cov-dot sl"></i> Starlink</span>
         <span class="cov-legend-note">↓ Mbps · tap a pin</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONFIRM DIALOG -->
+  <div id="confirmOverlay" class="confirm-overlay" hidden onclick="if(event.target===this)confirmRespond(false)">
+    <div class="confirm-box" role="alertdialog" aria-modal="true">
+      <div class="confirm-icon" id="confirmIcon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+      </div>
+      <div class="confirm-title" id="confirmTitle">Are you sure?</div>
+      <div class="confirm-msg" id="confirmMsg"></div>
+      <div class="confirm-actions">
+        <button class="confirm-cancel" id="confirmCancel" onclick="confirmRespond(false)">Cancel</button>
+        <button class="confirm-ok" id="confirmOk" onclick="confirmRespond(true)">Confirm</button>
       </div>
     </div>
   </div>
@@ -4085,6 +4131,73 @@ function updateAcFanUI() {
   });
 }
 
+// ── AC sleep timer ────────────────────────────────
+// The actual auto-off runs server-side in can-bridge.py (fires even with the phone
+// asleep). The dashboard just sends the duration and shows a live countdown driven
+// by the retained `van/status/ac/timer` end-time.
+const AC_TIMER_STEPS = [0, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240]; // minutes; 0 = Off
+let acTimerEndMs = 0;     // epoch ms when AC will auto-off (0 = no active timer)
+let acTimerTick  = null;  // setInterval handle for the live countdown
+
+function fmtTimerLabel(min) {
+  if (!min) return 'Off';
+  if (min < 60) return min + ' min';
+  const h = min / 60;
+  return (Number.isInteger(h) ? h : h.toFixed(1)) + ' hr';
+}
+function fmtRemain(ms) {
+  const s = Math.max(0, Math.round(ms / 1000));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return h > 0
+    ? `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
+    : `${m}:${String(sec).padStart(2,'0')}`;
+}
+function onClimTimerInput(el) {
+  const idx = parseInt(el.value) || 0;
+  const min = AC_TIMER_STEPS[idx] || 0;
+  el.style.setProperty('--pct', (idx / (AC_TIMER_STEPS.length - 1) * 100).toFixed(0) + '%');
+  const v = document.getElementById('climTimerVal');
+  if (v) v.textContent = fmtTimerLabel(min);
+}
+function onClimTimerChange(el) {
+  const idx = parseInt(el.value) || 0;
+  const min = AC_TIMER_STEPS[idx] || 0;
+  if (min > 0) localStorage.setItem('acTimerIdx', idx);
+  else localStorage.removeItem('acTimerIdx');
+  if (mqttClient?.connected) mqttClient.publish('van/ac/timer', String(min));
+  if (min === 0) { acTimerEndMs = 0; updateClimTimerCountdown(); }
+}
+function setClimTimerSlider(idx) {
+  const sl = document.getElementById('climTimerSlider');
+  if (!sl) return;
+  sl.value = idx;
+  onClimTimerInput(sl);
+}
+function updateClimTimerCountdown() {
+  const cd  = document.getElementById('climTimerCountdown');
+  const rem = document.getElementById('climTimerRemain');
+  if (acTimerTick) { clearInterval(acTimerTick); acTimerTick = null; }
+  if (!acTimerEndMs || acTimerEndMs <= Date.now()) {
+    if (cd) cd.hidden = true;
+    return;
+  }
+  const tick = () => {
+    const ms = acTimerEndMs - Date.now();
+    if (ms <= 0) {
+      if (cd) cd.hidden = true;
+      if (acTimerTick) { clearInterval(acTimerTick); acTimerTick = null; }
+      acTimerEndMs = 0;
+      setClimTimerSlider(0);
+      localStorage.removeItem('acTimerIdx');
+      return;
+    }
+    if (cd) cd.hidden = false;
+    if (rem) rem.textContent = fmtRemain(ms);
+  };
+  tick();
+  acTimerTick = setInterval(tick, 1000);
+}
+
 // ── Shore power ───────────────────────────────────
 let shoreConnected = false;
 function updateShoreUI(connected) {
@@ -4238,7 +4351,36 @@ let inputAmps    = null;
 const INPUT_AMPS_MIN = 2;
 const INPUT_AMPS_MAX = 50;
 
+// ── Confirm dialog (reusable) ─────────────────────
+let _confirmCb = null;
+function showConfirm(title, msg, okLabel, onOk) {
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMsg').textContent   = msg;
+  document.getElementById('confirmOk').textContent    = okLabel || 'Confirm';
+  _confirmCb = onOk;
+  document.getElementById('confirmOverlay').removeAttribute('hidden');
+}
+function confirmRespond(ok) {
+  document.getElementById('confirmOverlay').setAttribute('hidden', '');
+  const cb = _confirmCb; _confirmCb = null;
+  if (ok && cb) cb();
+}
+
 function setInverterMode(mode) {
+  // Warn before turning the inverter OFF while Starlink is powered — that cuts AC
+  // power to the dish and would drop the internet connection.
+  if (mode === 4 && starlinkOn === true) {
+    showConfirm(
+      'Turn off the inverter?',
+      'Starlink is powered on. Turning the inverter off cuts AC power and will drop your internet connection.',
+      'Turn Off Anyway',
+      () => applyInverterMode(mode)
+    );
+    return;
+  }
+  applyInverterMode(mode);
+}
+function applyInverterMode(mode) {
   inverterMode = mode;
   updateInverterUI();
   if (mqttClient?.connected)
@@ -4653,13 +4795,26 @@ function refreshModeChip() {
 }
 
 // ── Charging lightning bolt ────────────────────────
-function isAltCharging() {
-  // True when the alternator column is visible and showing a positive number
-  return (highIdleMode || drivingMode) && (battPower - currentSolarW) > 0;
+// Lightning shows ONLY when the battery is actually charging (any source).
+function isBattCharging() {
+  return battPower > 10;
+}
+
+// Battery % number + fill-bar are blue while charging, white otherwise.
+// Also (re)starts/stops the charging bolt animation.
+function applyBattChargeStyle() {
+  const charging = isBattCharging();
+  const pct = document.getElementById('battPct');
+  const bar = document.getElementById('battBar');
+  if (pct) pct.style.color = charging ? 'var(--blue)' : '#fff';
+  if (bar) bar.style.background = charging
+    ? 'linear-gradient(90deg, rgba(79,195,247,0.55) 0%, #4FC3F7 100%)'
+    : 'linear-gradient(90deg, rgba(255,255,255,0.5) 0%, #fff 100%)';
+  scheduleLightning();
 }
 
 function scheduleLightning() {
-  const active = isAltCharging();
+  const active = isBattCharging();
   if (active && !lightningLoopId) {
     nextStrikeAt = 0;
     lightningLoopId = setInterval(lightningTick, 500);
@@ -4671,7 +4826,7 @@ function scheduleLightning() {
 }
 
 function lightningTick() {
-  const active = isAltCharging();
+  const active = isBattCharging();
   if (!active) {
     clearInterval(lightningLoopId);
     lightningLoopId = null;
@@ -4763,6 +4918,7 @@ const POI_CATEGORIES = [
 );
 out center;`,
     defaultName: 'Rest Area',
+    exits: true,   // look up the real highway exit number for this category
   },
   {
     id: 'cracker', label: 'Cracker Barrel', icon: 'utensils',
@@ -4960,12 +5116,12 @@ async function fetchPOICategory(cat) {
       result = {
         kind: 'result', icon: cat.icon,
         name: best.name || cat.defaultName,
-        distMi: best.distM / 1609.34,
-        exitStr: best.ref ? 'Exit ' + best.ref : '',
+        distMi: best.distM / 1609.34,   // straight-line for now; enrichment upgrades to road miles
+        exitStr: '',                    // real highway exit filled in by enrichment (rest areas only)
         lat: best.lat, lng: best.lng
       };
     }
-    poiCache[cat.id] = { result, ts: Date.now() };
+    poiCache[cat.id] = { result, ts: Date.now(), enriched: false };
     return result;
   } catch (e) {
     // Keep any previous good result; only seed an error placeholder if nothing is cached.
@@ -4976,11 +5132,79 @@ async function fetchPOICategory(cat) {
   }
 }
 
-// Paint a cached / just-fetched result into the rest-stop box.
+// Real driving distance (and ETA) via OSRM. Straight-line is "as the crow flies" and
+// under-reports — this gives the actual road distance. Returns null on any failure so
+// the caller keeps the straight-line value.
+async function osrmRoadDistance(lat1, lng1, lat2, lng2) {
+  if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) return null;
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=false`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(7000) });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const route = data.routes && data.routes[0];
+    if (!route || route.distance == null) return null;
+    return { miles: route.distance / 1609.34, minutes: route.duration / 60 };
+  } catch (e) { return null; }
+}
+
+// The actual highway exit serving a point = nearest motorway_junction (which carries the
+// real exit `ref`). The POI's own `ref` tag is NOT the exit number, which is why exits
+// were wrong before. Returns '' if there's no junction within ~3 km.
+async function nearestExit(lat, lng) {
+  try {
+    const q = `[out:json][timeout:10];node["highway"="motorway_junction"](around:4000,${lat},${lng});out;`;
+    const resp = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST', body: 'data=' + encodeURIComponent(q), signal: AbortSignal.timeout(12000)
+    });
+    if (!resp.ok) return '';
+    const data = await resp.json();
+    let best = null, bestD = Infinity;
+    for (const el of (data.elements || [])) {
+      if (el.lat == null || el.lon == null) continue;
+      const d = haversineM(lat, lng, el.lat, el.lon);
+      if (d < bestD) { bestD = d; best = el; }
+    }
+    if (!best || bestD > 3000) return '';
+    return best.tags?.ref || best.tags?.name || '';
+  } catch (e) { return ''; }
+}
+
+// Upgrade the currently-shown POI with accurate road distance + real exit number.
+// Lazy (only the viewed category) and cached so we don't re-hit the APIs every render.
+async function enrichCurrentPOI() {
+  const cat   = POI_CATEGORIES[poiCategoryIdx];
+  const entry = poiCache[cat.id];
+  if (!entry || !entry.result || entry.result.kind !== 'result') return;
+  if (entry._enriching) return;
+  if (entry.enriched && Date.now() - (entry.enrichTs || 0) < REST_STOP_CACHE_MS) return;
+  if (!lastGPSLat || !lastGPSLng) return;
+  entry._enriching = true;
+  const r = entry.result;
+  try {
+    const road = await osrmRoadDistance(lastGPSLat, lastGPSLng, r.lat, r.lng);
+    if (road && isFinite(road.miles)) { r.distMi = road.miles; r.roadDist = true; }
+    if (cat.exits) {
+      const exit = await nearestExit(r.lat, r.lng);
+      r.exitStr = exit ? ('Exit ' + exit) : '';
+    }
+    entry.enriched = true;
+    entry.enrichTs = Date.now();
+    if (POI_CATEGORIES[poiCategoryIdx].id === cat.id) renderPOIResult(r);
+  } catch (e) {
+    // keep the straight-line result
+  } finally {
+    entry._enriching = false;
+  }
+}
+
+// Paint a cached / just-fetched result into the rest-stop box, then lazily upgrade it
+// to accurate road distance + real exit number.
 function renderPOIResult(result) {
   if (!result) return;
   if (result.kind === 'result') {
     setRestStopUI(result.icon, result.name, result.distMi, null, result.exitStr, result.lat, result.lng);
+    enrichCurrentPOI();   // background upgrade to road distance + real exit
   } else {
     setRestStopUI(result.icon, result.name, null, null, null);
   }
@@ -6329,9 +6553,9 @@ function updateSoc(val) {
   const el  = document.getElementById('battPct');
   clearSkel(el);
   el.textContent = pct + '%';
-  el.style.color = 'var(--blue)';
   const bar = document.getElementById('battBar');
   if (bar) bar.style.width = pct + '%';
+  applyBattChargeStyle();   // blue while charging, white otherwise
   recalcTTE();
   checkBattFull(pct);
 }
@@ -6353,6 +6577,7 @@ function updatePower(val) {
   el.style.color = battPower > 10 ? 'var(--green)' : battPower < -10 ? 'var(--red)' : 'var(--blue)';
   document.getElementById('battALabel').textContent =
     battPower > 10 ? 'Charging' : battPower < -10 ? 'Discharging' : 'Idle';
+  applyBattChargeStyle();   // update SOC %/bar color + bolt when charging state changes
 
   if (battPower > 10 && !wasCharging) {
     chargeStartSoc  = battSoc;
@@ -6580,6 +6805,17 @@ function connectMQTT() {
         if (!isNaN(t)) {
           document.getElementById('climateActual').textContent = t + '°';
         }
+      } else if (key === 'timer') {
+        const end = parseInt(msgStr);
+        if (!isNaN(end) && end > Date.now()) {
+          acTimerEndMs = end;
+          const savedIdx = parseInt(localStorage.getItem('acTimerIdx'));
+          if (!isNaN(savedIdx)) setClimTimerSlider(savedIdx);
+        } else {
+          acTimerEndMs = 0;
+          setClimTimerSlider(0);
+        }
+        updateClimTimerCountdown();
       }
       return;
     }

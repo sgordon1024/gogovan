@@ -43,6 +43,29 @@ AC_CAN_ID = "19FEF944"
 # Module-level MQTT client reference (set in on_connect)
 mqtt_client_ref = None
 
+# ── AC sleep timer ────────────────────────────────────────────────────────────
+# Runs server-side so the AC turns off at the scheduled time even when the phone
+# is asleep / the dashboard is closed (a browser setTimeout would not fire then).
+ac_timer = None
+ac_timer_lock = threading.Lock()
+
+def _clear_ac_timer():
+    global ac_timer
+    with ac_timer_lock:
+        if ac_timer is not None:
+            ac_timer.cancel()
+            ac_timer = None
+
+def _fire_ac_timer():
+    global ac_timer
+    with ac_timer_lock:
+        ac_timer = None
+    print("AC sleep timer expired → turning AC off")
+    send_ac("00C0FFFFFFFFFFFF")  # System OFF
+    if mqtt_client_ref:
+        mqtt_client_ref.publish("van/status/ac/mode", "off", retain=True)
+        mqtt_client_ref.publish("van/status/ac/timer", "", retain=True)
+
 def cansend(data):
     frame = f"19FEDB{SA}#{data}"
     print(f"cansend {CAN_IFACE} {frame}")
@@ -87,11 +110,16 @@ def handle_ac(key, payload):
       Byte 5: setpoint step (0xF9=step down; 0xFA=step up, hypothesized)
       All other bytes: 0xFF (don't-care)
     """
+    global ac_timer
     if key == "mode":
         if payload == "cool":
             send_ac("00F1FFFFFFFFFFFF")  # Cool ON
         elif payload == "off":
             send_ac("00C0FFFFFFFFFFFF")  # System OFF
+            # Manually turning the AC off cancels any pending sleep timer.
+            _clear_ac_timer()
+            if mqtt_client_ref:
+                mqtt_client_ref.publish("van/status/ac/timer", "", retain=True)
     elif key == "fan":
         if payload == "high":
             send_ac("00D5C8FFFFFFFFFF")  # Fan HIGH (0xC8 = 100%)
@@ -105,6 +133,27 @@ def handle_ac(key, payload):
             send_ac("00FFFFFFFFFAFFFF")
         elif payload == "down":
             send_ac("00FFFFFFFFF9FFFF")  # Confirmed step -1°F
+    elif key == "timer":
+        # payload = minutes until AC auto-off ("0"/"off" cancels)
+        try:
+            minutes = int(float(payload))
+        except ValueError:
+            minutes = 0
+        _clear_ac_timer()
+        if minutes > 0:
+            secs   = minutes * 60
+            end_ms = int((time.time() + secs) * 1000)
+            with ac_timer_lock:
+                ac_timer = threading.Timer(secs, _fire_ac_timer)
+                ac_timer.daemon = True
+                ac_timer.start()
+            print(f"AC sleep timer set: {minutes} min")
+            if mqtt_client_ref:
+                mqtt_client_ref.publish("van/status/ac/timer", str(end_ms), retain=True)
+        else:
+            print("AC sleep timer cancelled")
+            if mqtt_client_ref:
+                mqtt_client_ref.publish("van/status/ac/timer", "", retain=True)
 
 def get_current_upstream():
     """Detect which upstream Wi-Fi connection wlan0 is using via nmcli."""
@@ -259,6 +308,9 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe("van/ac/+")
     client.subscribe("van/network/speedtest")  # only speedtest; upstream owned by starlink-bridge
     print("Subscribed to van/light/+, van/motor/+, van/ac/+, van/network/speedtest")
+    # A restart loses any in-memory sleep timer — clear its retained status so the
+    # dashboard doesn't show a countdown that will never fire.
+    client.publish("van/status/ac/timer", "", retain=True)
     subprocess.run(["cansend", CAN_IFACE, f"18EEFF{SA}#0000000000008000"])
 
     t = threading.Thread(target=can_listener, args=(client,), daemon=True)

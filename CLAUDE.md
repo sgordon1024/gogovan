@@ -168,11 +168,18 @@ The dashboard has 5 tabs in the bottom nav bar (Apple HIG style):
 
 | Tab | Contents |
 |---|---|
-| **Power** | Battery SOC/voltage, solar input, grid/shore power, inverter mode, Victron data, charging lightning animation |
+| **Power** | Battery SOC/voltage, solar input, grid/shore power, inverter mode, Victron data |
 | **Lights** | All G12 lights with on/off/dim, Light Themes (scenes), rope lights (BLE) |
-| **Climate** | AC mode (cool/off), fan speed (high/low/auto), setpoint, ambient temperature |
+| **Climate** | AC mode (cool/off), fan speed (high/low/auto), setpoint, ambient temperature, sleep timer |
 | **Controls** | Water pump, tank heater, awning (extend/retract/stop) |
-| **Internet** | T-Mobile/Starlink switching, Starlink power/auto toggle, speed test, all-time stats overlay |
+| **Internet** | T-Mobile/Starlink switching, Starlink power/auto toggle, speed test, stats + coverage map |
+
+### Battery hero (Power tab)
+- The big SOC % (`#battPct`) and fill-bar (`#battBar`) are **blue while charging** and **white otherwise**. Charging = net battery power `> 10 W` (`isBattCharging()`); `applyBattChargeStyle()` is called from both `updateSoc` and `updatePower`.
+- The **lightning bolt animation only plays while charging** (any source — solar/shore/alternator), driven by `scheduleLightning()` off the same `isBattCharging()` check. No charging → no bolt, white text.
+
+### Inverter (Power tab)
+Mode buttons On/Charger/Inverter/Off → `setInverterMode()` writes `W/{PORTAL_ID}/vebus/276/Mode`. **Turning the inverter OFF (mode 4) while the Starlink dish is powered on first shows a confirm dialog** (`showConfirm` / `#confirmOverlay`) — cutting the inverter kills AC and would drop the internet. The other modes apply without a prompt.
 
 ---
 
@@ -233,6 +240,11 @@ query around the current GPS fix. Shows the nearest-ahead match's name, distance
 - It fires once on the **first GPS fix** (`poiInitialPreloaded` guard in `onGPSUpdate`) so the cache is warm before drive mode even starts, and again from `startRestStopUpdates()` when drive mode begins.
 - `handleRestBoxClick()` renders the cached result **immediately**, then background-refreshes only if the cache entry is older than `REST_STOP_CACHE_MS` (60s). Categories not yet cached fall back to a live fetch with a "Searching…" placeholder.
 - `fetchPOICategory(cat)` does the fetch + nearest-ahead computation and caches; `renderPOIResult(result)` paints a cached/fresh result into the box. The 60s interval (`updateRestStop`) keeps the currently-viewed category fresh.
+
+**Accuracy — distance & exit (`enrichCurrentPOI`):** the cached result first shows straight-line distance and **no exit**, then the *currently-viewed* category is upgraded in the background:
+- **Distance → real road miles** via OSRM (`osrmRoadDistance`, `router.project-osrm.org`). Straight-line under-reports vs the road; on any OSRM failure it keeps the straight-line value (so it never regresses).
+- **Exit → the real highway exit number** via the nearest `highway=motorway_junction` to the POI (`nearestExit`, Overpass, within ~3 km). Only the rest-area category has `exits: true` — Cracker Barrel / Walmart / BLM never show an exit. **The POI's own `ref` tag is NOT the exit number** — using it was the cause of the wrong exits; that's been removed.
+- Enrichment is lazy (only the viewed category), guarded per-cache-entry (`_enriching` / `enriched` / `enrichTs`), and re-cached so the APIs aren't hit on every render.
 
 ### Engine Panel (OBD-II)
 Displayed in the drive Speed tab below the speedometer. Shows live data from the Sprinter's OBD-II port via the vGate iCar Pro BT3 adapter:
@@ -343,6 +355,13 @@ Discovered by sniffing the G12 LCD (SA=0x9F) controlling the thermostat.
 | Setpoint +1°F | `00FFFFFFFFFAFFFF` *(hypothesized)* |
 | Setpoint −1°F | `00FFFFFFFFF9FFFF` *(confirmed)* |
 
+### Sleep Timer (server-side)
+The Climate tab has a stepped **Sleep Timer** slider (`AC_TIMER_STEPS`: Off, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240 min). It runs **server-side in `can-bridge.py`** (a `threading.Timer`) so the AC turns off at the scheduled time even when the phone is asleep / the dashboard is closed — a browser `setTimeout` would not fire then.
+- Dashboard publishes minutes to `van/ac/timer` (`0` cancels). The bridge schedules the off, then publishes the **epoch-ms end time** to `van/status/ac/timer` (retained), or `""` when cancelled/fired.
+- On expiry the bridge sends `System OFF` and publishes `van/status/ac/mode=off` + clears the timer status.
+- Manually turning the AC off (`van/ac/mode=off`) cancels any pending timer. A bridge restart clears the timer (in-memory) and its retained status, so the dashboard won't show a countdown that can't fire.
+- Dashboard shows a live `H:MM:SS` countdown computed from the retained end-time (`updateClimTimerCountdown`).
+
 ### Status PGNs (all proprietary Firefly)
 
 **`19FFE29B`** — G12 thermostat status (broadcasts continuously)
@@ -378,6 +397,7 @@ When AC mode is **off**, the Firefly LCD always displays fan as "Auto" regardles
 | `van/ac/mode` | Dashboard → Bridge | `cool`, `off` |
 | `van/ac/fan` | Dashboard → Bridge | `high`, `low`, `auto` |
 | `van/ac/setpoint` | Dashboard → Bridge | `up`, `down` |
+| `van/ac/timer` | Dashboard → Bridge | minutes until AC auto-off (`0` cancels) |
 | `van/rope-light/power` | Dashboard → rope-light.py | `on`, `off` |
 | `van/rope-light/color` | Dashboard → rope-light.py | `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `teal`, `cyan`, `sky`, `blue`, `navy`, `purple`, `pink`, `white` |
 | `van/rope-light/brightness` | Dashboard → rope-light.py | `1`–`100` |
@@ -395,6 +415,7 @@ When AC mode is **off**, the Firefly LCD always displays fan as "Auto" regardles
 | `van/status/ac/fan` | Bridge → Dashboard | `high`, `low`, `auto` |
 | `van/status/ac/setpoint` | Bridge → Dashboard | integer °F |
 | `van/status/ac/temp` | Bridge → Dashboard | integer °F |
+| `van/status/ac/timer` | Bridge → Dashboard | epoch-ms when AC auto-off fires, or `""` if none |
 | `van/status/starlink/power` | starlink-bridge → Dashboard | `on`, `off`, `unknown` |
 | `van/status/starlink/auto` | starlink-bridge → Dashboard | `on`, `off` |
 | `van/status/starlink/threshold` | starlink-bridge → Dashboard | min T-Mobile signal % for recheck |
