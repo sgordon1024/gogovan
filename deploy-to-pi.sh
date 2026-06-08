@@ -135,6 +135,38 @@ sshpass -p "$PASS" scp "$OBD_SRC" "$PI:~/obd-bridge.py" 2>/dev/null && echo "obd
   || echo "WARNING: obd-bridge.py copy failed"
 sshpass -p "$PASS" ssh "$PI" 'echo windows | sudo -S systemctl restart obd-bridge 2>/dev/null && echo "obd-bridge restarted" || echo "(obd-bridge service not installed — run pi-setup/setup-obd.sh)"'
 
+# ── voice-bridge.py (Claude voice control) ─────────────────────────────────
+echo "=== Copying voice-bridge.py ==="
+VOICE_SRC="$DIR/voice-bridge.py"; [ -f "$VOICE_SRC" ] || VOICE_SRC="$SCRIPT_DIR/voice-bridge.py"
+sshpass -p "$PASS" scp "$VOICE_SRC" "$PI:~/voice-bridge.py" 2>/dev/null && echo "voice-bridge.py copied" \
+  || echo "WARNING: voice-bridge.py copy failed"
+
+echo "=== Installing voice-bridge systemd service ==="
+sshpass -p "$PASS" ssh "$PI" 'bash -s' << 'REMOTE'
+set -e
+PASS="windows"
+echo "$PASS" | sudo -S tee /etc/systemd/system/voice-bridge.service > /dev/null << 'UNIT'
+[Unit]
+Description=GoGoVan voice control bridge (Claude)
+After=network.target mosquitto.service
+Wants=mosquitto.service
+
+[Service]
+ExecStart=/usr/bin/python3 /home/sgordon1024/voice-bridge.py
+WorkingDirectory=/home/sgordon1024
+Restart=always
+RestartSec=10
+User=sgordon1024
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+echo "$PASS" | sudo -S systemctl daemon-reload
+echo "$PASS" | sudo -S systemctl enable voice-bridge
+echo "$PASS" | sudo -S systemctl restart voice-bridge
+echo "voice-bridge installed and started"
+REMOTE
+
 # ── Status check ──────────────────────────────────────────────────────────
 echo ""
 echo "=== Service status ==="

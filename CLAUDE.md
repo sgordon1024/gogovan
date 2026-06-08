@@ -50,6 +50,7 @@ Pi CAN HAT (Waveshare 2-CH CAN HAT+)
 - `rope-light` — `rope-light.py` BLE↔MQTT bridge for interior rope lights
 - `starlink-bridge` — `starlink-bridge.py` Starlink smart plug + GL.iNet repeater auto-switch
 - `obd-bridge` — `obd-bridge.py` OBD-II data via vGate iCar Pro BT3
+- `voice-bridge` — `voice-bridge.py` voice control via Claude API (key in `~/.anthropic_key`)
 - `gogovan-web` — `python3 -m http.server 80` (port 80, runs as root)
 - `nginx` — serves HTTPS on port 443 via Tailscale cert; proxies `/mqtt` WebSocket to mosquitto:9001
 - `gogovan-watchdog.timer` — runs `/usr/local/bin/gogovan-watchdog.sh` every 2 minutes; auto-switches wlan0 between T-Mobile/Starlink on internet failure and restarts Tailscale if it drops
@@ -142,6 +143,7 @@ Adding the dashboard to iPhone home screen (Safari → Share → Add to Home Scr
 | `rope-light.py` | Pi: `/home/sgordon1024/rope-light.py` | BLE↔MQTT bridge for rope lights (bleak + paho-mqtt) |
 | `starlink-bridge.py` | Pi: `/home/sgordon1024/starlink-bridge.py` | Starlink smart plug (tinytuya) + GL.iNet repeater switching |
 | `obd-bridge.py` | Pi: `/home/sgordon1024/obd-bridge.py` | OBD-II data bridge (python-obd via /dev/rfcomm0) |
+| `voice-bridge.py` | Pi: `/home/sgordon1024/voice-bridge.py` | Voice control: transcript → Claude API → structured actions (key in `~/.anthropic_key`) |
 | `run-speedtest.py` | Pi: `/home/sgordon1024/run-speedtest.py` | Runs the official Ookla `speedtest --format=json`; used by BOTH the 4h timer and manual taps (deploy-to-pi.sh now copies it) |
 | `deploy-to-pi.sh` | Dev: project root | Main deploy script — auto-detects Tailscale or Apple Pi LAN |
 | `deploy-local.sh` | Dev: project root | Deploy when offline (tries 192.168.8.106, 192.168.4.1, Tailscale) |
@@ -156,7 +158,7 @@ Adding the dashboard to iPhone home screen (Safari → Share → Add to Home Scr
 ```bash
 ./deploy-to-pi.sh
 ```
-Auto-detects connection: tries Tailscale first (`100.98.52.107`), then `vanpi.local`, then `192.168.8.106`. Deploys: index.html, can-bridge.py, rope-light.py, starlink-bridge.py, obd-bridge.py, run-speedtest.py. Restarts all services after deploy.
+Auto-detects connection: tries Tailscale first (`100.98.52.107`), then `vanpi.local`, then `192.168.8.106`. Deploys: index.html, can-bridge.py, rope-light.py, starlink-bridge.py, obd-bridge.py, run-speedtest.py, voice-bridge.py (installs its systemd unit). Restarts all services after deploy.
 
 **IMPORTANT: Always run `./deploy-to-pi.sh` immediately after every change to any Pi file.** The user reviews changes live on the dashboard — if you don't deploy right away, they can't see what you did.
 
@@ -195,7 +197,7 @@ Can also be toggled manually via the Drive Mode card. (Revving the engine in par
 ### What happens on enter
 1. All G12 lights turned off (state saved to `preDriveLights`)
 2. Water pump turned off (`pumpWasOn` saved)
-3. AC turned off if cooling (`setAcMode('off')`); any server-side sleep timer / cycle is also cancelled so the AC can't switch back on while driving
+3. AC turned off **unconditionally** (`setAcMode('off')` every drive entry — robust even if the dashboard's tracked AC state is stale); any server-side sleep timer / cycle is also cancelled so the AC can't switch back on while driving
 4. Rope lights turned off (state saved to `predriveRope`: color, effect, brightness, speed)
 5. Awning retracted (G12 stops at limit switch if already retracted)
 6. UI locked to drive layout: Speed, Internet, and Climate tabs via bottom drive nav
@@ -209,7 +211,7 @@ Exit is decided by **engine state first, GPS second** (`engineRunning()` reads `
 `evaluateDriveState()` is the single enter/exit authority — it runs on every GPS tick **and** on OBD `speed`/`rpm`/`connected` changes (via `updateOBDUI`). So OBD genuinely drives detection: entry and exit both work even without GPS, and shutting the engine off while stopped parks promptly.
 
 ### What happens on exit
-1. Water pump always restored to ON
+1. Water pump always restored to ON via `restorePump()` (publishes the `van/light/pump` command **and** the retained `van/status/light/pump` status so the bridge actuates it and the UI stays in sync). The "Arrived?" toast's Restore button also calls it, re-asserting the pump in case the park-time publish didn't land. Note: drive mode only **exits** (and restores the pump) once the van is genuinely parked — engine off, or 60s of GPS-confirmed stop when OBD is unavailable; sitting stopped with the engine running is treated as a red light (held), so the pump returns when you shut the engine off.
 2. Rope lights restored to the **exact** pre-drive state via the shared `applyRopeRestore()` — color OR any effect (cycle/candle/…), plus brightness/speed. Both the auto-restore on park and the "Arrived?" toast's Restore button call it, so they can't diverge (the toast used to reset non-cycle effects to red)
 3. "Arrived?" toast shown if any G12 lights were on before driving — user taps to restore them
 
@@ -259,6 +261,14 @@ Displayed in the drive Speed tab below the speedometer. Shows live data from the
 - The "Accelerator" bar is fed from `accel-pos` (ACCELERATOR_POS_D / pedal), **not** `throttle-pos` — on this diesel THROTTLE_POS reads a stuck ~13%, so the pedal PID is the real driver input. `accel-pos` is fast-polled (2s) for responsiveness.
 - MIL (check engine light) indicator and DTC fault code list
 - Data published by `obd-bridge.py` via MQTT to `van/status/obd/*`
+
+### Voice Control (drive-mode mic)
+A **mic button** in the drive-mode bottom nav (`#driveNavVoice` → `startVoiceListen()`) lets you speak a command and have it executed.
+
+- **Speech-to-text** is the iPhone's built-in recognition (`webkitSpeechRecognition`) — needs no key, but requires the **HTTPS** dashboard (mic is blocked on plain `http://`, same as GPS).
+- The transcript + the list of controllable lights/scenes/colors is published to `van/voice/request`. **`voice-bridge.py`** on the Pi (holds the Anthropic key in `~/.anthropic_key`, **never in the webpage**) sends it to **Claude** (`claude-opus-4-8`, forced tool use `van_controls`) and publishes a structured `{actions, reply}` back on `van/voice/response`.
+- The dashboard's `executeVoiceActions()` / `applyVoiceAction()` map each action to the existing control functions (lights, AC mode/fan/setpoint, pump, tank heater, awning, rope color/effect/brightness, scenes, drive mode, Starlink). It speaks the `reply` confirmation.
+- **Setup (once):** `echo 'sk-ant-...' > ~/.anthropic_key && chmod 600 ~/.anthropic_key` on the Pi, then `sudo systemctl restart voice-bridge`. Without the key, the bridge returns `{error}` and the dashboard shows it. For faster/cheaper commands, set `MODEL = "claude-haiku-4-5"` in `voice-bridge.py`.
 
 ---
 
@@ -428,6 +438,7 @@ When AC mode is **off**, the Firefly LCD always displays fan as "Auto" regardles
 | `van/starlink/threshold` | Dashboard → starlink-bridge.py | `0`-`100` min T-Mobile signal % to re-test for switch-back (default 25) |
 | `van/network/speedtest` | Dashboard → run-speedtest.py | `run` (full manual test) or `lite` (small low-data test) |
 | `van/network/driving` | Dashboard → starlink-bridge.py | `on`/`off` — drive mode (weights Starlink more) |
+| `van/voice/request` | Dashboard → voice-bridge.py | JSON `{transcript, lights, scenes, colors}` — voice command |
 
 | Topic (publish, retained) | Direction | Payload |
 |---|---|---|
@@ -446,6 +457,7 @@ When AC mode is **off**, the Firefly LCD always displays fan as "Auto" regardles
 | `van/status/network/speedtest` | run-speedtest → Dashboard | JSON: `{download, upload, ping, server, upstream, timestamp, error}` |
 | `van/status/network/speedtest/running` | run-speedtest → Dashboard | `true` / `false` |
 | `van/status/network/alert` | starlink-bridge → Dashboard | warning text (e.g. both WANs down) → red toast; empty string clears |
+| `van/voice/response` | voice-bridge → Dashboard | JSON `{actions:[…], reply}` or `{error}` (not retained) |
 | `van/status/obd/connected` | obd-bridge → Dashboard | `ok`, `searching`, `error` |
 | `van/status/obd/rpm` | obd-bridge → Dashboard | integer |
 | `van/status/obd/speed` | obd-bridge → Dashboard | integer mph |
@@ -558,6 +570,11 @@ switching is the Pi's `wlan0`.
 - Health check every **20s** = real ping to 8.8.8.8 / 1.1.1.1 through the active link.
 - On T-Mobile, **3 consecutive failed checks (~60s)** → power dish on, wait for warmup
   (Starlink SSID to appear, up to 180s), switch routing to Starlink, verify.
+- **Inverter auto-on for Starlink:** the dish runs off the inverter's AC, so `switch_to_starlink()`
+  calls `ensure_inverter_on()` first — publishes `W/{PORTAL_ID}/vebus/276/Mode = {"value":3}` (On)
+  before powering the Tuya plug, then retries the plug for ~40s while it boots/rejoins Wi-Fi. So if
+  the user turned the inverter off, failover turns it back on to power Starlink. (PORTAL_ID `c0619ab5dcfb`,
+  same as the dashboard.) The inverter is **not** auto-turned-off afterward.
 - On Starlink, every **20 min** (`TMOBILE_RECHECK_INTERVAL`): if T-Mobile has signal
   (≥ `min_signal`, default 20 — the `threshold` topic), briefly switch to it and test
   REAL internet. If good → stay on T-Mobile + power dish off. If not → fall back to

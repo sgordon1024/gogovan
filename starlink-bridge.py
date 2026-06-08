@@ -384,6 +384,19 @@ def _end_transition():
 
 # ── Transitions ──────────────────────────────────────────────────────────────
 
+# Victron MQTT portal (matches the dashboard) — used to turn the inverter back on.
+PORTAL_ID = "c0619ab5dcfb"
+
+def ensure_inverter_on():
+    """The Starlink dish runs off the inverter's AC. Before powering the dish on, make
+    sure the MultiPlus is ON (mode 3) — if the user turned the inverter off, powering the
+    Tuya plug would do nothing. Idempotent (harmless if already on). Published as a Victron
+    write, bridged to the Cerbo through the local mosquitto (same path the dashboard uses)."""
+    if mqtt_client:
+        mqtt_client.publish(f"W/{PORTAL_ID}/vebus/276/Mode", '{"value": 3}')
+        print("Ensuring inverter ON (mode 3) so the Starlink dish has AC power")
+
+
 def switch_to_starlink(reason: str) -> bool:
     """Power on dish → warmup → route to Starlink → verify. Returns True if Starlink has internet."""
     global warmup_start, fail_count
@@ -393,11 +406,21 @@ def switch_to_starlink(reason: str) -> bool:
     try:
         print(f"FAILOVER → Starlink ({reason})")
 
-        # Power the dish on (best-effort). Don't abort if the plug is unreachable —
-        # the dish may already be powered, and network failover matters more.
-        if starlink_plug != "on":
-            if not plug_set(True):
-                print("Plug unreachable — continuing failover anyway (dish may already be on)")
+        # The dish runs off the inverter's AC, so make sure the inverter is on first
+        # (if the user turned it off, the Tuya plug would be dead and the dish can't power).
+        ensure_inverter_on()
+
+        # Power the dish on (best-effort), retrying for a bit since the plug may have been
+        # unpowered and needs to boot + rejoin Wi-Fi after the inverter just came on.
+        # Don't abort if it stays unreachable — the dish may already be powered.
+        powered = False
+        for _attempt in range(8):              # up to ~40s
+            if plug_set(True):
+                powered = True
+                break
+            time.sleep(5)
+        if not powered:
+            print("Plug unreachable — continuing failover anyway (dish may already be on)")
 
         # Wait for the Starlink SSID to appear (dish boot), then connect.
         warmup_start = time.time()
