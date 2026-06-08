@@ -1300,6 +1300,9 @@
       padding: 20px 22px calc(24px + env(safe-area-inset-bottom));
       width: 100%;
       max-width: 430px;
+      max-height: 85vh;                 /* never fill the whole screen — leave backdrop to tap-close */
+      overflow-y: auto;                 /* scroll internally if the themes don't fit */
+      -webkit-overflow-scrolling: touch;
       animation: slideUp 0.28s cubic-bezier(0.32, 0.72, 0, 1);
     }
 
@@ -1310,11 +1313,16 @@
 
     .sheet-handle {
       width: 36px;
-      height: 4px;
+      height: 5px;
+      padding: 10px 24px;            /* large tap target; bar stays 36x5 via content-box clip */
+      margin: -10px auto 6px;
+      box-sizing: content-box;
       background: var(--border);
-      border-radius: 2px;
-      margin: 0 auto 16px;
+      background-clip: content-box;
+      border-radius: 3px;
+      cursor: pointer;
     }
+    .sheet-handle:active { opacity: 0.6; }
 
     .sheet-title {
       font-size: 16px;
@@ -3001,7 +3009,7 @@ safe-buffer/index.js:
   <!-- THEME PICKER -->
   <div class="overlay" id="overlay" onclick="overlayClick(event)">
     <div class="theme-sheet" id="themeSheet">
-      <div class="sheet-handle"></div>
+      <div class="sheet-handle" onclick="document.getElementById('overlay').classList.remove('open')" style="cursor:pointer"></div>
       <div class="sheet-title">Settings</div>
       <div class="theme-group-label" style="margin-bottom:14px;font-size:11px;letter-spacing:0.8px;">Appearance</div>
       <div class="theme-group-label">Dark</div>

@@ -273,7 +273,7 @@ A "Light Themes" section at the top of the Lights tab lets the user save and rec
 
 ## Themes
 
-The dashboard has 26 visual color themes (Night, Day, Desert, Ocean, Forest, Neon, etc.). A theme button (palette icon) opens a bottom sheet picker. Themes are saved to `localStorage` key `theme`. The picker swatches **wrap** (don't cram into one nowrap row).
+The dashboard has 26 visual color themes (Night, Day, Desert, Ocean, Forest, Neon, etc.). A theme button (palette icon) opens a bottom sheet picker. Themes are saved to `localStorage` key `theme`. The picker swatches **wrap** (don't cram into one nowrap row). The sheet is **capped at `max-height:85vh` with `overflow-y:auto`** so it never fills the whole screen (which would hide the tap-to-close backdrop); it also closes by tapping the grab handle.
 
 **Secondary-text contrast:** `applyTheme()` nudges each theme's `--txt2` ~32% toward `--txt` (`_mixHex`) so dim labels are readable on every theme — done centrally instead of editing all 26 themes' `vars`.
 
