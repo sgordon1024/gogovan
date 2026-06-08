@@ -190,7 +190,7 @@ Drive mode activates automatically when the van is actually moving (≥5 mph hel
 ### What happens on enter
 1. All G12 lights turned off (state saved to `preDriveLights`)
 2. Water pump turned off (`pumpWasOn` saved)
-3. AC turned off via `setAcMode('off')`
+3. AC turned off if cooling (`setAcMode('off')`); any server-side sleep timer / cycle is also cancelled so the AC can't switch back on while driving
 4. Rope lights turned off (state saved to `predriveRope`: color, effect, brightness, speed)
 5. Awning retracted (G12 stops at limit switch if already retracted)
 6. UI locked to drive layout: Speed, Internet, and Climate tabs via bottom drive nav

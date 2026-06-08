@@ -4629,7 +4629,16 @@ function enterDrivingMode(manual = false) {
     if (pumpState) pumpState.textContent = 'Off';
   }
 
-  // 3. Save rope light state and turn off (always send — JS state may lag physical state)
+  // 3. Turn off the AC if it's running. Also cancel any server-side sleep timer / cycle
+  //    so it can't switch the AC back on while driving.
+  if (acMode === 'cool') {
+    setAcMode('off');                            // System OFF; bridge also cancels cycle + timer
+  } else if (mqttClient?.connected) {
+    mqttClient.publish('van/ac/cycle', 'off');   // kill a duty cycle paused in its off-phase
+    mqttClient.publish('van/ac/timer', '0');
+  }
+
+  // 4. Save rope light state and turn off (always send — JS state may lag physical state)
   preRopeOn         = ropeOn;
   preRopeColor      = ropeActiveColor;
   preRopeEffect     = ropeActiveEffect;
