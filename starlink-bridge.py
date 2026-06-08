@@ -105,6 +105,7 @@ last_tmobile_recheck    = 0.0
 manual_override         = False
 manual_override_expires = 0.0
 manual_test_pending     = 0.0       # epoch of last manual speed-test request (gates failover-on-result)
+driving                 = False     # van is driving → weight Starlink more (set via van/network/driving)
 transitioning           = False     # True while a switch is in progress
 
 _state_lock = threading.Lock()
@@ -538,14 +539,17 @@ def control_loop():
                     tmobile_stable_count += 1
                     # Power-saving: once T-Mobile has been solidly up (~1 min), the
                     # Starlink dish isn't needed — power it off (best-effort).
-                    if starlink_plug == "on" and tmobile_stable_count >= 3:
+                    # Power-saving: drop the dish once T-Mobile is solidly up — but NOT while
+                    # driving (keep the dish warm so switching is instant; power isn't a concern).
+                    if starlink_plug == "on" and tmobile_stable_count >= 3 and not driving:
                         print("T-Mobile stable — powering Starlink dish off (power saving)")
                         plug_set(False)
                 else:
                     fail_count += 1
                     tmobile_stable_count = 0
-                    print(f"T-Mobile internet check failed ({fail_count}/{FAIL_CONFIRM})")
-                    if fail_count >= FAIL_CONFIRM:
+                    need = 2 if driving else FAIL_CONFIRM   # fail over to Starlink faster while driving
+                    print(f"T-Mobile internet check failed ({fail_count}/{need})")
+                    if fail_count >= need:
                         fail_count = 0
                         threading.Thread(target=switch_to_starlink,
                                          args=("T-Mobile internet down",), daemon=True).start()
@@ -567,8 +571,9 @@ def control_loop():
                 else:
                     fail_count = 0
 
-                # Periodic T-Mobile recovery attempt
-                if time.time() - last_tmobile_recheck >= TMOBILE_RECHECK_INTERVAL:
+                # Periodic T-Mobile recovery attempt — skipped while driving (we weight
+                # Starlink and don't bother switching back to T-Mobile to save power).
+                if not driving and time.time() - last_tmobile_recheck >= TMOBILE_RECHECK_INTERVAL:
                     last_tmobile_recheck = time.time()
                     if sig >= min_signal:
                         print(f"T-Mobile recheck: signal={sig} present, testing real internet…")
@@ -611,8 +616,9 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe("van/starlink/auto")
     client.subscribe("van/starlink/threshold")
     client.subscribe("van/network/upstream")
-    client.subscribe("van/network/speedtest")          # manual test trigger ("run")
-    client.subscribe("van/status/network/speedtest")   # test result (react to manual ones)
+    client.subscribe("van/network/speedtest")          # manual/lite test trigger
+    client.subscribe("van/status/network/speedtest")   # test result (react to manual/lite ones)
+    client.subscribe("van/network/driving")            # drive mode → weight Starlink more
 
     # Initial plug + upstream snapshot
     plug_state    = plug_get_state()
@@ -643,7 +649,7 @@ def _arm_manual_override():
 
 
 def on_message(client, userdata, msg):
-    global auto_mode, min_signal, manual_override, manual_test_pending, last_tmobile_recheck
+    global auto_mode, min_signal, manual_override, manual_test_pending, last_tmobile_recheck, driving
     topic   = msg.topic
     payload = msg.payload.decode().strip().lower()
 
@@ -684,10 +690,15 @@ def on_message(client, userdata, msg):
             threading.Thread(target=switch_to_tmobile, args=("manual override",), daemon=True).start()
         return
 
+    if topic == "van/network/driving":
+        driving = (payload == "on")
+        print(f"Driving → {driving} (weighting Starlink {'more' if driving else 'normally'})")
+        return
+
     if topic == "van/network/speedtest":
-        if payload == "run":
+        if payload in ("run", "lite"):
             manual_test_pending = time.time()
-            print("Manual speed test requested — will check its result for failover")
+            print(f"Speed test requested ({payload}) — will check its result for failover")
         return
 
     if topic == "van/status/network/speedtest":
@@ -717,7 +728,8 @@ def on_message(client, userdata, msg):
         # back to it when it has real internet. switch_to_tmobile() pings to verify and
         # reverts to Starlink on its own if T-Mobile is actually dead (never strands us).
         cur = get_current_upstream()
-        if cur == "starlink" and auto_mode and not manual_override:
+        if cur == "starlink" and auto_mode and not manual_override and not driving:
+            # (While driving we weight Starlink and skip switching back to T-Mobile.)
             print(f"Manual test OK on Starlink ({dl} Mbps) — re-checking T-Mobile to switch back…")
             last_tmobile_recheck = time.time()          # reset the periodic recheck clock
             set_state("checking_tmobile")

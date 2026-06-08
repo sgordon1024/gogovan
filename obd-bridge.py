@@ -40,7 +40,7 @@ import obd
 MQTT_HOST  = 'localhost'
 MQTT_PORT  = 1883
 OBD_PORT   = '/dev/rfcomm0'
-POLL_FAST  = 2    # seconds — live gauges
+POLL_FAST  = 1    # seconds — live gauges + accelerator/load (drive-detection needs fine resolution)
 POLL_SLOW  = 30   # seconds — slow-changing values + MIL + DTCs
 
 TANK_GALLONS = 24.5    # diesel main tank (2024 Entegra Launch / Sprinter 3500)

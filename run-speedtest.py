@@ -7,8 +7,11 @@ by manual "Run Speed Test" taps in the dashboard (via can-bridge.py).
 Uses the official Ookla speedtest binary (multi-stream, accurate) with a fallback
 to speedtest-cli (Python package) if the Ookla binary isn't found.
 """
-import json, subprocess, os, shutil, socket
+import json, subprocess, os, shutil, socket, sys
 import paho.mqtt.client as mqtt
+
+# "--lite" = small, low-data test (~4 MB) for frequent checks while driving.
+LITE = '--lite' in sys.argv
 
 class _OoklaPortError(Exception):
     """Raised when Ookla fails with a socket/connect error — triggers HTTPS fallback."""
@@ -185,6 +188,61 @@ def run_https_speedtest():
     return down_mbps, up_mbps or 0, ping_ms or 0, server_name, timestamp
 
 
+def run_lite_speedtest():
+    """
+    Low-data HTTPS test (~4 MB total) for frequent driving checks — a short Cloudflare
+    download/upload so we can gauge the link and switch sources without burning data.
+    """
+    import urllib.request, time, datetime
+    server_name = 'Cloudflare (lite)'
+    timestamp   = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+    UA = 'Mozilla/5.0 (compatible; GoGoVan-SpeedTest/1.0)'
+
+    ping_ms = None
+    try:
+        t0 = time.time()
+        urllib.request.urlopen('https://speed.cloudflare.com/__down?bytes=1', timeout=5)
+        ping_ms = round((time.time() - t0) * 1000)
+    except Exception:
+        pass
+
+    down_mbps = None
+    try:
+        BUDGET = 4
+        t0 = time.time(); received = 0
+        req = urllib.request.Request('https://speed.cloudflare.com/__down?bytes=3000000',
+                                     headers={'User-Agent': UA})
+        with urllib.request.urlopen(req, timeout=BUDGET + 4) as r:
+            while time.time() - t0 < BUDGET:
+                chunk = r.read(65536)
+                if not chunk:
+                    break
+                received += len(chunk)
+        elapsed = time.time() - t0
+        if received > 0 and elapsed > 0:
+            down_mbps = round(received * 8 / elapsed / 1_000_000, 1)
+    except Exception:
+        pass
+
+    up_mbps = None
+    try:
+        data = b'0' * 1_000_000
+        t0 = time.time()
+        req = urllib.request.Request('https://speed.cloudflare.com/__up', data=data,
+                                     headers={'Content-Type': 'application/octet-stream', 'User-Agent': UA},
+                                     method='POST')
+        urllib.request.urlopen(req, timeout=8)
+        elapsed = time.time() - t0
+        if elapsed > 0:
+            up_mbps = round(len(data) * 8 / elapsed / 1_000_000, 1)
+    except Exception:
+        pass
+
+    if down_mbps is None:
+        raise ValueError('lite speed test failed — no internet connection')
+    return down_mbps, up_mbps or 0, ping_ms or 0, server_name, timestamp
+
+
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
 client.connect(MQTT_HOST, MQTT_PORT, 60)
 client.publish('van/status/network/speedtest/running', 'true', retain=True)
@@ -192,16 +250,20 @@ client.disconnect()
 
 upstream = get_upstream()
 try:
-    # Prefer the official Ookla binary (multi-stream, accurate)
-    try:
-        if shutil.which('speedtest'):
-            download, upload, ping, server, timestamp = run_ookla()
-        else:
-            download, upload, ping, server, timestamp = run_speedtest_cli()
-    except _OoklaPortError as e:
-        # Ookla failed — fall back to HTTPS-only test via Cloudflare
-        print(f'Ookla unavailable ({e}), falling back to HTTPS speed test…')
-        download, upload, ping, server, timestamp = run_https_speedtest()
+    if LITE:
+        # Small low-data test (used by the every-15-min driving checks).
+        download, upload, ping, server, timestamp = run_lite_speedtest()
+    else:
+        # Prefer the official Ookla binary (multi-stream, accurate)
+        try:
+            if shutil.which('speedtest'):
+                download, upload, ping, server, timestamp = run_ookla()
+            else:
+                download, upload, ping, server, timestamp = run_speedtest_cli()
+        except _OoklaPortError as e:
+            # Ookla failed — fall back to HTTPS-only test via Cloudflare
+            print(f'Ookla unavailable ({e}), falling back to HTTPS speed test…')
+            download, upload, ping, server, timestamp = run_https_speedtest()
 
     result = {
         'download':  download,
@@ -210,12 +272,13 @@ try:
         'server':    server,
         'upstream':  upstream,
         'timestamp': timestamp,
+        'lite':      LITE,
         'error':     None,
     }
 except Exception as e:
     result = {
         'download': None, 'upload': None, 'ping': None,
-        'server': None, 'upstream': upstream, 'timestamp': '', 'error': str(e),
+        'server': None, 'upstream': upstream, 'timestamp': '', 'lite': LITE, 'error': str(e),
     }
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)

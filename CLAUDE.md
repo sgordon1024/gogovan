@@ -185,7 +185,12 @@ Mode buttons On/Charger/Inverter/Off → `setInverterMode()` writes `W/{PORTAL_I
 
 ## Drive Mode
 
-Drive mode activates automatically when the van is actually moving (≥5 mph held 4s). Detection uses **OBD vehicle speed first, GPS as backup** (`sensorsSayDriving()` → `evaluateDriveState()`), so it works even when GPS is flaky. Can also be toggled manually via the Drive Mode card.
+Drive mode activates automatically when the van is actually moving. Detection (`sensorsSayDriving()` → `evaluateDriveState()`) uses three signals, fastest first:
+1. **OBD throttle/load variability** (`throttleVariabilityDriving()`): while driving, the accelerator (`accel-pos`) and engine load swing around constantly; at a high idle or parked they're static. Once accel-spread ≥6% or load-spread ≥10% has persisted for **≥3s** (`DRIVE_VAR_SUSTAIN`), it's "driving" and enters **immediately** (no extra confirm) — this is the fast path that fixed "drive mode takes too long." `recordDriveSample()` (fed from the OBD `accel-pos`/`engine-load` updates) keeps a 5s rolling window. OBD is fast-polled at **1s** (`POLL_FAST`) for resolution.
+2. **OBD vehicle speed** ≥ 5 mph (held `DRIVE_CONFIRM_MS`).
+3. **GPS speed** ≥ 5 mph as backup.
+
+Can also be toggled manually via the Drive Mode card. (Revving the engine in park for 3+ s could trip the variability path — rare, and a manual toggle-off overrides it.)
 
 ### What happens on enter
 1. All G12 lights turned off (state saved to `preDriveLights`)
@@ -205,7 +210,7 @@ Exit is decided by **engine state first, GPS second** (`engineRunning()` reads `
 
 ### What happens on exit
 1. Water pump always restored to ON
-2. Rope lights restored to exact pre-drive state: color or effect re-published, brightness/speed re-applied
+2. Rope lights restored to the **exact** pre-drive state via the shared `applyRopeRestore()` — color OR any effect (cycle/candle/…), plus brightness/speed. Both the auto-restore on park and the "Arrived?" toast's Restore button call it, so they can't diverge (the toast used to reset non-cycle effects to red)
 3. "Arrived?" toast shown if any G12 lights were on before driving — user taps to restore them
 
 ### Manual override (`driveOverride`)
@@ -273,7 +278,7 @@ A "Light Themes" section at the top of the Lights tab lets the user save and rec
 
 ## Themes
 
-The dashboard has 26 visual color themes (Night, Day, Desert, Ocean, Forest, Neon, etc.). A theme button (palette icon) opens a bottom sheet picker. Themes are saved to `localStorage` key `theme`. The picker swatches **wrap** (don't cram into one nowrap row). The sheet is **capped at `max-height:85vh` with `overflow-y:auto`** so it never fills the whole screen (which would hide the tap-to-close backdrop); it also closes by tapping the grab handle.
+The dashboard has 26 visual color themes (Night, Day, Desert, Ocean, Forest, Neon, etc.). A theme button (palette icon) opens a bottom sheet picker. Themes are saved to `localStorage` key `theme`. The picker swatches **wrap** (don't cram into one nowrap row). The sheet is **capped at `max-height:85vh` with `overflow-y:auto`** so it never fills the whole screen (which would hide the tap-to-close backdrop). It closes by tapping the backdrop, tapping the grab handle, or **dragging the sheet down** (`sheetTouchStart/Move/End` — drag engages only when scrolled to the top; >110px dismisses, else snaps back).
 
 **Secondary-text contrast:** `applyTheme()` nudges each theme's `--txt2` ~32% toward `--txt` (`_mixHex`) so dim labels are readable on every theme — done centrally instead of editing all 26 themes' `vars`.
 
@@ -421,7 +426,8 @@ When AC mode is **off**, the Firefly LCD always displays fan as "Auto" regardles
 | `van/starlink/power` | Dashboard → starlink-bridge.py | `on`, `off` |
 | `van/starlink/auto` | Dashboard → starlink-bridge.py | `on`, `off` |
 | `van/starlink/threshold` | Dashboard → starlink-bridge.py | `0`-`100` min T-Mobile signal % to re-test for switch-back (default 25) |
-| `van/network/speedtest` | Dashboard → run-speedtest.py | `run` (triggers manual test) |
+| `van/network/speedtest` | Dashboard → run-speedtest.py | `run` (full manual test) or `lite` (small low-data test) |
+| `van/network/driving` | Dashboard → starlink-bridge.py | `on`/`off` — drive mode (weights Starlink more) |
 
 | Topic (publish, retained) | Direction | Payload |
 |---|---|---|
@@ -462,6 +468,8 @@ Speed test results are stored in **`localStorage` key `gogovan-speed-history`** 
 **Manual speed test → failover:** when you tap "Test Now", `starlink-bridge.py` watches the result and switches sources if the current link is bad — i.e. an **error with a failed ping** (genuinely no internet, never a tooling hiccup) **or a download below `MANUAL_BAD_MBPS` (2 Mbps)**. If the other source ALSO has no usable internet, it publishes `van/status/network/alert` and the dashboard shows a red warning toast (`showNetworkAlert`). The bridge only reacts to *manual* tests (gated by a recent `van/network/speedtest=run`), not the periodic ones. Both the manual tap (via `can-bridge.py`) and the timer run the same `run-speedtest.py` (Ookla binary) — the old broken `speedtest-cli` path is gone.
 
 **Manual speed test → T-Mobile recheck (prefer-default):** T-Mobile is the preferred source; Starlink is only the fallback. So when a manual test is run **while on Starlink and the Starlink link tests OK**, the bridge also fires `switch_to_tmobile("manual test: prefer T-Mobile")` (if `auto_mode` and not `manual_override`). That does a **real connect-and-ping test of T-Mobile** and switches back to it (powering the dish off) when it has internet — otherwise it reverts to Starlink on its own (never strands). This is deliberately **independent of the T-Mobile signal scan**, which reads `-1` while associated to Starlink's 5 GHz and was blocking the automatic 20-min recheck (`get_tmobile_signal()` → periodic recheck gated on `sig >= min_signal`). Tapping "Test Now" is therefore the reliable way to force a T-Mobile recovery; the periodic auto-recheck still depends on the (sometimes blind) signal scan.
+
+**Driving: small tests every 15 min + Starlink-weighted.** In drive mode the dashboard publishes `van/network/driving=on` and fires a **lite** speed test (`van/network/speedtest=lite`) ~30s in and every 15 min. `run-speedtest.py --lite` does a ~4 MB Cloudflare down/up (vs Ookla's ~150 MB) — small enough to run often while driving. starlink-bridge treats `driving=on` by **weighting Starlink more**: skips the periodic T-Mobile recheck, keeps the dish powered (no power-saving off), fails over to Starlink after **2** bad checks instead of 3, and won't switch back to T-Mobile on a lite-test-OK. Exiting drive mode publishes `driving=off` and stops the tests. Rationale: while driving, switching matters most and power doesn't.
 
 GPS is captured with `navigator.geolocation.getCurrentPosition()` (8s timeout, 2min cache) at the time of each test result and stored as `{lat, lng}` in the history entry. Each result in the stats list links to `maps.apple.com/?ll=lat,lng`.
 

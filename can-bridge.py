@@ -253,19 +253,22 @@ def handle_network(key, payload):
     """Handle network commands. Upstream switching is owned by starlink-bridge.py;
     this handler only triggers speed tests."""
     if key == "speedtest":
-        t = threading.Thread(target=run_speedtest, daemon=True)
+        lite = (payload == "lite")   # small, low-data test (driving checks)
+        t = threading.Thread(target=run_speedtest, args=(lite,), daemon=True)
         t.start()
     # upstream switching is handled by starlink-bridge.py via van/network/upstream
 
-def run_speedtest():
+def run_speedtest(lite=False):
     """Manual trigger — run the SAME Ookla-based script the periodic timer uses
     (run-speedtest.py). It handles its own MQTT publish (running + result).
-    The old `speedtest-cli` path is gone — that tool isn't installed, so manual
-    tests used to always error."""
+    `lite=True` runs the small low-data variant (--lite) used while driving."""
     try:
-        subprocess.run(["python3", "/home/sgordon1024/run-speedtest.py"], timeout=180)
+        cmd = ["python3", "/home/sgordon1024/run-speedtest.py"]
+        if lite:
+            cmd.append("--lite")
+        subprocess.run(cmd, timeout=180)
     except Exception as e:
-        print(f"run_speedtest (manual) error: {e}")
+        print(f"run_speedtest error: {e}")
 
 def can_listener(mqtt_client):
     """

@@ -3008,7 +3008,8 @@ safe-buffer/index.js:
 
   <!-- THEME PICKER -->
   <div class="overlay" id="overlay" onclick="overlayClick(event)">
-    <div class="theme-sheet" id="themeSheet">
+    <div class="theme-sheet" id="themeSheet"
+         ontouchstart="sheetTouchStart(event)" ontouchmove="sheetTouchMove(event)" ontouchend="sheetTouchEnd(event)">
       <div class="sheet-handle" onclick="document.getElementById('overlay').classList.remove('open')" style="cursor:pointer"></div>
       <div class="sheet-title">Settings</div>
       <div class="theme-group-label" style="margin-bottom:14px;font-size:11px;letter-spacing:0.8px;">Appearance</div>
@@ -3349,6 +3350,45 @@ function overlayClick(e) {
   if (e.target === document.getElementById('overlay')) {
     document.getElementById('overlay').classList.remove('open');
   }
+}
+
+// ── Settings drawer: drag down to dismiss ─────────────
+let _sheetDragY = null, _sheetDragging = false;
+function sheetTouchStart(e) {
+  const sheet = document.getElementById('themeSheet');
+  // Only start a drag-to-dismiss when the sheet is scrolled to the top; otherwise
+  // a downward drag is an internal scroll.
+  if (sheet.scrollTop > 0) { _sheetDragY = null; return; }
+  _sheetDragY = e.touches[0].clientY;
+  _sheetDragging = false;
+}
+function sheetTouchMove(e) {
+  if (_sheetDragY == null) return;
+  const sheet = document.getElementById('themeSheet');
+  const dy = e.touches[0].clientY - _sheetDragY;
+  if (dy > 4 && sheet.scrollTop <= 0) {
+    _sheetDragging = true;
+    sheet.style.transition = 'none';
+    sheet.style.transform = `translateY(${dy}px)`;
+    e.preventDefault();   // stop the page/scroll from also moving
+  }
+}
+function sheetTouchEnd(e) {
+  if (_sheetDragY == null) return;
+  const sheet = document.getElementById('themeSheet');
+  const dy = e.changedTouches[0].clientY - _sheetDragY;
+  sheet.style.transition = '';
+  if (_sheetDragging && dy > 110) {
+    // dragged far enough → dismiss
+    sheet.style.transform = 'translateY(100%)';
+    setTimeout(() => {
+      document.getElementById('overlay').classList.remove('open');
+      sheet.style.transform = '';
+    }, 200);
+  } else {
+    sheet.style.transform = '';   // snap back
+  }
+  _sheetDragY = null; _sheetDragging = false;
 }
 
 // ── Van name ─────────────────────────────────────
@@ -4486,6 +4526,21 @@ const STOP_SPEED_MPH   = 2;    // below this = stopped
 const STOP_EXIT_MS     = 60000; // must stay stopped this long before auto-exiting drive mode
 const HIGH_IDLE_EXCESS = 150;  // excess charge watts over solar → alternator likely
 
+// ── Drive-mode speed tests (small/lite, every 15 min) ──
+const DRIVE_SPEEDTEST_MS = 15 * 60 * 1000;
+let driveSpeedTestInterval = null;
+let driveSpeedTestTimeout  = null;
+function _publishLiteTest() { if (mqttClient?.connected) mqttClient.publish('van/network/speedtest', 'lite'); }
+function startDriveSpeedTests() {
+  stopDriveSpeedTests();
+  driveSpeedTestTimeout  = setTimeout(_publishLiteTest, 30000);             // early baseline ~30s in
+  driveSpeedTestInterval = setInterval(_publishLiteTest, DRIVE_SPEEDTEST_MS);
+}
+function stopDriveSpeedTests() {
+  if (driveSpeedTestInterval) { clearInterval(driveSpeedTestInterval); driveSpeedTestInterval = null; }
+  if (driveSpeedTestTimeout)  { clearTimeout(driveSpeedTestTimeout);   driveSpeedTestTimeout  = null; }
+}
+
 function watchGPS() {
   if (!navigator.geolocation) {
     setGPSStatus('GPS not available');
@@ -4521,8 +4576,41 @@ function obdSpeedMph() {
   return isNaN(s) ? NaN : s;
 }
 
-// Are we actually driving? OBD vehicle speed is the most direct signal; GPS backs it up.
+// ── Drive detection via OBD throttle/load variability ──────────────────────
+// While driving, the accelerator and engine load swing around constantly; at a high
+// idle or when parked they're static. So sustained variability for ≥3s is a fast,
+// reliable "I'm driving" signal — quicker than waiting for road speed to build.
+let _driveVarSamples = [];    // [{ts, accel, load}]
+let _driveVarStart   = null;  // when continuous variability began (ms), or null
+const DRIVE_VAR_WINDOW  = 5000;  // rolling look-back window
+const DRIVE_VAR_SUSTAIN = 3000;  // variability must persist this long → driving
+const DRIVE_VAR_ACCEL   = 6;     // accelerator %-spread that counts as "varying"
+const DRIVE_VAR_LOAD    = 10;    // engine-load %-spread that counts as "varying"
+
+function recordDriveSample() {
+  if (!obdData || obdData.connected !== 'ok') { _driveVarSamples = []; _driveVarStart = null; return; }
+  const accel = parseFloat(obdData['accel-pos']);
+  const load  = parseFloat(obdData['engine-load']);
+  if (isNaN(accel) && isNaN(load)) return;
+  const now = Date.now();
+  _driveVarSamples.push({ ts: now, accel: isNaN(accel) ? null : accel, load: isNaN(load) ? null : load });
+  _driveVarSamples = _driveVarSamples.filter(s => now - s.ts <= DRIVE_VAR_WINDOW);
+  const spread = k => { const v = _driveVarSamples.map(s => s[k]).filter(x => x != null); return v.length >= 2 ? Math.max(...v) - Math.min(...v) : 0; };
+  const varying = spread('accel') >= DRIVE_VAR_ACCEL || spread('load') >= DRIVE_VAR_LOAD;
+  if (varying) { if (_driveVarStart == null) _driveVarStart = now; }
+  else _driveVarStart = null;
+  evaluateDriveState();
+}
+
+// True once the accelerator/load have been varying continuously for ≥ DRIVE_VAR_SUSTAIN.
+function throttleVariabilityDriving() {
+  return _driveVarStart != null && (Date.now() - _driveVarStart) >= DRIVE_VAR_SUSTAIN;
+}
+
+// Are we actually driving? Throttle/load variability is the fastest signal, then OBD
+// vehicle speed (most direct), then GPS speed as backup.
 function sensorsSayDriving() {
+  if (throttleVariabilityDriving()) return true;
   const os = obdSpeedMph();
   if (!isNaN(os) && os >= DRIVE_SPEED_MPH) return true;
   if (currentSpeedMph != null && currentSpeedMph >= DRIVE_SPEED_MPH) return true;
@@ -4548,7 +4636,12 @@ function evaluateDriveState() {
 
   if (!drivingMode) {
     // Auto-ENTER, unless the user forced it off (cleared once we naturally stop).
-    if (driving && driveOverride !== 'off') {
+    if (driveOverride !== 'off' && throttleVariabilityDriving()) {
+      // 3s of sustained pedal/load variation already confirms driving — enter now.
+      if (drivingTimer) { clearTimeout(drivingTimer); drivingTimer = null; }
+      enterDrivingMode(false);
+    } else if (driving && driveOverride !== 'off') {
+      // Speed-based — confirm over DRIVE_CONFIRM_MS before activating.
       if (!drivingTimer) drivingTimer = setTimeout(() => {
         drivingTimer = null;
         if (!drivingMode && driveOverride !== 'off' && sensorsSayDriving()) enterDrivingMode(false);
@@ -4672,6 +4765,11 @@ function enterDrivingMode(manual = false) {
   updateAltColumn();
   startRestStopUpdates();
   startExploreUpdates();
+
+  // Tell the network bridge we're driving (it weights Starlink more + keeps the dish
+  // ready), and run a small speed test every 15 min so source-switching stays sharp.
+  if (mqttClient?.connected) mqttClient.publish('van/network/driving', 'on');
+  startDriveSpeedTests();
 }
 
 function exitDrivingMode() {
@@ -4682,6 +4780,8 @@ function exitDrivingMode() {
   document.getElementById('drive-engine-panel')?.classList.remove('active');
   stopRestStopUpdates();
   stopExploreUpdates();
+  if (mqttClient?.connected) mqttClient.publish('van/network/driving', 'off');
+  stopDriveSpeedTests();
   switchTab(preDriveTab);
   refreshModeChip();
   updateDriveModeToggle();
@@ -4695,26 +4795,35 @@ function exitDrivingMode() {
   if (pumpBtn)   pumpBtn.classList.add('active');
   if (pumpState) pumpState.textContent = 'On';
 
-  // Restore rope lights to pre-drive state (always direct — never use toggle)
-  // Restore brightness and speed first
+  // Restore rope lights to the exact pre-drive state.
+  applyRopeRestore();
+
+  // Show "Arrived?" toast if any lights or rope lights were on before driving
+  if (preDriveLights.length > 0 || preRopeOn) showArrivedToast();
+}
+
+// Restore the rope lights to exactly what they were before driving — shared by
+// exitDrivingMode (silent restore) and restorePreDriveLights (the "Arrived?" toast),
+// so the two can never diverge (the toast used to reset non-cycle effects to red).
+function applyRopeRestore() {
   ropeActiveBrightness = preRopeBrightness;
   ropeActiveSpeed      = preRopeSpeed;
-  const _brightEl = document.getElementById('ropeBrightness');
-  if (_brightEl) {
-    _brightEl.value = preRopeBrightness;
-    _brightEl.style.setProperty('--pct', preRopeBrightness + '%');
+  const brightEl = document.getElementById('ropeBrightness');
+  if (brightEl) {
+    brightEl.value = preRopeBrightness;
+    brightEl.style.setProperty('--pct', preRopeBrightness + '%');
     document.getElementById('ropeBrightPct').textContent = preRopeBrightness + '%';
   }
-  const _speedEl = document.getElementById('ropeSpeed');
-  if (_speedEl) {
-    _speedEl.value = preRopeSpeed;
-    _speedEl.style.setProperty('--pct', ((preRopeSpeed - 1) / 9 * 100).toFixed(0) + '%');
+  const speedEl = document.getElementById('ropeSpeed');
+  if (speedEl) {
+    speedEl.value = preRopeSpeed;
+    speedEl.style.setProperty('--pct', ((preRopeSpeed - 1) / 9 * 100).toFixed(0) + '%');
     document.getElementById('ropeSpeedPct').textContent = preRopeSpeed;
   }
   if (mqttClient?.connected) mqttClient.publish('van/rope-light/brightness', String(preRopeBrightness));
   if (preRopeOn) {
     if (preRopeEffect) {
-      // Restore any effect (cycle, candle, breathe, aurora, strobe)
+      // Any effect (cycle, candle, breathe, aurora, strobe…)
       setRopeEffect(preRopeEffect);
       if (mqttClient?.connected) mqttClient.publish('van/rope-light/speed', String(preRopeSpeed));
     } else if (preRopeColor) {
@@ -4726,12 +4835,8 @@ function exitDrivingMode() {
       if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', 'on');
     }
   } else {
-    // Were off before — make sure they stay off
     if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', 'off');
   }
-
-  // Show "Arrived?" toast if any lights or rope lights were on before driving
-  if (preDriveLights.length > 0 || preRopeOn) showArrivedToast();
 }
 
 function showArrivedToast() {
@@ -4759,35 +4864,8 @@ function restorePreDriveLights() {
   });
   preDriveLights = [];
 
-  // Restore rope lights (re-apply in case the silent restore at exit didn't land)
-  ropeActiveBrightness = preRopeBrightness;
-  ropeActiveSpeed      = preRopeSpeed;
-  const brightEl = document.getElementById('ropeBrightness');
-  if (brightEl) {
-    brightEl.value = preRopeBrightness;
-    brightEl.style.setProperty('--pct', preRopeBrightness + '%');
-    document.getElementById('ropeBrightPct').textContent = preRopeBrightness + '%';
-  }
-  const speedEl = document.getElementById('ropeSpeed');
-  if (speedEl) {
-    speedEl.value = preRopeSpeed;
-    speedEl.style.setProperty('--pct', ((preRopeSpeed - 1) / 9 * 100).toFixed(0) + '%');
-    document.getElementById('ropeSpeedPct').textContent = preRopeSpeed;
-  }
-  if (mqttClient?.connected) mqttClient.publish('van/rope-light/brightness', String(preRopeBrightness));
-  if (preRopeOn) {
-    if (preRopeEffect === 'cycle') {
-      setRopeEffect('cycle');
-      if (mqttClient?.connected) mqttClient.publish('van/rope-light/speed', String(preRopeSpeed));
-    } else if (preRopeColor) {
-      setRopeColor(preRopeColor);
-    } else {
-      ropeOn = true;
-      document.getElementById('ropeRow').classList.add('on');
-      document.getElementById('ropeIcon').setAttribute('stroke', 'var(--amber)');
-      if (mqttClient?.connected) mqttClient.publish('van/rope-light/power', 'on');
-    }
-  }
+  // Restore rope lights to the exact pre-drive state (shared with exitDrivingMode).
+  applyRopeRestore();
 
   renderLights();
   dismissArrivedToast();
@@ -4938,12 +5016,14 @@ function lightningTick() {
   }
   const now = Date.now();
   if (nextStrikeAt === 0) {
-    nextStrikeAt = now + 8000 + Math.random() * 12000;
+    nextStrikeAt = now + 1200 + Math.random() * 2500;   // first strike soon (1.2–3.7s)
     return;
   }
   if (now >= nextStrikeAt) {
     strikeLightning();
-    nextStrikeAt = now + 12000 + Math.random() * 23000;
+    // Occasionally fire a quick second bolt for a denser storm
+    if (Math.random() < 0.4) setTimeout(strikeLightning, 250 + Math.random() * 350);
+    nextStrikeAt = now + 3000 + Math.random() * 6000;    // 3–9s between strikes (was 12–35s)
   }
 }
 
@@ -6369,6 +6449,7 @@ function updateOBDUI(key, val) {
       const lbl  = document.getElementById('engine-throttle-val');
       if (fill) fill.style.width = Math.max(0, Math.min(100, pct)) + '%';
       if (lbl)  lbl.textContent  = pct + '%';
+      recordDriveSample();   // feed throttle-variability drive detection
       break;
     }
     case 'voltage': {
@@ -6413,6 +6494,7 @@ function updateOBDUI(key, val) {
         el.textContent = p + '%';
         el.className = 'engine-value' + (p >= 90 ? ' alert' : p >= 75 ? ' warn' : '');
       }
+      recordDriveSample();   // feed throttle/load-variability drive detection
       break;
     }
     case 'mpg': {
