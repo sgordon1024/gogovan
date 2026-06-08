@@ -2949,18 +2949,18 @@ safe-buffer/index.js:
       </div>
       <!-- Threshold slider — only active when auto is on -->
       <div class="starlink-thresh-row disabled" id="starlinkThreshRow">
-        <span class="thresh-label">Min signal to recheck</span>
+        <span class="thresh-label">Min T-Mobile speed</span>
         <div class="thresh-slider-wrap">
           <span class="thresh-end-label">0</span>
           <input type="range" class="dim-slider" id="threshSlider"
-            min="0" max="100" value="25" style="--pct:25%"
+            min="0" max="50" value="5" style="--pct:10%"
             oninput="onThreshInput(this)" onchange="onThreshChange(this)"
-            aria-label="T-Mobile signal threshold (%)">
-          <span class="thresh-end-label">100</span>
+            aria-label="Minimum T-Mobile download speed in Mbps">
+          <span class="thresh-end-label">50</span>
         </div>
-        <span class="thresh-val-label" id="threshVal">25</span><span style="font-size:11px;color:var(--txt2);margin-left:2px">%</span>
+        <span class="thresh-val-label" id="threshVal">5</span><span style="font-size:11px;color:var(--txt2);margin-left:2px">Mbps</span>
       </div>
-      <div class="net-hint" id="starlinkAutoHint" style="padding:0 16px 14px;text-align:left">Auto-switch uses real internet checks, not signal. While on Starlink, the van only re-tests T-Mobile to switch back when its signal is at least <span id="threshHintVal">25</span>%.</div>
+      <div class="net-hint" id="starlinkAutoHint" style="padding:0 16px 14px;text-align:left">Auto-switch decides by real download speed. While on Starlink, the van switches back to T-Mobile only when T-Mobile actually delivers at least <span id="threshHintVal">5</span> Mbps (0 = switch back whenever T-Mobile has any working internet).</div>
       <div class="net-hint" id="starlinkManualHint" style="padding:0 16px 14px;text-align:left" hidden>Auto-switch off — the power button controls the dish directly. No automatic switching or loops.</div>
     </div>
   </div>
@@ -6919,8 +6919,8 @@ function updateStarlinkThreshold(val) {
   const el = document.getElementById('threshSlider');
   if (el) {
     el.value = val;
-    // slider range is 1–25 Mbps
-    el.style.setProperty('--pct', val + '%');
+    const max = parseInt(el.max) || 50;        // fill % is value/range, NOT the raw value
+    el.style.setProperty('--pct', Math.round(val / max * 100) + '%');
   }
   document.getElementById('threshVal').textContent = val;
   document.getElementById('threshHintVal').textContent = val;
@@ -6928,7 +6928,8 @@ function updateStarlinkThreshold(val) {
 
 function onThreshInput(el) {
   const val = parseInt(el.value);
-  el.style.setProperty('--pct', val + '%');
+  const max = parseInt(el.max) || 50;          // fill % is value/range, NOT the raw value
+  el.style.setProperty('--pct', Math.round(val / max * 100) + '%');
   document.getElementById('threshVal').textContent = val;
   document.getElementById('threshHintVal').textContent = val;
 }

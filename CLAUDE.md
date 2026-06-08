@@ -441,7 +441,7 @@ When AC mode is **off**, the Firefly LCD always displays fan as "Auto" regardles
 | `van/rope-light/speed` | Dashboard → rope-light.py | `1`–`10` (cycle speed) |
 | `van/starlink/power` | Dashboard → starlink-bridge.py | `on`, `off` |
 | `van/starlink/auto` | Dashboard → starlink-bridge.py | `on`, `off` |
-| `van/starlink/threshold` | Dashboard → starlink-bridge.py | `0`-`100` min T-Mobile signal % to re-test for switch-back (default 25) |
+| `van/starlink/threshold` | Dashboard → starlink-bridge.py | `0`-`50` min T-Mobile **download Mbps** required to prefer/switch-back to T-Mobile (default 5; `0` = any working T-Mobile) |
 | `van/network/speedtest` | Dashboard → run-speedtest.py | `run` (full manual test) or `lite` (small low-data test) |
 | `van/network/driving` | Dashboard → starlink-bridge.py | `on`/`off` — drive mode (weights Starlink more) |
 | `van/voice/request` | Dashboard → voice-bridge.py | JSON `{transcript, lights, scenes, colors}` — voice command |
@@ -457,7 +457,7 @@ When AC mode is **off**, the Firefly LCD always displays fan as "Auto" regardles
 | `van/status/ac/cycle` | Bridge → Dashboard | active duty cycle `"ON/OFF"` (e.g. `30/20`), or `""` if none |
 | `van/status/starlink/power` | starlink-bridge → Dashboard | `on`, `off`, `unknown` |
 | `van/status/starlink/auto` | starlink-bridge → Dashboard | `on`, `off` |
-| `van/status/starlink/threshold` | starlink-bridge → Dashboard | min T-Mobile signal % for recheck |
+| `van/status/starlink/threshold` | starlink-bridge → Dashboard | min T-Mobile download Mbps to prefer T-Mobile (0–50) |
 | `van/status/starlink/quality` | starlink-bridge → Dashboard | `good`, `poor`, `unknown` |
 | `van/status/network/upstream` | starlink-bridge → Dashboard | `tmobile`, `starlink` |
 | `van/status/network/speedtest` | run-speedtest → Dashboard | JSON: `{download, upload, ping, server, upstream, timestamp, error}` |
@@ -485,7 +485,7 @@ Speed test results are stored in **`localStorage` key `gogovan-speed-history`** 
 
 **Manual speed test → failover:** when you tap "Test Now", `starlink-bridge.py` watches the result and switches sources if the current link is bad — i.e. an **error with a failed ping** (genuinely no internet, never a tooling hiccup) **or a download below `MANUAL_BAD_MBPS` (2 Mbps)**. If the other source ALSO has no usable internet, it publishes `van/status/network/alert` and the dashboard shows a red warning toast (`showNetworkAlert`). The bridge only reacts to *manual* tests (gated by a recent `van/network/speedtest=run`), not the periodic ones. Both the manual tap (via `can-bridge.py`) and the timer run the same `run-speedtest.py` (Ookla binary) — the old broken `speedtest-cli` path is gone.
 
-**Manual speed test → T-Mobile recheck (prefer-default):** T-Mobile is the preferred source; Starlink is only the fallback. So when a manual test is run **while on Starlink and the Starlink link tests OK**, the bridge also fires `switch_to_tmobile("manual test: prefer T-Mobile")` (if `auto_mode` and not `manual_override`). That does a **real connect-and-ping test of T-Mobile** and switches back to it (powering the dish off) when it has internet — otherwise it reverts to Starlink on its own (never strands). This is deliberately **independent of the T-Mobile signal scan**, which reads `-1` while associated to Starlink's 5 GHz and was blocking the automatic 20-min recheck (`get_tmobile_signal()` → periodic recheck gated on `sig >= min_signal`). Tapping "Test Now" is therefore the reliable way to force a T-Mobile recovery; the periodic auto-recheck still depends on the (sometimes blind) signal scan.
+**Manual speed test → T-Mobile recheck (prefer-default):** T-Mobile is the preferred source; Starlink is only the fallback. So when a manual test is run **while on Starlink and the Starlink link tests OK**, the bridge also fires `switch_to_tmobile("manual test: prefer T-Mobile", min_mbps=min_speed)` (if `auto_mode` and not `manual_override`). That connects to T-Mobile, pings, then **measures T-Mobile's real download** and switches back to it (powering the dish off) only if it meets `min_speed` Mbps — otherwise it reverts to Starlink on its own (never strands). Both the manual recheck and the automatic 20-min recheck now use this same speed gate; **neither depends on the T-Mobile signal scan anymore** (it reads `-1` on Starlink 5 GHz and used to block the auto-recheck entirely). Tapping "Test Now" forces an immediate T-Mobile speed recheck.
 
 **Driving: small tests every 15 min + Starlink-weighted.** In drive mode the dashboard publishes `van/network/driving=on` and fires a **lite** speed test (`van/network/speedtest=lite`) ~30s in and every 15 min. `run-speedtest.py --lite` does a ~4 MB Cloudflare down/up (vs Ookla's ~150 MB) — small enough to run often while driving. starlink-bridge treats `driving=on` by **weighting Starlink more**: skips the periodic T-Mobile recheck, keeps the dish powered (no power-saving off), fails over to Starlink after **2** bad checks instead of 3, and won't switch back to T-Mobile on a lite-test-OK. Exiting drive mode publishes `driving=off` and stops the tests. Rationale: while driving, switching matters most and power doesn't.
 
@@ -581,10 +581,17 @@ switching is the Pi's `wlan0`.
   before powering the Tuya plug, then retries the plug for ~40s while it boots/rejoins Wi-Fi. So if
   the user turned the inverter off, failover turns it back on to power Starlink. (PORTAL_ID `c0619ab5dcfb`,
   same as the dashboard.) The inverter is **not** auto-turned-off afterward.
-- On Starlink, every **20 min** (`TMOBILE_RECHECK_INTERVAL`): if T-Mobile has signal
-  (≥ `min_signal`, default 20 — the `threshold` topic), briefly switch to it and test
-  REAL internet. If good → stay on T-Mobile + power dish off. If not → fall back to
-  Starlink (no flapping). If Starlink itself fails and T-Mobile has signal → try T-Mobile now.
+- On Starlink, every **20 min** (`TMOBILE_RECHECK_INTERVAL`): briefly switch to T-Mobile and
+  **measure its real download speed** (`measure_download_mbps()` — a ~3 MB Cloudflare download, same
+  as the lite test). If T-Mobile delivers **≥ `min_speed` Mbps** (the `threshold` topic, default 5,
+  range 0–50) → stay on T-Mobile + power dish off. If it's **slower** → fall back to Starlink (no
+  flapping). The speed gate lives in `switch_to_tmobile(..., min_mbps=min_speed)`; an inconclusive
+  measurement (`-1`) keeps T-Mobile since ping already passed (a tooling hiccup never strands us).
+  **There is no signal pre-gate anymore** — the old `sig >= min_signal` check blocked this recheck
+  because `get_tmobile_signal()` reads `-1` on Starlink 5 GHz. If Starlink itself fails → try
+  T-Mobile right away with **no** speed gate (any working T-Mobile beats a dead Starlink).
+  Note: the T-Mobile **signal** readout (`van/status/starlink/tmobile-signal`) is still scanned and
+  shown on the dashboard — it's display-only now, not a switching input.
 - **Manual override** (`van/network/upstream` = tmobile/starlink) forces a side and
   suspends auto for 30 min. Never powers the dish off unless the target's internet is
   confirmed (no stranding).
