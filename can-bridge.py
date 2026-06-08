@@ -61,10 +61,66 @@ def _fire_ac_timer():
     with ac_timer_lock:
         ac_timer = None
     print("AC sleep timer expired → turning AC off")
+    _clear_ac_cycle()            # also stop any running duty cycle
     send_ac("00C0FFFFFFFFFFFF")  # System OFF
     if mqtt_client_ref:
         mqtt_client_ref.publish("van/status/ac/mode", "off", retain=True)
         mqtt_client_ref.publish("van/status/ac/timer", "", retain=True)
+
+# ── AC sleep cycle (sensor-independent duty cycling) ──────────────────────────
+# Alternates Cool-ON (on Low) / System-OFF on a fixed timer so cooling doesn't depend
+# on the temp sensor (the bathroom door blocks it). Runs server-side so it keeps
+# cycling while the phone is asleep.
+ac_cycle_timer = None
+ac_cycle_spec  = None   # (on_min, off_min) or None
+ac_cycle_lock  = threading.Lock()
+
+def _clear_ac_cycle(publish_status=True):
+    global ac_cycle_timer, ac_cycle_spec
+    with ac_cycle_lock:
+        if ac_cycle_timer is not None:
+            ac_cycle_timer.cancel()
+            ac_cycle_timer = None
+        ac_cycle_spec = None
+    if publish_status and mqtt_client_ref:
+        mqtt_client_ref.publish("van/status/ac/cycle", "", retain=True)
+
+def _ac_cycle_step(phase):
+    """Run one phase of the duty cycle, then schedule the next."""
+    global ac_cycle_timer
+    with ac_cycle_lock:
+        spec = ac_cycle_spec
+    if spec is None:
+        return
+    on_min, off_min = spec
+    if phase == "on":
+        send_ac("00F1FFFFFFFFFFFF")  # Cool ON
+        send_ac("00DF64FFFFFFFFFF")  # Fan LOW
+        if mqtt_client_ref:
+            mqtt_client_ref.publish("van/status/ac/mode", "cool", retain=True)
+            mqtt_client_ref.publish("van/status/ac/fan", "low", retain=True)
+        nxt, secs = "off", on_min * 60
+    else:
+        send_ac("00C0FFFFFFFFFFFF")  # System OFF
+        if mqtt_client_ref:
+            mqtt_client_ref.publish("van/status/ac/mode", "off", retain=True)
+        nxt, secs = "on", off_min * 60
+    with ac_cycle_lock:
+        if ac_cycle_spec is None:
+            return
+        ac_cycle_timer = threading.Timer(secs, _ac_cycle_step, args=(nxt,))
+        ac_cycle_timer.daemon = True
+        ac_cycle_timer.start()
+
+def _start_ac_cycle(on_min, off_min):
+    global ac_cycle_spec
+    _clear_ac_cycle(publish_status=False)
+    with ac_cycle_lock:
+        ac_cycle_spec = (on_min, off_min)
+    if mqtt_client_ref:
+        mqtt_client_ref.publish("van/status/ac/cycle", f"{on_min}/{off_min}", retain=True)
+    print(f"AC cycle started: {on_min} min on / {off_min} min off")
+    _ac_cycle_step("on")   # begin with an on-phase immediately
 
 def cansend(data):
     frame = f"19FEDB{SA}#{data}"
@@ -112,6 +168,8 @@ def handle_ac(key, payload):
     """
     global ac_timer
     if key == "mode":
+        # A manual mode change means the user is taking control — stop any duty cycle.
+        _clear_ac_cycle()
         if payload == "cool":
             send_ac("00F1FFFFFFFFFFFF")  # Cool ON
         elif payload == "off":
@@ -154,6 +212,21 @@ def handle_ac(key, payload):
             print("AC sleep timer cancelled")
             if mqtt_client_ref:
                 mqtt_client_ref.publish("van/status/ac/timer", "", retain=True)
+    elif key == "cycle":
+        # payload = "ON/OFF" minutes (e.g. "30/20"), or "off"/"0" to stop.
+        if payload in ("off", "0", ""):
+            _clear_ac_cycle()
+            print("AC cycle cancelled")
+        else:
+            try:
+                on_s, off_s = payload.split("/")
+                on_min, off_min = int(on_s), int(off_s)
+            except (ValueError, AttributeError):
+                on_min = off_min = 0
+            if on_min > 0 and off_min > 0:
+                _start_ac_cycle(on_min, off_min)
+            else:
+                print(f"AC cycle: bad spec '{payload}' — ignored")
 
 def get_current_upstream():
     """Detect which upstream Wi-Fi connection wlan0 is using via nmcli."""
@@ -308,9 +381,10 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe("van/ac/+")
     client.subscribe("van/network/speedtest")  # only speedtest; upstream owned by starlink-bridge
     print("Subscribed to van/light/+, van/motor/+, van/ac/+, van/network/speedtest")
-    # A restart loses any in-memory sleep timer — clear its retained status so the
-    # dashboard doesn't show a countdown that will never fire.
+    # A restart loses any in-memory sleep timer / cycle — clear their retained status so
+    # the dashboard doesn't show a countdown or active cycle that will never fire.
     client.publish("van/status/ac/timer", "", retain=True)
+    client.publish("van/status/ac/cycle", "", retain=True)
     subprocess.run(["cansend", CAN_IFACE, f"18EEFF{SA}#0000000000008000"])
 
     t = threading.Thread(target=can_listener, args=(client,), daemon=True)

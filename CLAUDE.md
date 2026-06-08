@@ -185,7 +185,7 @@ Mode buttons On/Charger/Inverter/Off → `setInverterMode()` writes `W/{PORTAL_I
 
 ## Drive Mode
 
-Drive mode activates automatically when GPS speed stays above 5 mph for 4 consecutive seconds. Can also be toggled manually via the Drive Mode card.
+Drive mode activates automatically when the van is actually moving (≥5 mph held 4s). Detection uses **OBD vehicle speed first, GPS as backup** (`sensorsSayDriving()` → `evaluateDriveState()`), so it works even when GPS is flaky. Can also be toggled manually via the Drive Mode card.
 
 ### What happens on enter
 1. All G12 lights turned off (state saved to `preDriveLights`)
@@ -201,18 +201,19 @@ Exit is decided by **engine state first, GPS second** (`engineRunning()` reads `
 - **Engine off (`connected==='ok'` and `rpm===0`) + stopped** → genuinely parked. **Exit immediately** (no 60s wait).
 - **OBD unavailable / transient dropout (`connected!=='ok'`, so `engineRunning()` returns `null`)** → fall back to the GPS-only grace timer: must stay below `STOP_SPEED_MPH` for `STOP_EXIT_MS` (60s) before exiting. A Bluetooth hiccup returns `null` (not `false`), so a dropout won't false-park while driving.
 
-`evaluateEnginePark()` also runs whenever OBD `rpm`/`connected` change (via `updateOBDUI`), so shutting the engine off while already stopped parks promptly even if GPS isn't ticking.
+`evaluateDriveState()` is the single enter/exit authority — it runs on every GPS tick **and** on OBD `speed`/`rpm`/`connected` changes (via `updateOBDUI`). So OBD genuinely drives detection: entry and exit both work even without GPS, and shutting the engine off while stopped parks promptly.
 
 ### What happens on exit
 1. Water pump always restored to ON
 2. Rope lights restored to exact pre-drive state: color or effect re-published, brightness/speed re-applied
 3. "Arrived?" toast shown if any G12 lights were on before driving — user taps to restore them
 
-### Manual override
-- Tapping Drive Mode toggle while driving calls `exitDrivingMode()` and sets `driveModeManuallyPaused = true`
-- Subtitle shows "Paused · tap to resume" while moving with auto paused
-- Tapping again clears the flag and re-enables auto-detection
-- Flag is session-only (not persisted)
+### Manual override (`driveOverride`)
+Toggling the Drive Mode card overrides auto-detection until a **natural state change**, then auto resumes on its own:
+- **Toggle OFF while actually driving** → `driveOverride='off'`: stays out of drive mode (no auto re-entry) until the van naturally **stops/parks**, which clears the override.
+- **Toggle ON while parked** → `driveOverride='on'`: stays in drive mode (no auto-exit) until the van naturally **starts driving**, which clears it (then normal auto-exit applies when you next park).
+- Toggling off while already parked / on while already driving just sets `null` (plain auto) — no override needed.
+- Subtitle reflects it ("On · manual — auto resumes once moving", "Off · manual — auto resumes once parked"). Session-only (not persisted).
 
 ### Drive nav tabs
 - **Speed** → speedometer + battery/power panels + rest stop finder + engine panel (OBD data)
@@ -226,9 +227,10 @@ STOP_SPEED_MPH   = 2     // below this = stopped
 DRIVE_CONFIRM_MS = 4000  // must hold above threshold before activating
 STOP_EXIT_MS     = 60000 // GPS-only grace before parking — used ONLY when OBD engine state is unknown
 ```
-Entry is still GPS-only (5 mph for 4s) — we don't auto-enter drive mode just because the
-engine started, so warming up in the driveway with lights on won't kill them. OBD only
-refines **exit** (see "When it exits to parked" above).
+Entry triggers on **either** OBD vehicle speed or GPS speed ≥ `DRIVE_SPEED_MPH`, held `DRIVE_CONFIRM_MS`.
+It does NOT trigger on engine-start alone (no road speed), so warming up in the driveway with
+lights on won't kill them. `engineRunning()` (rpm>0 when connected) only refines **exit**
+(red light vs. parked).
 
 ### Rest Stop Finder (preloaded POIs)
 Top-left box of the drive Speed tab. Tapping the box cycles through `POI_CATEGORIES`
@@ -248,7 +250,8 @@ query around the current GPS fix. Shows the nearest-ahead match's name, distance
 
 ### Engine Panel (OBD-II)
 Displayed in the drive Speed tab below the speedometer. Shows live data from the Sprinter's OBD-II port via the vGate iCar Pro BT3 adapter:
-- RPM, speed (mph), coolant temperature (°F), fuel level (%), throttle position (%), battery voltage (V)
+- RPM, speed (mph), coolant temperature (°F), fuel level (%), **accelerator pedal (%)**, battery voltage (V)
+- The "Accelerator" bar is fed from `accel-pos` (ACCELERATOR_POS_D / pedal), **not** `throttle-pos` — on this diesel THROTTLE_POS reads a stuck ~13%, so the pedal PID is the real driver input. `accel-pos` is fast-polled (2s) for responsiveness.
 - MIL (check engine light) indicator and DTC fault code list
 - Data published by `obd-bridge.py` via MQTT to `van/status/obd/*`
 
@@ -270,7 +273,12 @@ A "Light Themes" section at the top of the Lights tab lets the user save and rec
 
 ## Themes
 
-The dashboard has 26 visual color themes (Night, Day, Desert, Ocean, Forest, Neon, etc.). A theme button (palette icon) opens a bottom sheet picker. Themes are saved to `localStorage` key `theme`.
+The dashboard has 26 visual color themes (Night, Day, Desert, Ocean, Forest, Neon, etc.). A theme button (palette icon) opens a bottom sheet picker. Themes are saved to `localStorage` key `theme`. The picker swatches **wrap** (don't cram into one nowrap row).
+
+**Secondary-text contrast:** `applyTheme()` nudges each theme's `--txt2` ~32% toward `--txt` (`_mixHex`) so dim labels are readable on every theme — done centrally instead of editing all 26 themes' `vars`.
+
+### Drive-mode fun facts → CarPlay
+The explore "fun facts" play through an **`<audio>` element** (TTS via Google translate_tts, chunked), because on iOS `<audio>` media routes to **CarPlay / car speakers** whereas `speechSynthesis` stays on the phone. Falls back to `speechSynthesis` if the audio source fails (e.g. no internet). `speakLocalFact()` → audio first, `speakFactViaSynthesis()` is the fallback. (Best-effort: true CarPlay routing is an iOS behavior; if Google TTS proves flaky, move TTS onto the Pi.)
 
 ---
 
@@ -362,6 +370,12 @@ The Climate tab has a stepped **Sleep Timer** slider (`AC_TIMER_STEPS`: Off, 5, 
 - Manually turning the AC off (`van/ac/mode=off`) cancels any pending timer. A bridge restart clears the timer (in-memory) and its retained status, so the dashboard won't show a countdown that can't fire.
 - Dashboard shows a live `H:MM:SS` countdown computed from the retained end-time (`updateClimTimerCountdown`).
 
+### Sleep Cycle (server-side duty cycling)
+The Climate tab also has **Sleep Cycle** preset buttons (Off / Light `20·40` / Medium `30·30` / Strong `30·20`). The AC's auto/thermostat mode is useless when the bathroom door blocks the temp sensor (it never reaches setpoint, so it runs on high all night). The cycle is **sensor-independent**: `can-bridge.py` alternates `Cool ON` (on **Fan LOW**) for the on-minutes, then `System OFF` for the off-minutes, repeating, via chained `threading.Timer`s — so it keeps cycling while the phone is asleep.
+- Dashboard publishes `van/ac/cycle` = `"ON/OFF"` minutes (e.g. `30/20`), or `off` to stop. Bridge publishes the active spec to `van/status/ac/cycle` (retained), `""` when off.
+- Each on-phase sends Cool ON **and Fan LOW** (and publishes `van/status/ac/mode=cool` + `van/status/ac/fan=low`); each off-phase sends System OFF.
+- A **manual mode change** (`van/ac/mode` cool/off) cancels the cycle. The **sleep timer firing** also cancels it. A bridge restart clears it (in-memory) and its retained status.
+
 ### Status PGNs (all proprietary Firefly)
 
 **`19FFE29B`** — G12 thermostat status (broadcasts continuously)
@@ -398,6 +412,7 @@ When AC mode is **off**, the Firefly LCD always displays fan as "Auto" regardles
 | `van/ac/fan` | Dashboard → Bridge | `high`, `low`, `auto` |
 | `van/ac/setpoint` | Dashboard → Bridge | `up`, `down` |
 | `van/ac/timer` | Dashboard → Bridge | minutes until AC auto-off (`0` cancels) |
+| `van/ac/cycle` | Dashboard → Bridge | duty cycle `"ON/OFF"` minutes (e.g. `30/20`); `off`/`0` cancels |
 | `van/rope-light/power` | Dashboard → rope-light.py | `on`, `off` |
 | `van/rope-light/color` | Dashboard → rope-light.py | `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `teal`, `cyan`, `sky`, `blue`, `navy`, `purple`, `pink`, `white` |
 | `van/rope-light/brightness` | Dashboard → rope-light.py | `1`–`100` |
@@ -416,6 +431,7 @@ When AC mode is **off**, the Firefly LCD always displays fan as "Auto" regardles
 | `van/status/ac/setpoint` | Bridge → Dashboard | integer °F |
 | `van/status/ac/temp` | Bridge → Dashboard | integer °F |
 | `van/status/ac/timer` | Bridge → Dashboard | epoch-ms when AC auto-off fires, or `""` if none |
+| `van/status/ac/cycle` | Bridge → Dashboard | active duty cycle `"ON/OFF"` (e.g. `30/20`), or `""` if none |
 | `van/status/starlink/power` | starlink-bridge → Dashboard | `on`, `off`, `unknown` |
 | `van/status/starlink/auto` | starlink-bridge → Dashboard | `on`, `off` |
 | `van/status/starlink/threshold` | starlink-bridge → Dashboard | min T-Mobile signal % for recheck |
@@ -585,7 +601,8 @@ If the connection gets flaky after moving the van, revert with:
 **Range / distance-to-empty math** (`obd-bridge.py`): `fuel-remaining = fuel% × TANK_GALLONS (24.5)`;
 `range = fuel-remaining × avg-mpg`. `avg-mpg` is an EMA (α=0.05) of instant MPG, seeded with `DEFAULT_MPG=18`
 until it converges from real driving. The vehicle exposes 89 PIDs total (`conn.supported_commands`); we poll the
-useful subset. **Poll rates:** fast gauges + MPG/range every 2s; slow values + MIL/DTCs every 30s.
+useful subset. **Poll rates:** fast gauges + accelerator + MPG/range every 2s; slow values + MIL/DTCs every 30s.
+**Range smoothing:** `range` is an EMA (`_range_ema`, α=0.1) of `fuel × avg_mpg`, **rounded to the nearest 5 mi**, so the dashboard distance-to-empty stays steady instead of jumping every poll. The explore-tab number (`renderExploreRange`) is crisp — no glow/blur, tight letter-spacing.
 
 **Dashboard:** the drive-mode **Engine panel** shows RPM/Fuel/Coolant/Alternator + **Engine Load + MPG**, with an
 **"All engine data →"** button opening a full overlay (`#obd-all-overlay`, `renderObdEverything()` from the `obdData`

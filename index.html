@@ -1297,7 +1297,7 @@
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 24px 24px 0 0;
-      padding: 16px 20px calc(20px + env(safe-area-inset-bottom));
+      padding: 20px 22px calc(24px + env(safe-area-inset-bottom));
       width: 100%;
       max-width: 430px;
       animation: slideUp 0.28s cubic-bezier(0.32, 0.72, 0, 1);
@@ -1325,19 +1325,20 @@
     }
 
     .theme-group-label {
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 700;
       letter-spacing: 1px;
       text-transform: uppercase;
       color: var(--txt2);
-      margin-bottom: 10px;
+      margin-top: 6px;
+      margin-bottom: 13px;
     }
 
     .theme-row {
       display: flex;
-      gap: 8px;
-      margin-bottom: 20px;
-      flex-wrap: nowrap;
+      gap: 16px 14px;
+      margin-bottom: 26px;
+      flex-wrap: wrap;
       justify-content: center;
     }
 
@@ -1345,10 +1346,10 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 6px;
+      gap: 7px;
       cursor: pointer;
-      flex: 1;
-      min-width: 0;
+      flex: 0 0 58px;
+      width: 58px;
       position: relative;
       -webkit-tap-highlight-color: transparent;
     }
@@ -2093,16 +2094,13 @@
 
     #drive-speed-number {
       font-size: clamp(72px, 20vw, 110px);
-      font-weight: 200;
+      font-weight: 300;
       font-family: 'Courier New', 'Lucida Console', monospace;
-      letter-spacing: 4px;
+      letter-spacing: -3px;
       line-height: 1;
       color: #fff;
       font-variant-numeric: tabular-nums;
-      text-shadow:
-        0 0 8px rgba(255,255,255,0.8),
-        0 0 24px rgba(255,255,255,0.4),
-        0 0 48px rgba(255,255,255,0.15);
+      text-shadow: none;
     }
 
     @keyframes speed-blink {
@@ -2372,11 +2370,21 @@
     .confirm-cancel:active, .confirm-ok:active { opacity:.75; }
 
     /* ── Climate sleep timer ──────────────────────────── */
-    .clim-timer { padding:14px 2px 2px; margin-top:8px; border-top:1px solid var(--border); }
-    .clim-timer-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; }
+    .clim-timer { border-top:1px solid var(--border); padding:16px; }
+    .clim-timer-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; }
+    .clim-timer-slider { width:100%; display:block; margin:0; }
     .clim-timer-val { font-size:15px; font-weight:700; color:var(--txt); font-variant-numeric:tabular-nums; }
-    .clim-timer-countdown { font-size:12.5px; color:var(--txt2); margin-top:10px; text-align:center; }
+    .clim-timer-countdown { font-size:12.5px; color:var(--txt2); margin-top:14px; text-align:center; }
     .clim-timer-countdown #climTimerRemain { color:var(--amber); font-weight:700; font-variant-numeric:tabular-nums; }
+
+    /* ── Climate cycle modes (sensor-independent duty cycling) ── */
+    .clim-cycle { border-top:1px solid var(--border); padding:16px; }
+    .clim-cycle-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px; }
+    .clim-cycle-seg { display:flex; gap:6px; }
+    .clim-cycle-btn { flex:1; padding:9px 4px; border-radius:10px; border:1px solid var(--border); background:transparent; color:var(--txt2); font-size:13px; font-weight:600; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:background .15s, color .15s; display:flex; flex-direction:column; align-items:center; gap:2px; line-height:1.15; }
+    .clim-cycle-btn .cyc-sub { font-size:10px; font-weight:600; opacity:.7; }
+    .clim-cycle-btn.active { background:var(--amber); color:#000; border-color:transparent; }
+    .clim-cycle-note { font-size:12px; color:var(--txt2); margin-top:12px; line-height:1.45; }
 
     /* ── Starlink power card ──────────────────────────── */
     .starlink-power-row { display:flex; align-items:center; justify-content:space-between; padding:16px; }
@@ -2756,6 +2764,19 @@ safe-buffer/index.js:
                aria-label="AC sleep timer">
         <div class="clim-timer-countdown" id="climTimerCountdown" hidden>Turns off in <span id="climTimerRemain">—</span></div>
       </div>
+      <div class="clim-cycle" id="climCycleWrap">
+        <div class="clim-cycle-head">
+          <span class="clim-group-label">Sleep Cycle</span>
+          <span class="clim-timer-val" id="climCycleVal">Off</span>
+        </div>
+        <div class="clim-cycle-seg">
+          <button class="clim-cycle-btn active" data-cyc="off" onclick="setAcCycle('off')">Off</button>
+          <button class="clim-cycle-btn" data-cyc="20/40" onclick="setAcCycle('20/40')">Light<span class="cyc-sub">20·40 min</span></button>
+          <button class="clim-cycle-btn" data-cyc="30/30" onclick="setAcCycle('30/30')">Medium<span class="cyc-sub">30·30 min</span></button>
+          <button class="clim-cycle-btn" data-cyc="30/20" onclick="setAcCycle('30/20')">Strong<span class="cyc-sub">30·20 min</span></button>
+        </div>
+        <div class="clim-cycle-note">Cools on <b>Low</b>, cycling on then off on a fixed timer — no temp sensor needed, so it won't blast on high all night.</div>
+      </div>
     </div>
   </div>
 
@@ -3126,7 +3147,7 @@ safe-buffer/index.js:
       </div>
     </div>
     <div id="engine-throttle-row">
-      <span class="engine-label">Throttle</span>
+      <span class="engine-label">Accelerator</span>
       <div id="engine-throttle-bar"><div id="engine-throttle-fill"></div></div>
       <span id="engine-throttle-val">—</span>
     </div>
@@ -3224,11 +3245,27 @@ let persistedTheme = localStorage.getItem('theme') || 'night'; // saved to disk
 let activeTheme    = persistedTheme;                           // currently on screen (may be a preview)
 let rainbowTimerId = null;
 
+function _hexToRgb(h) {
+  h = (h || '').trim().replace('#', '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  if (h.length < 6) return null;
+  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+}
+function _mixHex(a, b, ratio) {
+  const ca = _hexToRgb(a), cb = _hexToRgb(b);
+  if (!ca || !cb) return null;
+  const m = ca.map((v, i) => Math.round(v + (cb[i] - v) * ratio));
+  return `rgb(${m[0]},${m[1]},${m[2]})`;
+}
+
 function applyTheme(id) {
   if (rainbowTimerId) { clearInterval(rainbowTimerId); rainbowTimerId = null; }
   const t = THEMES.find(t => t.id === id) || THEMES[0];
   const root = document.documentElement;
   Object.entries(t.vars).forEach(([k,v]) => root.style.setProperty(k, v));
+  // Boost secondary-text contrast: nudge --txt2 ~32% toward --txt so dim labels are readable.
+  const boostedTxt2 = _mixHex(t.vars['--txt2'], t.vars['--txt'], 0.32);
+  if (boostedTxt2) root.style.setProperty('--txt2', boostedTxt2);
   activeTheme = id;
   // NOTE: does NOT save to localStorage — call saveTheme() to persist
   if (id === 'rainbow') {
@@ -4198,6 +4235,23 @@ function updateClimTimerCountdown() {
   acTimerTick = setInterval(tick, 1000);
 }
 
+// ── AC sleep cycle (sensor-independent duty cycling) ──
+// Runs server-side in can-bridge.py: alternates Cool-ON-on-Low / System-OFF on a fixed
+// timer, so it never relies on the (door-blocked) temp sensor and won't run high all night.
+function setAcCycle(spec) {
+  // spec = 'off' or 'ON/OFF' minutes (e.g. '30/20')
+  document.querySelectorAll('.clim-cycle-btn').forEach(b => b.classList.toggle('active', b.dataset.cyc === spec));
+  const valEl = document.getElementById('climCycleVal');
+  if (valEl) valEl.textContent = (spec === 'off') ? 'Off' : spec.replace('/', ' · ') + ' min';
+  if (mqttClient?.connected) mqttClient.publish('van/ac/cycle', spec);
+}
+function reflectAcCycleStatus(spec) {
+  spec = spec && spec.includes('/') ? spec : 'off';
+  document.querySelectorAll('.clim-cycle-btn').forEach(b => b.classList.toggle('active', b.dataset.cyc === spec));
+  const valEl = document.getElementById('climCycleVal');
+  if (valEl) valEl.textContent = (spec === 'off') ? 'Off' : spec.replace('/', ' · ') + ' min';
+}
+
 // ── Shore power ───────────────────────────────────
 let shoreConnected = false;
 function updateShoreUI(connected) {
@@ -4405,7 +4459,7 @@ function adjustInputAmps(delta) {
 
 // ── Driving Mode ─────────────────────────────────
 let drivingMode     = false;
-let manualDriveMode = false;  // true = user toggled on manually; skip auto-exit
+let driveOverride   = null;   // null = auto; 'on' = forced on; 'off' = forced off — until a natural state change
 let highIdleMode    = false;
 let lightningLoopId = null;   // setInterval handle
 let nextStrikeAt    = 0;      // timestamp of next planned strike
@@ -4452,20 +4506,68 @@ function engineRunning() {
   return rpm > 0;
 }
 
-// React to engine state changes independent of GPS ticks (e.g. engine shut off while
-// already stopped). Called from updateOBDUI when rpm / connected change.
-function evaluateEnginePark() {
-  if (!drivingMode || manualDriveMode) return;
-  const eng = engineRunning();
-  const stopped = (currentSpeedMph == null) || (currentSpeedMph < STOP_SPEED_MPH);
-  if (eng === false && stopped) {
-    // Engine off and stopped → genuinely parked. Exit now.
-    if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
-    exitDrivingMode();
-  } else if (eng === true && stopTimer) {
-    // Engine confirmed running — cancel any pending GPS grace-period exit.
-    clearTimeout(stopTimer); stopTimer = null;
+// OBD vehicle speed (mph) when the adapter is connected, else NaN.
+function obdSpeedMph() {
+  if (!obdData || obdData.connected !== 'ok') return NaN;
+  const s = parseInt(obdData.speed, 10);
+  return isNaN(s) ? NaN : s;
+}
+
+// Are we actually driving? OBD vehicle speed is the most direct signal; GPS backs it up.
+function sensorsSayDriving() {
+  const os = obdSpeedMph();
+  if (!isNaN(os) && os >= DRIVE_SPEED_MPH) return true;
+  if (currentSpeedMph != null && currentSpeedMph >= DRIVE_SPEED_MPH) return true;
+  return false;
+}
+
+// Genuinely stopped/parked? Engine-off is a hard "parked"; otherwise both OBD (if
+// present) and GPS must be below the stop threshold.
+function sensorsSayStopped() {
+  if (engineRunning() === false) return true;
+  const os = obdSpeedMph();
+  const gpsStopped = (currentSpeedMph == null) || (currentSpeedMph < STOP_SPEED_MPH);
+  const obdStopped = isNaN(os) ? true : (os < STOP_SPEED_MPH);
+  return gpsStopped && obdStopped;
+}
+
+// Single source of truth for auto enter/exit. Runs on every GPS tick AND on OBD
+// speed/rpm/connected changes, so the OBD connection genuinely drives detection.
+// A manual toggle sets driveOverride, which is honored until a natural state change.
+function evaluateDriveState() {
+  const driving = sensorsSayDriving();
+  const stopped = sensorsSayStopped();
+
+  if (!drivingMode) {
+    // Auto-ENTER, unless the user forced it off (cleared once we naturally stop).
+    if (driving && driveOverride !== 'off') {
+      if (!drivingTimer) drivingTimer = setTimeout(() => {
+        drivingTimer = null;
+        if (!drivingMode && driveOverride !== 'off' && sensorsSayDriving()) enterDrivingMode(false);
+      }, DRIVE_CONFIRM_MS);
+    } else if (drivingTimer) {
+      clearTimeout(drivingTimer); drivingTimer = null;
+    }
+    if (driveOverride === 'off' && stopped) driveOverride = null;  // natural stop → resume auto
+  } else {
+    if (driving) {
+      // Moving — cancel any pending exit; a forced-on override has served its purpose.
+      if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
+      if (driveOverride === 'on') driveOverride = null;            // now actually driving → resume auto
+    } else if (stopped && driveOverride !== 'on') {
+      // Stopped: park via engine state (red light vs. genuinely parked).
+      const eng = engineRunning();
+      if (eng === true) {
+        if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }   // engine running — red light, hold
+      } else if (eng === false) {
+        if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
+        exitDrivingMode();                                              // engine off — parked
+      } else if (!stopTimer) {
+        stopTimer = setTimeout(() => { stopTimer = null; exitDrivingMode(); }, STOP_EXIT_MS);  // no OBD — GPS grace
+      }
+    }
   }
+  updateDriveModeToggle();
 }
 
 function onGPSUpdate(pos) {
@@ -4490,29 +4592,7 @@ function onGPSUpdate(pos) {
     preloadAllPOIs();
   }
 
-  if (currentSpeedMph >= DRIVE_SPEED_MPH) {
-    // Moving — cancel any pending stop exit, start drive confirm if needed
-    if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
-    if (!drivingMode && !drivingTimer)
-      drivingTimer = setTimeout(enterDrivingMode, DRIVE_CONFIRM_MS);
-  } else {
-    // Below driving threshold — cancel drive-entry timer
-    if (drivingTimer) { clearTimeout(drivingTimer); drivingTimer = null; }
-    if (drivingMode && !manualDriveMode && currentSpeedMph < STOP_SPEED_MPH) {
-      const eng = engineRunning();
-      if (eng === true) {
-        // Engine running but stopped — red light / traffic. Never auto-park here.
-        if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
-      } else if (eng === false) {
-        // Engine off and stopped — genuinely parked. Exit immediately.
-        if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
-        exitDrivingMode();
-      } else if (!stopTimer) {
-        // No OBD signal — fall back to the GPS-only grace period before parking.
-        stopTimer = setTimeout(() => { stopTimer = null; exitDrivingMode(); }, STOP_EXIT_MS);
-      }
-    }
-  }
+  evaluateDriveState();
   refreshModeChip();
 }
 
@@ -4526,7 +4606,6 @@ function onGPSError(err) {
 function enterDrivingMode(manual = false) {
   drivingMode  = true;
   drivingTimer = null;
-  if (manual) manualDriveMode = true;
 
   // Save pre-drive state for restore on exit
   preDriveLights = [];
@@ -4580,7 +4659,6 @@ function enterDrivingMode(manual = false) {
 
 function exitDrivingMode() {
   drivingMode     = false;
-  manualDriveMode = false;
   if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
   document.body.classList.remove('driving');
   document.getElementById('drive-explore-panel')?.classList.remove('active');
@@ -4715,11 +4793,15 @@ function switchDriveTab(name) {
 
 function toggleDriveMode() {
   if (drivingMode) {
+    // User wants OFF. If we're actually driving, suppress auto-re-entry until a natural stop.
     currentSpeedMph = currentSpeedMph ?? 0;
+    driveOverride = sensorsSayDriving() ? 'off' : null;
     exitDrivingMode();
   } else {
+    // User wants ON. If we're NOT actually driving, hold it on until we naturally start driving.
     if (drivingTimer) { clearTimeout(drivingTimer); drivingTimer = null; }
     if (currentSpeedMph == null) currentSpeedMph = 0;
+    driveOverride = sensorsSayDriving() ? null : 'on';
     enterDrivingMode(true);
   }
 }
@@ -4730,7 +4812,11 @@ function updateDriveModeToggle() {
   if (!btn || !sub) return;
   btn.classList.toggle('on', drivingMode);
   if (drivingMode) {
-    sub.textContent = 'On · controls locked';
+    sub.textContent = driveOverride === 'on'
+      ? 'On · manual — auto resumes once moving'
+      : 'On · controls locked';
+  } else if (driveOverride === 'off') {
+    sub.textContent = 'Off · manual — auto resumes once parked';
   } else if (currentSpeedMph != null) {
     sub.textContent = 'Auto · GPS active';
   } else {
@@ -5523,6 +5609,18 @@ function showLocalFact() {
   if (hintEl) { hintEl.textContent = 'tap to hear'; hintEl.classList.remove('speaking'); }
 }
 
+let _factAudio = null;       // <audio> element used so playback routes to CarPlay
+let _factAudioActive = false;
+
+function _factSpeakingUI() {
+  const hintEl = document.getElementById('explore-facts-hint');
+  if (hintEl) { hintEl.textContent = '▶ reading…'; hintEl.classList.add('speaking'); }
+}
+function _factAdvance() {
+  localFactIdx = (localFactIdx + 1) % localFacts.length;
+  showLocalFact(); // resets hint to "tap to hear" and removes .speaking
+}
+
 function _cancelUtter() {
   // Clear handlers BEFORE cancelling so iOS onerror from cancel() doesn't increment
   if (_currentUtter) {
@@ -5531,12 +5629,15 @@ function _cancelUtter() {
     _currentUtter = null;
   }
   if (window.speechSynthesis) window.speechSynthesis.cancel();
+  if (_factAudio) { try { _factAudio.onended = null; _factAudio.onerror = null; _factAudio.onplaying = null; _factAudio.pause(); } catch(e){} }
+  _factAudioActive = false;
 }
 
 function tapLocalFact() {
   if (!localFacts.length) return;
   // If already speaking, stop and cycle to next
-  if (window.speechSynthesis && window.speechSynthesis.speaking) {
+  const speaking = _factAudioActive || (window.speechSynthesis && window.speechSynthesis.speaking);
+  if (speaking) {
     _cancelUtter();
     localFactIdx = (localFactIdx + 1) % localFacts.length;
     showLocalFact();
@@ -5545,34 +5646,62 @@ function tapLocalFact() {
   speakLocalFact();
 }
 
+// Split text into <=maxLen pieces on sentence/word boundaries (Google TTS caps length).
+function chunkFactText(text, maxLen) {
+  const parts = [];
+  let rest = (text || '').trim();
+  while (rest.length > maxLen) {
+    const dot = rest.lastIndexOf('. ', maxLen);
+    let cut = (dot > maxLen * 0.5) ? dot + 1 : rest.lastIndexOf(' ', maxLen);
+    if (cut <= 0) cut = maxLen;
+    parts.push(rest.slice(0, cut).trim());
+    rest = rest.slice(cut).trim();
+  }
+  if (rest) parts.push(rest);
+  return parts;
+}
+
 function speakLocalFact() {
   if (!localFacts.length) return;
-  const hintEl = document.getElementById('explore-facts-hint');
   const text = localFacts[localFactIdx];
-
-  if (!window.speechSynthesis) {
-    // No TTS support — just cycle
-    localFactIdx = (localFactIdx + 1) % localFacts.length;
-    showLocalFact();
-    return;
-  }
-
   _cancelUtter();
+
+  // Prefer <audio> media playback — on iOS this routes to CarPlay / the car speakers,
+  // whereas SpeechSynthesis stays on the phone. Fall back to SpeechSynthesis if the
+  // audio source fails (e.g. no internet).
+  const chunks = chunkFactText(text, 180);
+  if (!_factAudio) { _factAudio = new Audio(); _factAudio.setAttribute('playsinline', ''); }
+  const audio = _factAudio;
+  let idx = 0, started = false;
+  _factAudioActive = true;
+
+  const finish = () => { audio.onended = audio.onerror = audio.onplaying = null; _factAudioActive = false; };
+  const playNext = () => {
+    if (!_factAudioActive) return;
+    if (idx >= chunks.length) { finish(); _factAdvance(); return; }
+    const c = chunks[idx++];
+    audio.src = `https://translate.google.com/translate_tts?ie=UTF-8&tl=en&client=tw-ob&q=${encodeURIComponent(c)}`;
+    audio.onplaying = () => { started = true; _factSpeakingUI(); };
+    audio.onended   = playNext;
+    audio.onerror   = () => { if (!started) { finish(); speakFactViaSynthesis(text); } else { finish(); _factAdvance(); } };
+    const p = audio.play();
+    if (p && p.catch) p.catch(() => { if (!started) { finish(); speakFactViaSynthesis(text); } });
+  };
+  playNext();
+}
+
+function speakFactViaSynthesis(text) {
+  if (!window.speechSynthesis) { _factAdvance(); return; }
   const utter = new SpeechSynthesisUtterance(text);
   _currentUtter = utter;
   utter.rate  = 0.85;
   utter.pitch = 1.0;
-
-  utter.onstart = () => {
-    if (hintEl) { hintEl.textContent = '▶ reading…'; hintEl.classList.add('speaking'); }
-  };
+  utter.onstart = _factSpeakingUI;
   utter.onend = utter.onerror = () => {
     if (_currentUtter !== utter) return; // was manually cancelled — don't increment
     _currentUtter = null;
-    localFactIdx = (localFactIdx + 1) % localFacts.length;
-    showLocalFact(); // resets hint to "tap to hear" and removes .speaking
+    _factAdvance();
   };
-
   window.speechSynthesis.speak(utter);
 }
 
@@ -6185,13 +6314,18 @@ function updateOBDUI(key, val) {
         pill.textContent = '● Searching…';
         pill.className = '';
       }
-      evaluateEnginePark();
+      evaluateDriveState();
       break;
     }
     case 'rpm': {
       const el = document.getElementById('engine-rpm');
       if (el) el.textContent = parseInt(val).toLocaleString();
-      evaluateEnginePark();
+      evaluateDriveState();
+      break;
+    }
+    case 'speed': {
+      // OBD vehicle speed actively informs drive/park detection.
+      evaluateDriveState();
       break;
     }
     case 'coolant-temp': {
@@ -6210,11 +6344,13 @@ function updateOBDUI(key, val) {
       el.className = 'engine-value' + (pct <= 15 ? ' alert' : pct <= 25 ? ' warn' : '');
       break;
     }
-    case 'throttle-pos': {
+    case 'accel-pos': {
+      // Accelerator pedal position — the real driver input on this diesel
+      // (THROTTLE_POS reads a stuck ~13% on the Sprinter, so we show the pedal instead).
       const pct = parseInt(val);
       const fill = document.getElementById('engine-throttle-fill');
       const lbl  = document.getElementById('engine-throttle-val');
-      if (fill) fill.style.width = pct + '%';
+      if (fill) fill.style.width = Math.max(0, Math.min(100, pct)) + '%';
       if (lbl)  lbl.textContent  = pct + '%';
       break;
     }
@@ -6283,7 +6419,7 @@ function renderExploreRange() {
   const range = obdData.range != null ? parseInt(obdData.range) : NaN;
   if (isNaN(range)) {
     el.textContent = '—';
-    el.style.color = ''; el.style.textShadow = ''; el.classList.remove('blinking');
+    el.style.color = ''; el.style.textShadow = 'none'; el.classList.remove('blinking');
     return;
   }
   el.textContent = range;
@@ -6293,9 +6429,8 @@ function renderExploreRange() {
   else if (range <= 70)  c = [255, 90, 10];
   else if (range <= 120) c = [255, 235, 130];
   else                   c = [255, 255, 255];
-  const col = `rgb(${c[0]},${c[1]},${c[2]})`;
-  el.style.color = col;
-  el.style.textShadow = `0 0 8px ${col}, 0 0 24px rgba(${c[0]},${c[1]},${c[2]},0.5)`;
+  el.style.color = `rgb(${c[0]},${c[1]},${c[2]})`;
+  el.style.textShadow = 'none';   // crisp, no glow
   el.classList.toggle('blinking', range <= 25);
 }
 
@@ -6816,6 +6951,8 @@ function connectMQTT() {
           setClimTimerSlider(0);
         }
         updateClimTimerCountdown();
+      } else if (key === 'cycle') {
+        reflectAcCycleStatus(msgStr);
       }
       return;
     }

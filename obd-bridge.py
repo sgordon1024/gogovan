@@ -52,7 +52,8 @@ def T(s): return f'{BASE}/{s}'
 
 _mqttc = None
 _mqtt_ready = threading.Event()
-_avg_mpg = None   # rolling-average MPG (EMA), None until the first moving sample
+_avg_mpg = None    # rolling-average MPG (EMA), None until the first moving sample
+_range_ema = None  # smoothed distance-to-empty (EMA), None until first computed
 
 # ── MQTT thread ───────────────────────────────────────────────────────────────
 
@@ -103,7 +104,7 @@ def _to_mi(qty):
 
 def _poll_gauges(conn):
     """Fast-poll PIDs + derived MPG / range."""
-    global _avg_mpg
+    global _avg_mpg, _range_ema
     speed_mph = fuel_gph = fuel_pct = None
 
     r = _query(conn, obd.commands.RPM)
@@ -124,6 +125,11 @@ def _poll_gauges(conn):
 
     r = _query(conn, obd.commands.THROTTLE_POS)
     if r: publish(T('throttle-pos'), round(r.value.magnitude))
+
+    # Accelerator pedal — fast-polled so the dashboard "Accelerator" bar is responsive.
+    # (THROTTLE_POS reads a stuck ~13% on this diesel; the pedal PID is the real input.)
+    r = _query(conn, obd.commands.ACCELERATOR_POS_D)
+    if r: publish(T('accel-pos'), round(r.value.magnitude))
 
     r = _query(conn, obd.commands.CONTROL_MODULE_VOLTAGE)
     if r: publish(T('voltage'), round(r.value.magnitude, 1))
@@ -148,12 +154,15 @@ def _poll_gauges(conn):
     if _avg_mpg is not None:
         publish(T('avg-mpg'), round(_avg_mpg, 1))
 
-    # Distance to empty = fuel remaining (gal) × avg MPG
+    # Distance to empty = fuel remaining (gal) × avg MPG. Smooth it (EMA) and round to
+    # the nearest 5 mi so the dashboard number stays steady instead of jumping each poll.
     if fuel_pct is not None:
         gal = (fuel_pct / 100.0) * TANK_GALLONS
         publish(T('fuel-remaining'), round(gal, 1))
         mpg = _avg_mpg if _avg_mpg is not None else DEFAULT_MPG
-        publish(T('range'), round(gal * mpg))
+        raw_range = gal * mpg
+        _range_ema = raw_range if _range_ema is None else (_range_ema * 0.9 + raw_range * 0.1)
+        publish(T('range'), int(round(_range_ema / 5.0) * 5))
 
 def _poll_extra(conn):
     """Slower-changing values for the full OBD page."""
@@ -168,9 +177,6 @@ def _poll_extra(conn):
 
     r = _query(conn, obd.commands.BAROMETRIC_PRESSURE)
     if r: publish(T('barometric'), round(r.value.magnitude))
-
-    r = _query(conn, obd.commands.ACCELERATOR_POS_D)
-    if r: publish(T('accel-pos'), round(r.value.magnitude))
 
     r = _query(conn, obd.commands.DISTANCE_W_MIL)
     if r: publish(T('distance-mil'), round(_to_mi(r.value)))
