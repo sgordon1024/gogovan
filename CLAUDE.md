@@ -166,15 +166,20 @@ Auto-detects connection: tries Tailscale first (`100.98.52.107`), then `vanpi.lo
 
 ## Dashboard Tabs (Normal Mode)
 
-The dashboard has 5 tabs in the bottom nav bar (Apple HIG style):
+The bottom nav bar has 5 slots (Apple HIG style): **Power · Controls · 🎤 Voice (raised center button) · Climate · More**.
 
-| Tab | Contents |
+| Tab / button | Contents |
 |---|---|
 | **Power** | Battery SOC/voltage, solar input, grid/shore power, inverter mode, Victron data |
-| **Lights** | All G12 lights with on/off/dim, Light Themes (scenes), rope lights (BLE) |
+| **Controls** | Merged Lights + Controls — shows **both** the lights panel (all G12 lights on/off/dim, Light Themes/scenes, rope lights) **and** the controls panel (water pump, tank heater, awning). |
+| **🎤 Voice** | Center raised circular button (`.tab-voice` / `.tab-voice-circle`) — opens the full-screen voice overlay (`startVoiceListen()`). See **Voice Control** below. |
 | **Climate** | AC mode (cool/off), fan speed (high/low/auto), setpoint, ambient temperature, sleep timer |
-| **Controls** | Water pump, tank heater, awning (extend/retract/stop) |
-| **Internet** | T-Mobile/Starlink switching, Starlink power/auto toggle, speed test, stats + coverage map |
+| **More** | Hamburger (`.tab-menu` → `openMenu()`) opening the menu sheet (`#menuOverlay`) with two items: **Internet & Speed** (→ `switchTab('internet')`) and **Settings & Themes** (→ `openThemePicker()`). |
+
+**Tab plumbing:** `switchTab(tab)` uses `TAB_PANELS` to map a tab to one or more panels — `controls:['lights','controls']` is the merge; `internet:['internet']` has **no** bottom-tab button (reached only via the More menu). It hides every panel in `ALL_TAB_PANELS`, shows the selected one(s), marks the matching `.tab-btn[data-tab=…]` active (optional-chained — internet/voice/menu have no `data-tab`), and scrolls to top.
+
+### Voice Control (drive-mode + normal-mode mic)
+Tapping the center 🎤 (normal mode) or the drive-nav Voice button (`#driveNavVoice`) opens a **full-screen overlay** (`#voiceOverlay`) that **only closes via its X button** (`stopVoiceListen()`) — no tap-outside/auto-close. It uses the browser's `webkitSpeechRecognition` (needs the **HTTPS** dashboard) and shows live feedback: the heard transcript streams into `#voiceTranscript` (interim + final), status into `#voiceStatus`, mic state via `.voice-mic` (`pulsing`/`thinking`/`error`). On a result it publishes `van/voice/request` → **`voice-bridge.py`** (Claude) → `van/voice/response`; `handleVoiceResponse()` runs the returned actions (`applyVoiceAction`) and speaks the reply. After a reply **or** an error the overlay stays open and reveals the **"🎤 Speak again"** button (`#voiceAgain`) so the user can issue another command; it's hidden again at the start of each listen. (See "Voice Control Pipeline" further below for the bridge/key details.)
 
 ### Battery hero (Power tab)
 - The big SOC % (`#battPct`) and fill-bar (`#battBar`) are **blue while charging** and **white otherwise**. Charging = net battery power `> 10 W` (`isBattCharging()`); `applyBattChargeStyle()` is called from both `updateSoc` and `updatePower`.
@@ -262,9 +267,10 @@ Displayed in the drive Speed tab below the speedometer. Shows live data from the
 - MIL (check engine light) indicator and DTC fault code list
 - Data published by `obd-bridge.py` via MQTT to `van/status/obd/*`
 
-### Voice Control (drive-mode mic)
-A **mic button** in the drive-mode bottom nav (`#driveNavVoice` → `startVoiceListen()`) lets you speak a command and have it executed.
+### Voice Control Pipeline (bridge + key)
+Two entry points open the **same full-screen overlay** (`#voiceOverlay`, `startVoiceListen()`): the **center 🎤 button** in the normal-mode bottom tab bar (`.tab-voice`) and the **Voice button in the drive-mode nav** (`#driveNavVoice`).
 
+- **Full-screen, manual-close UX:** the overlay takes the whole screen and **only the X button closes it** (`stopVoiceListen()`) — there is no tap-outside or timed auto-close (this was the "got stuck, couldn't close it" fix). Live feedback: interim+final transcript streams into `#voiceTranscript`, status into `#voiceStatus`, mic state via `.voice-mic` (`pulsing` listening / `thinking` / `error`). After a reply **or** an error the overlay stays open and shows the **"🎤 Speak again"** button (`#voiceAgain`), hidden again at the start of each listen.
 - **Speech-to-text** is the iPhone's built-in recognition (`webkitSpeechRecognition`) — needs no key, but requires the **HTTPS** dashboard (mic is blocked on plain `http://`, same as GPS).
 - The transcript + the list of controllable lights/scenes/colors is published to `van/voice/request`. **`voice-bridge.py`** on the Pi (holds the Anthropic key in `~/.anthropic_key`, **never in the webpage**) sends it to **Claude** (`claude-opus-4-8`, forced tool use `van_controls`) and publishes a structured `{actions, reply}` back on `van/voice/response`.
 - The dashboard's `executeVoiceActions()` / `applyVoiceAction()` map each action to the existing control functions (lights, AC mode/fan/setpoint, pump, tank heater, awning, rope color/effect/brightness, scenes, drive mode, Starlink). It speaks the `reply` confirmation.
@@ -789,6 +795,9 @@ SSH into Pi and run: `sudo tailscale cert vanpi.tail27a0b4.ts.net` — writes ne
 
 **Why the offline banner uses `env(safe-area-inset-top)` instead of `top: 20px`:**  
 The Dynamic Island on iPhone 14 Pro and later sits ~59px from the top, so a fixed `20px` offset placed the banner behind it. `env(safe-area-inset-top)` is set by the browser to the exact inset height for the current device.
+
+**Why the bottom bars use `left:0; right:0` (NOT `left:50%; transform:translateX(-50%)`):**  
+Both `.tab-bar` and `#drive-nav` are `position:fixed; bottom:0`. They used to also have `left:50%; transform:translateX(-50%)` (pointless centering — `width:100%` already spans full width). On iOS Safari, a `position:fixed` element that has **its own `transform`** is mis-positioned on the **first paint** and only snaps to `bottom:0` after a repaint is forced — so on launch the bar floated above the bottom edge, then jumped down the moment you tapped a tab (which reflows via `switchTab`). Removing the transform and pinning with `left:0; right:0` fixes it. Do NOT re-add a `transform` to these bars. (The `.starlink-quality-banner` keeps its `translateX(-50%)` because its width is `calc(100% - 32px)` and it genuinely needs centering — that one is fine since it's not the element fighting `bottom:0` on load.)
 
 **Why Avahi is restricted to `eth0`:**  
 Without this restriction, Avahi advertises `vanpi.local` on all interfaces. When the Pi's wlan0 is on the T-Mobile subnet (192.168.12.x), clients on Apple Pi could receive mDNS responses with the wlan0 IP (unreachable from Apple Pi subnet). Restricting to `eth0` ensures the advertised IP is always `192.168.8.106`.

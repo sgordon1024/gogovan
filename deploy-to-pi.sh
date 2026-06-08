@@ -60,7 +60,7 @@ fi
 # ── Sudoers (nmcli without password) ──────────────────────────────────────
 echo "=== Ensuring sudoers entry for nmcli ==="
 sshpass -p "$PASS" ssh "$PI" \
-  'echo windows | sudo -S bash -c "echo \"sgordon1024 ALL=(ALL) NOPASSWD: /usr/bin/nmcli\" > /etc/sudoers.d/gogovan-nmcli && chmod 440 /etc/sudoers.d/gogovan-nmcli" && echo sudoers ok"' \
+  'echo windows | sudo -S bash -c "echo \"sgordon1024 ALL=(ALL) NOPASSWD: /usr/bin/nmcli\" > /etc/sudoers.d/gogovan-nmcli && chmod 440 /etc/sudoers.d/gogovan-nmcli" && echo sudoers ok' \
   || echo "(sudoers entry may already exist — continuing)"
 
 # ── can-bridge.py ─────────────────────────────────────────────────────────
