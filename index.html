@@ -4772,6 +4772,21 @@ function enterDrivingMode(manual = false) {
   startDriveSpeedTests();
 }
 
+// Restore the water pump to ON — drive mode always turns it back on once parked.
+// Publishes the command AND the retained status so the bridge actuates it and the
+// dashboard reflects it (used by exitDrivingMode and the "Arrived?" toast restore).
+function restorePump() {
+  pumpOn = true;
+  if (mqttClient?.connected) {
+    mqttClient.publish('van/light/pump', 'on');
+    mqttClient.publish('van/status/light/pump', 'on', { retain: true, qos: 0 });
+  }
+  const pumpBtn   = document.getElementById('pumpBtn');
+  const pumpState = document.getElementById('pumpState');
+  if (pumpBtn)   pumpBtn.classList.add('active');
+  if (pumpState) pumpState.textContent = 'Running';
+}
+
 function exitDrivingMode() {
   drivingMode     = false;
   if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
@@ -4787,13 +4802,8 @@ function exitDrivingMode() {
   updateDriveModeToggle();
   updateAltColumn();
 
-  // Always restore water pump when drive mode ends
-  pumpOn = true;
-  if (mqttClient?.connected) mqttClient.publish('van/light/pump', 'on');
-  const pumpBtn   = document.getElementById('pumpBtn');
-  const pumpState = document.getElementById('pumpState');
-  if (pumpBtn)   pumpBtn.classList.add('active');
-  if (pumpState) pumpState.textContent = 'On';
+  // Always restore the water pump when drive mode ends (parked).
+  restorePump();
 
   // Restore rope lights to the exact pre-drive state.
   applyRopeRestore();
@@ -4863,6 +4873,9 @@ function restorePreDriveLights() {
     publishLight(id, String(level));
   });
   preDriveLights = [];
+
+  // Make sure the water pump is back on too (re-assert in case the exit publish didn't land).
+  restorePump();
 
   // Restore rope lights to the exact pre-drive state (shared with exitDrivingMode).
   applyRopeRestore();
