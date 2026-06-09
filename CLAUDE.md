@@ -162,6 +162,13 @@ Auto-detects connection: tries Tailscale first (`100.98.52.107`), then `vanpi.lo
 
 **IMPORTANT: Always run `./deploy-to-pi.sh` immediately after every change to any Pi file.** The user reviews changes live on the dashboard — if you don't deploy right away, they can't see what you did.
 
+### Auto-deploy on finish (Stop hook — safety net)
+A **Stop hook** in `~/.claude/settings.json` runs **`auto-deploy.sh`** every time Claude finishes a turn, so a deploy happens even if Claude forgets. It is guarded so it isn't disruptive:
+- **Change-detection:** `deploy-to-pi.sh` writes a content hash of the deployed files to `~/.gogovan-deploy-hash` on every successful deploy. `auto-deploy.sh` recomputes that hash and **only deploys if it changed** — so turns that didn't touch a Pi file (questions, doc edits) cause **no** service restart. When Claude already deployed in-turn, the hook is a fast no-op.
+- **Deployable file set** (must stay identical in `deploy-to-pi.sh`'s `DEPLOY_HASH_FILES` and `auto-deploy.sh`'s `FILES`): `index.html can-bridge.py rope-light.py starlink-bridge.py obd-bridge.py run-speedtest.py voice-bridge.py`. If you add a new deployed Pi file, add it to BOTH lists or the hook won't notice changes to it.
+- **Guards:** the hook only fires when the session `cwd` is under `/Users/stephengordon/development/gogovan` (main repo or any worktree); a single-flight `/tmp/gogovan-autodeploy.lock` prevents overlap; it runs `async` and always exits 0, so it never blocks the turn and **fails gracefully if the Pi is offline** (stamp stays stale → next finish retries). Background output → `/tmp/gogovan-autodeploy.log`.
+- **Still deploy in-turn yourself** — that's how you verify services restarted and report results; the hook is only a backstop (and stays a no-op because the in-turn deploy already updated the stamp). `auto-deploy.sh` and `deploy-to-pi.sh` are local Mac orchestration scripts — they are NOT copied to the Pi.
+
 ---
 
 ## Dashboard Tabs (Normal Mode)

@@ -183,3 +183,9 @@ sshpass -p "$PASS" ssh "$PI" '
 echo ""
 echo "=== DONE ==="
 echo "Dashboard: http://vanpi.local | https://vanpi.tail27a0b4.ts.net"
+
+# Record a content hash of the files we just deployed, so the auto-deploy Stop
+# hook (auto-deploy.sh) can skip a redundant deploy when nothing has changed
+# since this run. Must hash the SAME file list, in the same order, as auto-deploy.sh.
+DEPLOY_HASH_FILES="index.html can-bridge.py rope-light.py starlink-bridge.py obd-bridge.py run-speedtest.py voice-bridge.py"
+( cd "$DIR" && cat $DEPLOY_HASH_FILES 2>/dev/null | shasum | cut -d' ' -f1 > "$HOME/.gogovan-deploy-hash" ) 2>/dev/null || true
