@@ -138,14 +138,15 @@ Adding the dashboard to iPhone home screen (Safari → Share → Add to Home Scr
 
 | File | Location | Purpose |
 |---|---|---|
-| `index.html` | Pi: `/home/sgordon1024/index.html` | Dashboard UI (single-file, ~627KB incl. bundled mqtt.js) |
+| `index.html` | Pi: `/home/sgordon1024/index.html` | Dashboard UI (single-file, ~695KB incl. bundled mqtt.js) |
 | `can-bridge.py` | Pi: `/home/sgordon1024/can-bridge.py` | MQTT subscriber → CAN sender + CAN listener → MQTT publisher |
 | `rope-light.py` | Pi: `/home/sgordon1024/rope-light.py` | BLE↔MQTT bridge for rope lights (bleak + paho-mqtt) |
 | `starlink-bridge.py` | Pi: `/home/sgordon1024/starlink-bridge.py` | Starlink smart plug (tinytuya) + GL.iNet repeater switching |
 | `obd-bridge.py` | Pi: `/home/sgordon1024/obd-bridge.py` | OBD-II data bridge (python-obd via /dev/rfcomm0) |
 | `voice-bridge.py` | Pi: `/home/sgordon1024/voice-bridge.py` | Voice control: transcript → Claude API → structured actions (key in `~/.anthropic_key`) |
 | `run-speedtest.py` | Pi: `/home/sgordon1024/run-speedtest.py` | Runs the official Ookla `speedtest --format=json`; used by BOTH the 4h timer and manual taps (deploy-to-pi.sh now copies it) |
-| `deploy-to-pi.sh` | Dev: project root | Main deploy script — auto-detects Tailscale or Apple Pi LAN |
+| `deploy-to-pi.sh` | Dev: project root | Main deploy script — auto-detects Tailscale or Apple Pi LAN; on success writes a content-hash stamp to `~/.gogovan-deploy-hash` |
+| `auto-deploy.sh` | Dev: project root (local only — NOT copied to Pi) | Stop-hook wrapper: deploys only if a deployable file changed since the last deploy. See "Auto-deploy on finish (Stop hook)" |
 | `deploy-local.sh` | Dev: project root | Deploy when offline (tries 192.168.8.106, 192.168.4.1, Tailscale) |
 | `fix-hostapd.sh` | Dev: project root | One-time: adds auto-restart + country code to hostapd (legacy) |
 | `ble-sweep2.py` | Dev: project root | BLE sweep script for rope light command discovery |
@@ -169,6 +170,8 @@ A **Stop hook** in `~/.claude/settings.json` runs **`auto-deploy.sh`** every tim
 - **Guards:** the hook only fires when the session `cwd` is under `/Users/stephengordon/development/gogovan` (main repo or any worktree); a single-flight `/tmp/gogovan-autodeploy.lock` prevents overlap; it runs `async` and always exits 0, so it never blocks the turn and **fails gracefully if the Pi is offline** (stamp stays stale → next finish retries). Background output → `/tmp/gogovan-autodeploy.log`.
 - **Still deploy in-turn yourself** — that's how you verify services restarted and report results; the hook is only a backstop (and stays a no-op because the in-turn deploy already updated the stamp). `auto-deploy.sh` and `deploy-to-pi.sh` are local Mac orchestration scripts — they are NOT copied to the Pi.
 
+**Auto-save commits:** the working repo auto-commits roughly hourly (commits titled `Auto-save: <timestamp>` on the current branch, e.g. `drive-mode-v2`). So `git status` is usually clean even right after edits — your changes were committed by the auto-saver, not lost. These commits are **local only**; pushing to `origin` still happens only when the user asks.
+
 ---
 
 ## Dashboard Tabs (Normal Mode)
@@ -180,7 +183,7 @@ The bottom nav bar has 5 slots (Apple HIG style): **Power · Controls · 🎤 Vo
 | **Power** | Battery SOC/voltage, solar input, grid/shore power, inverter mode, Victron data |
 | **Controls** | Merged Lights + Controls — shows **both** the lights panel (all G12 lights on/off/dim, Light Themes/scenes, rope lights) **and** the controls panel (water pump, tank heater, awning). |
 | **🎤 Voice** | Center raised circular button (`.tab-voice` / `.tab-voice-circle`) — opens the full-screen voice overlay (`startVoiceListen()`). See **Voice Control** below. |
-| **Climate** | AC mode (cool/off), fan speed (high/low/auto), setpoint, ambient temperature, sleep timer |
+| **Climate** | AC mode (cool/off), fan speed (high/low/auto), setpoint, ambient temperature, sleep timer, cooling cycle |
 | **More** | Hamburger (`.tab-menu` → `openMenu()`) opening the menu sheet (`#menuOverlay`) with two items: **Internet & Speed** (→ `switchTab('internet')`) and **Settings & Themes** (→ `openThemePicker()`). |
 
 **Tab plumbing:** `switchTab(tab)` uses `TAB_PANELS` to map a tab to one or more panels — `controls:['lights','controls']` is the merge; `internet:['internet']` has **no** bottom-tab button (reached only via the More menu). It hides every panel in `ALL_TAB_PANELS`, shows the selected one(s), marks the matching `.tab-btn[data-tab=…]` active (optional-chained — internet/voice/menu have no `data-tab`), and scrolls to top.
@@ -303,6 +306,8 @@ A "Light Themes" section at the top of the Lights tab lets the user save and rec
 
 The dashboard has 26 visual color themes (Night, Day, Desert, Ocean, Forest, Neon, etc.). A theme button (palette icon) opens a bottom sheet picker. Themes are saved to `localStorage` key `theme`. The picker swatches **wrap** (don't cram into one nowrap row). The sheet is **capped at `max-height:85vh` with `overflow-y:auto`** so it never fills the whole screen (which would hide the tap-to-close backdrop). It closes by tapping the backdrop, tapping the grab handle, or **dragging the sheet down** (`sheetTouchStart/Move/End` — drag engages only when scrolled to the top; >110px dismisses, else snaps back).
 
+**Selecting a theme persists immediately:** tapping a swatch calls `selectTheme(id)`, which writes `localStorage['theme']` **on the spot** and then `applyTheme()` — so the theme on screen when you close the app is restored on reopen. There is **no separate "Save" step**. (The old preview→Save model meant an un-saved pick was lost on close and an older theme came back — that was a bug. `applyTheme()` itself still does NOT persist — it's the pure "apply visually" primitive used at startup; only `selectTheme()`/`saveTheme()` write storage. With immediate persist, `activeTheme` always equals `persistedTheme`, so the now-vestigial "Previewing/Save" bar never appears.)
+
 **Secondary-text contrast:** `applyTheme()` nudges each theme's `--txt2` ~32% toward `--txt` (`_mixHex`) so dim labels are readable on every theme — done centrally instead of editing all 26 themes' `vars`.
 
 ### Drive-mode fun facts → CarPlay
@@ -398,11 +403,14 @@ The Climate tab has a stepped **Sleep Timer** slider (`AC_TIMER_STEPS`: Off, 5, 
 - Manually turning the AC off (`van/ac/mode=off`) cancels any pending timer. A bridge restart clears the timer (in-memory) and its retained status, so the dashboard won't show a countdown that can't fire.
 - Dashboard shows a live `H:MM:SS` countdown computed from the retained end-time (`updateClimTimerCountdown`).
 
-### Sleep Cycle (server-side duty cycling)
-The Climate tab also has **Sleep Cycle** preset buttons (Off / Light `20·40` / Medium `30·30` / Strong `30·20`). The AC's auto/thermostat mode is useless when the bathroom door blocks the temp sensor (it never reaches setpoint, so it runs on high all night). The cycle is **sensor-independent**: `can-bridge.py` alternates `Cool ON` (on **Fan LOW**) for the on-minutes, then `System OFF` for the off-minutes, repeating, via chained `threading.Timer`s — so it keeps cycling while the phone is asleep.
+### Cooling Cycle (server-side duty cycling, scrubbable)
+The Climate tab has **Cooling Cycle** preset buttons (Off / Light `20·40` / Medium `30·30` / Strong `30·20`). (Formerly "Sleep Cycle".) The AC's auto/thermostat mode is useless when the bathroom door blocks the temp sensor (it never reaches setpoint, so it runs on high all night). The cycle is **sensor-independent**: `can-bridge.py` alternates `Cool ON` (on **Fan LOW**) for the on-minutes, then `System OFF` for the off-minutes, repeating, via chained `threading.Timer`s — so it keeps cycling while the phone is asleep.
 - Dashboard publishes `van/ac/cycle` = `"ON/OFF"` minutes (e.g. `30/20`), or `off` to stop. Bridge publishes the active spec to `van/status/ac/cycle` (retained), `""` when off.
 - Each on-phase sends Cool ON **and Fan LOW** (and publishes `van/status/ac/mode=cool` + `van/status/ac/fan=low`); each off-phase sends System OFF.
-- A **manual mode change** (`van/ac/mode` cool/off) cancels the cycle. The **sleep timer firing** also cancels it. A bridge restart clears it (in-memory) and its retained status.
+- **Live phase indicator + playhead:** at every phase flip (and on a scrub) the bridge publishes `van/status/ac/cycle-phase` (retained) = `"<phase>/<startEpochMs>/<endEpochMs>"` where phase is `cool` (blowing) or `off` (resting). `updateAcCyclePhase()` drives: a **scrubbable playhead** (`#climCyclePlayhead`, an `<input type=range>` under the buttons) whose fill = progress through the current phase; a `M:SS` countdown; the spinning-fan "Cooling/Resting" row; and the **selected button's pulse** — the chosen preset shows full amber while cooling and a dimmed amber outline (`.clim-cycle-btn.active.resting`) while resting, so the *selected* button conveys the phase. `""` clears all of it. (`cycle-phase` is one topic level, so `van/status/ac/+` matches it.)
+- **Scrub to skip ahead:** dragging the playhead publishes `van/ac/cycle-seek` = a `0..1` fraction; `_seek_ac_cycle()` reschedules the current phase's end to that point (≈1.0 flips to the next phase immediately) and re-publishes `cycle-phase`. Re-actuates nothing — same phase, new end time. A seek when no cycle is running is a safe no-op.
+- **No confusing toggle flip:** while a cooling cycle is active the dashboard keeps the Cool/Off **mode toggle on "Cool"** (`updateAcModeUI()` ORs in `acCycleActive`), instead of flipping to "Off" during the rest phase (the Firefly broadcasts mode=off during rest, which the bridge republishes — the dashboard just doesn't let it flip the toggle mid-cycle). When the cycle ends, the toggle reflects the real AC mode again.
+- A **manual mode change** (`van/ac/mode` cool/off) cancels the cycle. The **sleep timer firing** also cancels it (`_fire_ac_timer()` → `_clear_ac_cycle()` → System OFF + clears `van/status/ac/cycle` and `van/status/ac/cycle-phase`), so setting a sleep timer guarantees the cycle shuts off when the timer ends. A bridge restart clears the cycle (in-memory) and all retained statuses (`cycle`, `cycle-phase`, `timer`).
 
 ### Status PGNs (all proprietary Firefly)
 
@@ -441,6 +449,7 @@ When AC mode is **off**, the Firefly LCD always displays fan as "Auto" regardles
 | `van/ac/setpoint` | Dashboard → Bridge | `up`, `down` |
 | `van/ac/timer` | Dashboard → Bridge | minutes until AC auto-off (`0` cancels) |
 | `van/ac/cycle` | Dashboard → Bridge | duty cycle `"ON/OFF"` minutes (e.g. `30/20`); `off`/`0` cancels |
+| `van/ac/cycle-seek` | Dashboard → Bridge | scrub the cooling-cycle playhead: `0`–`1` fraction to fast-forward the current phase to (≈`1` flips to the next phase now) |
 | `van/rope-light/power` | Dashboard → rope-light.py | `on`, `off` |
 | `van/rope-light/color` | Dashboard → rope-light.py | `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `teal`, `cyan`, `sky`, `blue`, `navy`, `purple`, `pink`, `white` |
 | `van/rope-light/brightness` | Dashboard → rope-light.py | `1`–`100` |
@@ -462,6 +471,7 @@ When AC mode is **off**, the Firefly LCD always displays fan as "Auto" regardles
 | `van/status/ac/temp` | Bridge → Dashboard | integer °F |
 | `van/status/ac/timer` | Bridge → Dashboard | epoch-ms when AC auto-off fires, or `""` if none |
 | `van/status/ac/cycle` | Bridge → Dashboard | active duty cycle `"ON/OFF"` (e.g. `30/20`), or `""` if none |
+| `van/status/ac/cycle-phase` | Bridge → Dashboard | current cycle phase `"<cool\|off>/<startEpochMs>/<endEpochMs>"` for the playhead+countdown+icon, or `""` if none |
 | `van/status/starlink/power` | starlink-bridge → Dashboard | `on`, `off`, `unknown` |
 | `van/status/starlink/auto` | starlink-bridge → Dashboard | `on`, `off` |
 | `van/status/starlink/threshold` | starlink-bridge → Dashboard | min T-Mobile download Mbps to prefer T-Mobile (0–50) |
@@ -810,8 +820,12 @@ SSH into Pi and run: `sudo tailscale cert vanpi.tail27a0b4.ts.net` — writes ne
 **Why the offline banner uses `env(safe-area-inset-top)` instead of `top: 20px`:**  
 The Dynamic Island on iPhone 14 Pro and later sits ~59px from the top, so a fixed `20px` offset placed the banner behind it. `env(safe-area-inset-top)` is set by the browser to the exact inset height for the current device.
 
-**Why the bottom bars use `left:0; right:0` (NOT `left:50%; transform:translateX(-50%)`):**  
-Both `.tab-bar` and `#drive-nav` are `position:fixed; bottom:0`. They used to also have `left:50%; transform:translateX(-50%)` (pointless centering — `width:100%` already spans full width). On iOS Safari, a `position:fixed` element that has **its own `transform`** is mis-positioned on the **first paint** and only snaps to `bottom:0` after a repaint is forced — so on launch the bar floated above the bottom edge, then jumped down the moment you tapped a tab (which reflows via `switchTab`). Removing the transform and pinning with `left:0; right:0` fixes it. Do NOT re-add a `transform` to these bars. (The `.starlink-quality-banner` keeps its `translateX(-50%)` because its width is `calc(100% - 32px)` and it genuinely needs centering — that one is fine since it's not the element fighting `bottom:0` on load.)
+**Why the bottom bars (`.tab-bar` / `#drive-nav`) load at the bottom — the iOS standalone fix:**  
+Both are `position:fixed; bottom:0; left:0; right:0` (no `transform`; `left:0;right:0` spans full width without one). The real bug was that an **iPhone home-screen (standalone) webview collapses the layout viewport to the *content* height on first paint** — so on the short Power tab the bar's `bottom:0` landed at the content bottom (~300px up), and only the first reflow (tapping the tall Controls tab, which makes the document exceed the viewport) snapped it down. Two fixes, both required:
+1. **`_settleBottomBars()`** forces that reflow automatically on `load`, `pageshow`, after the splash hides, and at init — it briefly sets `body` `min-height: calc(100dvh + 60px)` (scrollable past the viewport), then reverts next frame. Invisible (below the fold, stays scrolled to top), and it mirrors what the tab tap did.
+2. **`@media (display-mode: standalone) { html, body { min-height: -webkit-fill-available } }`** gives standalone the true available height so the viewport can't collapse in the first place. Scoped to standalone so normal Safari (dynamic toolbar) is unaffected.
+
+This is **iOS-standalone-specific and NOT reproducible in desktop Chrome** (which always positions the bar correctly), so verify changes on the actual home-screen app. An earlier theory blamed the bars' own `transform:translateX(-50%)` and removed it — that was a *wrong* diagnosis (an element's own `transform` does not change its own containing block), though the transform was pointless so removing it was harmless. The `.starlink-quality-banner` keeps its `translateX(-50%)` (width `calc(100% - 32px)`, genuinely needs centering — and it's not fixed to `bottom:0`).
 
 **Why Avahi is restricted to `eth0`:**  
 Without this restriction, Avahi advertises `vanpi.local` on all interfaces. When the Pi's wlan0 is on the T-Mobile subnet (192.168.12.x), clients on Apple Pi could receive mDNS responses with the wlan0 IP (unreachable from Apple Pi subnet). Restricting to `eth0` ensures the advertised IP is always `192.168.8.106`.

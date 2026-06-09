@@ -50,6 +50,15 @@
       min-width: 320px;
     }
 
+    /* iOS home-screen (standalone) webviews collapse the layout viewport to the content
+       height on first paint, floating the fixed bottom bar ~content-height up from the
+       real screen bottom. -webkit-fill-available reports the true available height there,
+       so the viewport can't collapse. Scoped to standalone so it can't affect normal
+       Safari (where the dynamic toolbar makes fill-available behave differently). */
+    @media (display-mode: standalone) {
+      html, body { min-height: -webkit-fill-available; }
+    }
+
     /* ── Splash screen ───────────────────────────── */
     #splash {
       position: fixed;
@@ -2413,21 +2422,44 @@
     .menu-item svg { color:var(--txt2); flex-shrink:0; }
 
     /* ── Climate sleep timer ──────────────────────────── */
-    .clim-timer { border-top:1px solid var(--border); padding:16px; }
-    .clim-timer-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; }
-    .clim-timer-slider { width:100%; display:block; margin:0; }
+    .clim-timer { border-top:1px solid var(--border); padding:20px 16px 26px; }
+    .clim-timer-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:16px; }
+    .clim-timer-slider { width:100%; display:block; margin:0 0 10px; }
     .clim-timer-val { font-size:15px; font-weight:700; color:var(--txt); font-variant-numeric:tabular-nums; }
-    .clim-timer-countdown { font-size:12.5px; color:var(--txt2); margin-top:14px; text-align:center; }
+    .clim-timer-countdown { font-size:12.5px; color:var(--txt2); margin-top:20px; text-align:center; }
     .clim-timer-countdown #climTimerRemain { color:var(--amber); font-weight:700; font-variant-numeric:tabular-nums; }
 
     /* ── Climate cycle modes (sensor-independent duty cycling) ── */
-    .clim-cycle { border-top:1px solid var(--border); padding:16px; }
-    .clim-cycle-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px; }
+    .clim-cycle { border-top:1px solid var(--border); padding:20px 16px 22px; }
+    .clim-cycle-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; }
     .clim-cycle-seg { display:flex; gap:6px; }
-    .clim-cycle-btn { flex:1; padding:9px 4px; border-radius:10px; border:1px solid var(--border); background:transparent; color:var(--txt2); font-size:13px; font-weight:600; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:background .15s, color .15s; display:flex; flex-direction:column; align-items:center; gap:2px; line-height:1.15; }
+    .clim-cycle-btn { flex:1; padding:11px 4px; border-radius:10px; border:1px solid var(--border); background:transparent; color:var(--txt2); font-size:13px; font-weight:600; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:background .4s, color .4s, border-color .4s; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; line-height:1.15; }
     .clim-cycle-btn .cyc-sub { font-size:10px; font-weight:600; opacity:.7; }
+    /* Selected cycle: full amber while it's the COOLING phase ("on") … */
     .clim-cycle-btn.active { background:var(--amber); color:#000; border-color:transparent; }
-    .clim-cycle-note { font-size:12px; color:var(--txt2); margin-top:12px; line-height:1.45; }
+    /* … and a dimmed amber outline while it's the RESTING phase ("off") — same button,
+       just visibly off, so it pulses on→off→on with the cycle instead of lighting "Off". */
+    .clim-cycle-btn.active.resting { background:var(--amber-dim); color:var(--amber); border-color:var(--amber); }
+
+    /* Playhead: progress through the current phase; drag it to skip ahead. */
+    .clim-cycle-track { margin-top:16px; }
+    .clim-cycle-track[hidden] { display:none; }
+    .cyc-playhead { -webkit-appearance:none; appearance:none; width:100%; height:10px; border-radius:5px; outline:none; cursor:pointer;
+      background:linear-gradient(to right, var(--amber) 0%, var(--amber) var(--pct,0%), var(--surface2) var(--pct,0%), var(--surface2) 100%); }
+    .cyc-playhead::-webkit-slider-thumb { -webkit-appearance:none; width:18px; height:18px; border-radius:50%; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,0.4); cursor:pointer; transition:transform .12s; }
+    .cyc-playhead::-moz-range-thumb { width:18px; height:18px; border:none; border-radius:50%; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,0.4); cursor:pointer; }
+    .cyc-playhead:active::-webkit-slider-thumb { transform:scale(1.2); }
+    /* Live phase indicator: icon "blowing" (spinning fan) vs "resting", + countdown */
+    .clim-cycle-status { display:flex; align-items:center; gap:9px; margin-top:16px; font-size:13.5px; font-weight:600; color:var(--txt2); }
+    .clim-cycle-status[hidden] { display:none; }
+    .clim-cycle-icon { display:inline-flex; color:var(--txt2); }
+    .clim-cycle-remain { margin-left:auto; color:var(--txt2); font-weight:600; }
+    .clim-cycle-remain #climCycleRemain { color:var(--amber); font-weight:700; font-variant-numeric:tabular-nums; }
+    .clim-cycle-status.blowing { color:var(--txt); }
+    .clim-cycle-status.blowing .clim-cycle-icon { color:var(--amber); }
+    .clim-cycle-status.blowing .clim-cycle-icon svg { animation:fan-spin 1.7s linear infinite; transform-origin:50% 50%; }
+    @keyframes fan-spin { to { transform:rotate(360deg); } }
+    .clim-cycle-note { font-size:12px; color:var(--txt2); margin-top:14px; line-height:1.45; }
 
     /* ── Starlink power card ──────────────────────────── */
     .starlink-power-row { display:flex; align-items:center; justify-content:space-between; padding:16px; }
@@ -2809,7 +2841,7 @@ safe-buffer/index.js:
       </div>
       <div class="clim-cycle" id="climCycleWrap">
         <div class="clim-cycle-head">
-          <span class="clim-group-label">Sleep Cycle</span>
+          <span class="clim-group-label">Cooling Cycle</span>
           <span class="clim-timer-val" id="climCycleVal">Off</span>
         </div>
         <div class="clim-cycle-seg">
@@ -2818,7 +2850,17 @@ safe-buffer/index.js:
           <button class="clim-cycle-btn" data-cyc="30/30" onclick="setAcCycle('30/30')">Medium<span class="cyc-sub">30·30 min</span></button>
           <button class="clim-cycle-btn" data-cyc="30/20" onclick="setAcCycle('30/20')">Strong<span class="cyc-sub">30·20 min</span></button>
         </div>
-        <div class="clim-cycle-note">Cools on <b>Low</b>, cycling on then off on a fixed timer — no temp sensor needed, so it won't blast on high all night.</div>
+        <div class="clim-cycle-track" id="climCyclePlayheadWrap" hidden>
+          <input type="range" class="cyc-playhead" id="climCyclePlayhead" min="0" max="1000" value="0" style="--pct:0%"
+                 oninput="onCyclePlayheadInput(this)" onchange="onCyclePlayheadChange(this)"
+                 aria-label="Cooling cycle progress — drag to skip to the next part">
+        </div>
+        <div class="clim-cycle-status" id="climCycleStatus" hidden>
+          <span class="clim-cycle-icon" id="climCycleIcon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.827 16.379a6.082 6.082 0 0 1-8.618-7.002l5.412 1.45a6.082 6.082 0 0 1 7.002-8.618l-1.45 5.412a6.082 6.082 0 0 1 8.618 7.002l-5.412-1.45a6.082 6.082 0 0 1-7.002 8.618l1.45-5.412Z"/><path d="M12 12v.01"/></svg></span>
+          <span id="climCyclePhase">Cooling</span>
+          <span class="clim-cycle-remain"><span id="climCycleRemain">—</span> left</span>
+        </div>
+        <div class="clim-cycle-note">Cools on <b>Low</b>, alternating on then off on a fixed timer — no temp sensor needed, so it won't blast on high all night. Drag the playhead to skip to the next part.</div>
       </div>
     </div>
   </div>
@@ -3365,6 +3407,15 @@ function saveTheme() {
   renderThemePicker();
 }
 
+// Tapping a swatch persists the theme IMMEDIATELY — the theme you're on when you close
+// the app is the one you get back on reopen. (The old preview/"Save" model meant an
+// un-saved pick was lost on close, so an older theme came back — that was the bug.)
+function selectTheme(id) {
+  persistedTheme = id;
+  localStorage.setItem('theme', id);
+  applyTheme(id);   // applies on screen + re-renders the picker (never stuck "previewing")
+}
+
 function renderThemePicker() {
   const groups = ['dark','light','vivid','special'];
   const rowIds  = { dark:'darkRow', light:'lightRow', vivid:'vividRow', special:'specialRow' };
@@ -3384,7 +3435,7 @@ function renderThemePicker() {
       const isSaved     = t.id === persistedTheme;
       const el = document.createElement('div');
       el.className = 'theme-swatch' + (isActive ? ' active' : '') + (isSaved && isPreviewing ? ' saved' : '');
-      el.onclick = () => { applyTheme(t.id); };
+      el.onclick = () => { selectTheme(t.id); };
       el.innerHTML = `
         <div class="swatch-circle" style="${bgStyle}">
           <div class="swatch-check" style="background:${checkOverlay};">
@@ -4277,8 +4328,11 @@ function setAcFan(speed) {
   }
 }
 
+let acCycleActive = false;   // true while a cooling cycle is running
 function updateAcModeUI() {
-  const on = acMode === 'cool';
+  // A cooling cycle owns the AC, so keep "Cool" lit for the whole cycle instead of
+  // flipping the toggle to "Off" during its rest phase (that flip was the confusing part).
+  const on = acMode === 'cool' || acCycleActive;
   const modeEl = document.getElementById('climateModeLine');
   modeEl.classList.toggle('off', !on);
   document.getElementById('climateIcon').innerHTML = on ? lucideIcon('snowflake', 14) : lucideIcon('thermometer', 14);
@@ -4364,11 +4418,17 @@ function updateClimTimerCountdown() {
 // ── AC sleep cycle (sensor-independent duty cycling) ──
 // Runs server-side in can-bridge.py: alternates Cool-ON-on-Low / System-OFF on a fixed
 // timer, so it never relies on the (door-blocked) temp sensor and won't run high all night.
+let acCyclePhaseEndMs   = 0;    // epoch ms when the current phase ends (0 = none)
+let acCyclePhaseStartMs = 0;    // epoch ms when the current phase started
+let acCyclePhaseTotalMs = 0;    // full duration of the current phase (ms)
+let acCyclePhaseTick    = null; // setInterval handle for the live countdown + playhead
+let _cycleScrubbing     = false;// true while the user is dragging the playhead
 function setAcCycle(spec) {
   // spec = 'off' or 'ON/OFF' minutes (e.g. '30/20')
   document.querySelectorAll('.clim-cycle-btn').forEach(b => b.classList.toggle('active', b.dataset.cyc === spec));
   const valEl = document.getElementById('climCycleVal');
   if (valEl) valEl.textContent = (spec === 'off') ? 'Off' : spec.replace('/', ' · ') + ' min';
+  if (spec === 'off') updateAcCyclePhase('');   // stop → hide playhead/indicator right away
   if (mqttClient?.connected) mqttClient.publish('van/ac/cycle', spec);
 }
 function reflectAcCycleStatus(spec) {
@@ -4376,6 +4436,76 @@ function reflectAcCycleStatus(spec) {
   document.querySelectorAll('.clim-cycle-btn').forEach(b => b.classList.toggle('active', b.dataset.cyc === spec));
   const valEl = document.getElementById('climCycleVal');
   if (valEl) valEl.textContent = (spec === 'off') ? 'Off' : spec.replace('/', ' · ') + ' min';
+  if (spec === 'off') updateAcCyclePhase('');   // cycle cleared → drop the live indicator
+}
+// Live cycle phase: "cool/<startMs>/<endMs>" (blowing) or "off/<startMs>/<endMs>" (resting),
+// or "" to hide. Drives the playhead progress + per-phase countdown + spinning-fan icon, and
+// pulses the SELECTED button on(cool)→off(rest). The bridge re-publishes this at every phase
+// flip and on a scrub, so everything re-seeds from the authoritative state.
+function updateAcCyclePhase(str) {
+  const statusEl = document.getElementById('climCycleStatus');
+  const phaseEl  = document.getElementById('climCyclePhase');
+  const remainEl = document.getElementById('climCycleRemain');
+  const trackEl  = document.getElementById('climCyclePlayheadWrap');
+  const ph       = document.getElementById('climCyclePlayhead');
+  if (acCyclePhaseTick) { clearInterval(acCyclePhaseTick); acCyclePhaseTick = null; }
+  const parts = (str || '').split('/');
+  const phase = parts[0], start = parseInt(parts[1]), end = parseInt(parts[2]);
+  if (!str || (phase !== 'cool' && phase !== 'off') || isNaN(start) || isNaN(end)) {
+    acCyclePhaseEndMs = acCyclePhaseStartMs = acCyclePhaseTotalMs = 0;
+    acCycleActive = false; _cycleScrubbing = false;
+    if (statusEl) statusEl.hidden = true;
+    if (trackEl)  trackEl.hidden  = true;
+    document.querySelectorAll('.clim-cycle-btn').forEach(b => b.classList.remove('resting'));
+    updateAcModeUI();   // cycle gone → toggle reflects the real AC mode again
+    return;
+  }
+  _cycleScrubbing = false;
+  acCyclePhaseStartMs = start;
+  acCyclePhaseEndMs   = end;
+  acCyclePhaseTotalMs = Math.max(1000, end - start);
+  acCycleActive = true;
+  const blowing = phase === 'cool';
+  if (statusEl) { statusEl.hidden = false; statusEl.classList.toggle('blowing', blowing); }
+  if (trackEl)  trackEl.hidden = false;
+  if (phaseEl)  phaseEl.textContent = blowing ? 'Cooling' : 'Resting';
+  // Selected button pulses: full amber while cooling, dimmed/outlined while resting.
+  document.querySelectorAll('.clim-cycle-btn.active').forEach(b => b.classList.toggle('resting', !blowing));
+  updateAcModeUI();   // keep the Cool/Off toggle on "Cool" for the whole cycle
+  const tick = () => {
+    const now = Date.now();
+    const ms = acCyclePhaseEndMs - now;
+    if (remainEl) remainEl.textContent = ms > 0 ? fmtRemain(ms) : '0:00';
+    if (!_cycleScrubbing && ph) {
+      const prog = Math.max(0, Math.min(1, (now - acCyclePhaseStartMs) / acCyclePhaseTotalMs));
+      ph.value = Math.round(prog * 1000);
+      ph.style.setProperty('--pct', Math.round(prog * 100) + '%');
+    }
+    if (ms <= 0 && acCyclePhaseTick) { clearInterval(acCyclePhaseTick); acCyclePhaseTick = null; }
+  };
+  tick();
+  acCyclePhaseTick = setInterval(tick, 1000);
+}
+// Dragging the playhead: live-preview the scrubbed position, then on release tell the bridge
+// to fast-forward the current phase to that point (skip toward the next part of the cycle).
+function onCyclePlayheadInput(el) {
+  _cycleScrubbing = true;
+  const v = parseInt(el.value) || 0;                         // 0..1000
+  el.style.setProperty('--pct', (v / 10) + '%');
+  const remainEl = document.getElementById('climCycleRemain');
+  if (remainEl && acCyclePhaseTotalMs > 0) remainEl.textContent = fmtRemain(acCyclePhaseTotalMs * (1 - v / 1000));
+}
+function onCyclePlayheadChange(el) {
+  const frac = Math.max(0, Math.min(1, (parseInt(el.value) || 0) / 1000));
+  if (mqttClient?.connected) mqttClient.publish('van/ac/cycle-seek', String(frac));
+  // Optimistically slide the local phase window so the playhead keeps moving smoothly from
+  // the scrubbed point; the bridge confirms with a matching cycle-phase message.
+  if (acCyclePhaseTotalMs > 0) {
+    const remaining = acCyclePhaseTotalMs * (1 - frac);
+    acCyclePhaseEndMs   = Date.now() + remaining;
+    acCyclePhaseStartMs = acCyclePhaseEndMs - acCyclePhaseTotalMs;
+  }
+  _cycleScrubbing = false;
 }
 
 // ── Shore power ───────────────────────────────────
@@ -7310,6 +7440,8 @@ function connectMQTT() {
         updateClimTimerCountdown();
       } else if (key === 'cycle') {
         reflectAcCycleStatus(msgStr);
+      } else if (key === 'cycle-phase') {
+        updateAcCyclePhase(msgStr);
       }
       return;
     }
@@ -7496,12 +7628,33 @@ function connectMQTT() {
 connectMQTT();
 setTimeout(dismissSplash, 5000); // fallback: dismiss splash if MQTT never connects
 
+// ── Bottom-bar viewport fix (iOS standalone) ──────
+// iOS home-screen webviews collapse the layout viewport to the content height on first
+// paint, so a position:fixed;bottom:0 bar (.tab-bar / #drive-nav) renders ~content-height
+// up from the real screen bottom until the document first grows past the viewport — which
+// is exactly why tapping the tall "Controls" tab snapped it down. Force that same recompute
+// automatically: briefly make the page scrollable past the viewport, then revert (invisible,
+// since it's below the fold and we stay scrolled to top).
+function _settleBottomBars() {
+  const b = document.body;
+  if (!b) return;
+  b.style.minHeight = 'calc(100dvh + 60px)';
+  void b.offsetHeight;                 // synchronous reflow
+  requestAnimationFrame(() => {
+    window.scrollTo(0, 0);
+    b.style.minHeight = '';            // revert to the stylesheet's min-height
+  });
+}
+window.addEventListener('load', _settleBottomBars);
+window.addEventListener('pageshow', _settleBottomBars);   // standalone relaunch / bfcache restore
+
 // ── Splash ────────────────────────────────────────
 function dismissSplash() {
   const splash = document.getElementById('splash');
   if (!splash) return;
   splash.classList.add('hiding');
   splash.addEventListener('transitionend', () => splash.remove(), { once: true });
+  _settleBottomBars();   // real content is now visible — pin the bottom bar to the bottom
 }
 
 // ── Pull to refresh ───────────────────────────────
@@ -7605,6 +7758,7 @@ renderLights();
 renderScenes();
 watchGPS();
 renderExploreRange();
+_settleBottomBars();   // iOS standalone: pin the fixed bottom bar to the real screen bottom on first paint
 </script>
 </body>
 </html>

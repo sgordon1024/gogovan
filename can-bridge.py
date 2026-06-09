@@ -73,21 +73,26 @@ def _fire_ac_timer():
 # cycling while the phone is asleep.
 ac_cycle_timer = None
 ac_cycle_spec  = None   # (on_min, off_min) or None
+ac_cycle_phase = None   # "on" / "off" — the phase currently running
+ac_cycle_total = 0      # total seconds of the current phase (for scrub/seek + playhead)
 ac_cycle_lock  = threading.Lock()
 
 def _clear_ac_cycle(publish_status=True):
-    global ac_cycle_timer, ac_cycle_spec
+    global ac_cycle_timer, ac_cycle_spec, ac_cycle_phase, ac_cycle_total
     with ac_cycle_lock:
         if ac_cycle_timer is not None:
             ac_cycle_timer.cancel()
             ac_cycle_timer = None
         ac_cycle_spec = None
+        ac_cycle_phase = None
+        ac_cycle_total = 0
     if publish_status and mqtt_client_ref:
         mqtt_client_ref.publish("van/status/ac/cycle", "", retain=True)
+        mqtt_client_ref.publish("van/status/ac/cycle-phase", "", retain=True)
 
 def _ac_cycle_step(phase):
     """Run one phase of the duty cycle, then schedule the next."""
-    global ac_cycle_timer
+    global ac_cycle_timer, ac_cycle_phase, ac_cycle_total
     with ac_cycle_lock:
         spec = ac_cycle_spec
     if spec is None:
@@ -99,18 +104,26 @@ def _ac_cycle_step(phase):
         if mqtt_client_ref:
             mqtt_client_ref.publish("van/status/ac/mode", "cool", retain=True)
             mqtt_client_ref.publish("van/status/ac/fan", "low", retain=True)
-        nxt, secs = "off", on_min * 60
+        nxt, secs, label = "off", on_min * 60, "cool"
     else:
         send_ac("00C0FFFFFFFFFFFF")  # System OFF
         if mqtt_client_ref:
             mqtt_client_ref.publish("van/status/ac/mode", "off", retain=True)
-        nxt, secs = "on", off_min * 60
+        nxt, secs, label = "on", off_min * 60, "off"
     with ac_cycle_lock:
         if ac_cycle_spec is None:
             return
+        ac_cycle_phase = phase
+        ac_cycle_total = secs
         ac_cycle_timer = threading.Timer(secs, _ac_cycle_step, args=(nxt,))
         ac_cycle_timer.daemon = True
         ac_cycle_timer.start()
+    # Tell the dashboard the current phase ("cool" = blowing, "off" = resting), when it
+    # started and ends (epoch ms) — drives the playhead progress + countdown + icon.
+    if mqtt_client_ref:
+        now = time.time()
+        start_ms, end_ms = int(now * 1000), int((now + secs) * 1000)
+        mqtt_client_ref.publish("van/status/ac/cycle-phase", f"{label}/{start_ms}/{end_ms}", retain=True)
 
 def _start_ac_cycle(on_min, off_min):
     global ac_cycle_spec
@@ -121,6 +134,42 @@ def _start_ac_cycle(on_min, off_min):
         mqtt_client_ref.publish("van/status/ac/cycle", f"{on_min}/{off_min}", retain=True)
     print(f"AC cycle started: {on_min} min on / {off_min} min off")
     _ac_cycle_step("on")   # begin with an on-phase immediately
+
+def _seek_ac_cycle(frac):
+    """Scrub the current phase to progress fraction `frac` (0..1). Forward scrubs
+    shorten the phase (skip toward the next part); at ~the end it flips to the next
+    phase immediately. Re-actuates nothing — same phase, just a new end time."""
+    global ac_cycle_timer
+    with ac_cycle_lock:
+        spec, phase, total = ac_cycle_spec, ac_cycle_phase, ac_cycle_total
+    if spec is None or phase is None or total <= 0:
+        return
+    frac = max(0.0, min(1.0, frac))
+    remaining = total * (1.0 - frac)
+    nxt = "off" if phase == "on" else "on"
+    if remaining <= 1.0:
+        with ac_cycle_lock:
+            if ac_cycle_timer is not None:
+                ac_cycle_timer.cancel(); ac_cycle_timer = None
+        print(f"AC cycle: scrubbed to end of {phase}-phase → next phase now")
+        _ac_cycle_step(nxt)   # flip immediately (actuates the next phase)
+        return
+    with ac_cycle_lock:
+        if ac_cycle_spec is None:
+            return
+        if ac_cycle_timer is not None:
+            ac_cycle_timer.cancel()
+        ac_cycle_timer = threading.Timer(remaining, _ac_cycle_step, args=(nxt,))
+        ac_cycle_timer.daemon = True
+        ac_cycle_timer.start()
+    print(f"AC cycle: scrubbed {phase}-phase to {int(frac*100)}% ({int(remaining)}s left)")
+    if mqtt_client_ref:
+        now = time.time()
+        # Keep the bar width = the phase total; only the playhead position moves.
+        end_ms   = int((now + remaining) * 1000)
+        start_ms = int((now + remaining - total) * 1000)
+        label    = "cool" if phase == "on" else "off"
+        mqtt_client_ref.publish("van/status/ac/cycle-phase", f"{label}/{start_ms}/{end_ms}", retain=True)
 
 def cansend(data):
     frame = f"19FEDB{SA}#{data}"
@@ -227,6 +276,13 @@ def handle_ac(key, payload):
                 _start_ac_cycle(on_min, off_min)
             else:
                 print(f"AC cycle: bad spec '{payload}' — ignored")
+    elif key == "cycle-seek":
+        # payload = target progress fraction (0..1) of the current phase — scrub the
+        # playhead to skip toward the next part of the cycle.
+        try:
+            _seek_ac_cycle(float(payload))
+        except ValueError:
+            pass
 
 def get_current_upstream():
     """Detect which upstream Wi-Fi connection wlan0 is using via nmcli."""
@@ -388,6 +444,7 @@ def on_connect(client, userdata, flags, rc):
     # the dashboard doesn't show a countdown or active cycle that will never fire.
     client.publish("van/status/ac/timer", "", retain=True)
     client.publish("van/status/ac/cycle", "", retain=True)
+    client.publish("van/status/ac/cycle-phase", "", retain=True)
     subprocess.run(["cansend", CAN_IFACE, f"18EEFF{SA}#0000000000008000"])
 
     t = threading.Thread(target=can_listener, args=(client,), daemon=True)
