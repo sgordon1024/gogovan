@@ -10,6 +10,7 @@ MQTT_HOST = "localhost"
 MQTT_PORT = 1883
 CAN_IFACE = "can1"
 SA = "44"
+PORTAL_ID = "c0619ab5dcfb"
 
 LIGHTS = {
     "kitchen":  "16",
@@ -482,6 +483,19 @@ def on_message(client, userdata, msg):
     elif category == "ac":
         print(f"ac/{name} -> {payload}")
         handle_ac(name, payload)
+
+def _cerbo_keepalive():
+    """Periodically publish Victron keepalive so Cerbo keeps transmitting telemetry even when no browser is open."""
+    time.sleep(10)
+    while True:
+        try:
+            if mqtt_client_ref and mqtt_client_ref.is_connected():
+                mqtt_client_ref.publish(f"R/{PORTAL_ID}/keepalive", "")
+        except Exception:
+            pass
+        time.sleep(30)
+
+threading.Thread(target=_cerbo_keepalive, daemon=True, name="cerbo-keepalive").start()
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
 client.on_connect = on_connect
