@@ -5402,6 +5402,17 @@ function updateAltColumn() {
   }
 }
 
+// Victron publishes battery temperature in °C → show °F in the drive-mode alt strip.
+let lastBattTempC = null;
+function updateBattTemp(c) {
+  if (c == null || isNaN(c)) return;
+  lastBattTempC = c;
+  const el = document.getElementById('battTempF');
+  if (!el) return;
+  const f = Math.round(c * 9 / 5 + 32);
+  el.textContent = f + '°F';
+}
+
 function refreshModeChip() {
   const chip  = document.getElementById('modeChip');
   const icon  = document.getElementById('modeChipIcon');
@@ -6329,6 +6340,9 @@ function switchNetwork(target) {
   btnS.classList.add('switching');
   document.getElementById('netStatusLabel').textContent = 'Switching…';
   document.getElementById('netStatusSub').textContent   = target === 'starlink' ? 'May take ~1 minute' : 'Please wait…';
+  // Picking a carrier by hand means "stay here" — disable auto-failover so the
+  // bridge doesn't re-switch us 30 min later and drop the connection.
+  mqttClient.publish('van/starlink/auto', 'off');
   mqttClient.publish('van/network/upstream', target);
 }
 
@@ -7675,6 +7689,7 @@ function connectMQTT() {
     if (topic === `${P}/battery/1/TimeToGo`) { updateTTE(val); return; }
     if (val == null) return;
     if      (topic === `${P}/system/0/Dc/Battery/Power`) updatePower(val);
+    else if (topic === `${P}/system/0/Dc/Battery/Temperature`) updateBattTemp(val);
     else if (topic.includes('/solarcharger/') && topic.endsWith('/Yield/Power')) updateSolar(val);
     else if (topic === `${P}/vebus/276/Mode`) {
       inverterMode = val;

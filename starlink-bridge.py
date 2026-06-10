@@ -95,7 +95,7 @@ MANUAL_BAD_MBPS          = 2.0       # a manual speed test below this (or an err
 # ── Module state ─────────────────────────────────────────────────────────────
 state                   = "unknown"  # see States above
 starlink_plug           = None       # "on" / "off" / None(unknown)
-auto_mode               = True       # auto failover armed (persisted to AUTO_FILE)
+auto_mode               = False      # auto failover armed (persisted to AUTO_FILE); default OFF
 min_speed               = DEFAULT_MIN_SPEED
 tmobile_signal          = -1
 tmobile_ssid            = ""
@@ -129,9 +129,9 @@ def save_threshold(val: int):
 
 def load_auto() -> bool:
     try:
-        return open(AUTO_FILE).read().strip() != "off"
+        return open(AUTO_FILE).read().strip() == "on"
     except Exception:
-        return True   # default ON
+        return False  # default OFF — manual carrier switching only
 
 def save_auto(on: bool):
     try:
