@@ -88,7 +88,7 @@ DEFAULT_MIN_SPEED       = 5         # min T-Mobile download (Mbps) to prefer it 
 MAX_MIN_SPEED           = 50        # slider/clamp ceiling for the min-speed threshold (Mbps)
 WARMUP_MAX_SECS          = 180       # max wait for Starlink dish to boot
 WARMUP_POLL_SECS         = 10        # seconds between SSID scans during warmup
-ROUTING_TIMEOUT          = 25        # seconds for an nmcli 'up' to succeed
+ROUTING_TIMEOUT          = 60        # seconds for an nmcli 'up' to succeed
 MANUAL_OVERRIDE_SECS     = 30 * 60   # manual switch suspends auto this long
 MANUAL_BAD_MBPS          = 2.0       # a manual speed test below this (or an error) triggers a source switch
 
@@ -513,18 +513,19 @@ def switch_to_tmobile(reason: str, power_off_dish: bool = True, min_mbps: float 
         time.sleep(4)
         if internet_up():
             # Speed gate (recovery paths only): T-Mobile is reachable, but is it
-            # fast enough to prefer over Starlink? A valid measurement below the
-            # target reverts to Starlink; an inconclusive one keeps T-Mobile.
+            # fast enough to prefer over Starlink? A failed (-1) or slow measurement
+            # reverts to Starlink — DNS failure means T-Mobile has no real internet
+            # even if ping passes (ICMP to raw IPs bypasses DNS).
             if min_mbps > 0:
                 mbps = measure_download_mbps()
-                if 0 <= mbps < min_mbps:
-                    print(f"T-Mobile only {mbps} Mbps (< {min_mbps} required) — staying on Starlink")
+                if mbps < min_mbps:
+                    reason = f"measurement failed (DNS/TCP down)" if mbps < 0 else f"only {mbps} Mbps (< {min_mbps} required)"
+                    print(f"T-Mobile {reason} — staying on Starlink")
                     nmcli_up(STARLINK_CONN)
                     set_state("starlink")
                     pub("van/status/network/upstream", "starlink")
                     return False
-                print(f"T-Mobile speed {mbps} Mbps (>= {min_mbps}) — switching" if mbps >= 0
-                      else "T-Mobile speed check inconclusive — keeping T-Mobile (ping OK)")
+                print(f"T-Mobile speed {mbps} Mbps (>= {min_mbps}) — switching")
             set_state("tmobile")
             pub("van/status/network/upstream", "tmobile")
             pub("van/status/starlink/quality", "unknown")
