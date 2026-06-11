@@ -3198,7 +3198,7 @@ safe-buffer/index.js:
     </button>
   </nav>
 
-  <!-- Wakespeed / battery temp strip — drive mode only, fixed above drive nav -->
+  <!-- Second-alternator charge strip — drive mode only, fixed above drive nav -->
   <div id="drive-alt-strip">
     <div class="alt-cell">
       <div class="alt-cell-label">Alt W</div>
@@ -3206,14 +3206,14 @@ safe-buffer/index.js:
       <div class="alt-cell-sub">Output</div>
     </div>
     <div class="alt-cell">
-      <div class="alt-cell-label">Alt Mode</div>
-      <div class="alt-cell-value" id="altMode">—</div>
-      <div class="alt-cell-sub">Wakespeed</div>
+      <div class="alt-cell-label">Alt A</div>
+      <div class="alt-cell-value" id="altStripA">—</div>
+      <div class="alt-cell-sub">Current</div>
     </div>
     <div class="alt-cell">
-      <div class="alt-cell-label">Alt Temp</div>
-      <div class="alt-cell-value" id="altTempF">—</div>
-      <div class="alt-cell-sub">Alternator</div>
+      <div class="alt-cell-label">Alt V</div>
+      <div class="alt-cell-value" id="altStripV">—</div>
+      <div class="alt-cell-sub">Voltage</div>
     </div>
     <div class="alt-cell">
       <div class="alt-cell-label">Batt Temp</div>
@@ -5389,28 +5389,43 @@ function updateAltColumn() {
     el.style.color = altW > 50 ? 'var(--green)' : 'var(--txt2)';
     cell.style.display = '';
     strip.className = 'power-strip-4';
-
-    // Also update the drive-mode alt strip
-    const stripW = document.getElementById('altStripW');
-    if (stripW) {
-      stripW.textContent = altW + ' W';
-      stripW.style.color = altW > 50 ? 'var(--green)' : 'var(--txt2)';
-    }
+    // Note: the drive-mode alt strip's Alt W is driven by the real alternator
+    // service topic (updateAltPower), not this battery-minus-solar proxy.
   } else {
     cell.style.display = 'none';
     strip.className = 'power-strip-3';
   }
 }
 
-// Victron publishes battery temperature in °C → show °F in the drive-mode alt strip.
-let lastBattTempC = null;
+// ── Second-alternator charge strip (drive mode) ───
+// Victron alternator service (instance 0) reports the aux alternator that charges
+// the house bank: Dc/0/Power (W), Dc/0/Current (A), Dc/0/Voltage (V). No mode or
+// temperature is published on the bus, so the strip shows W / A / V / battery SOC.
+let altPowerW = null;
+function updateAltPower(w) {
+  if (w == null || isNaN(w)) return;
+  altPowerW = Math.round(w);
+  const el = document.getElementById('altStripW');
+  if (!el) return;
+  el.textContent = altPowerW + ' W';
+  el.style.color = altPowerW > 50 ? 'var(--green)' : 'var(--txt2)';
+}
+function updateAltCurrent(a) {
+  if (a == null || isNaN(a)) return;
+  const el = document.getElementById('altStripA');
+  if (el) el.textContent = a.toFixed(1) + ' A';
+}
+function updateAltVoltage(v) {
+  if (v == null || isNaN(v)) return;
+  const el = document.getElementById('altStripV');
+  if (el) el.textContent = v.toFixed(1) + ' V';
+}
+// Victron publishes battery temperature in °C → show °F in the alt strip.
+// (No alternator temperature sensor exists on the bus.)
 function updateBattTemp(c) {
   if (c == null || isNaN(c)) return;
-  lastBattTempC = c;
   const el = document.getElementById('battTempF');
-  if (!el) return;
-  const f = Math.round(c * 9 / 5 + 32);
-  el.textContent = f + '°F';
+  if (el) el.textContent = Math.round(c * 9 / 5 + 32) + '°F';
 }
 
 function refreshModeChip() {
@@ -7689,6 +7704,9 @@ function connectMQTT() {
     if (topic === `${P}/battery/1/TimeToGo`) { updateTTE(val); return; }
     if (val == null) return;
     if      (topic === `${P}/system/0/Dc/Battery/Power`) updatePower(val);
+    else if (topic === `${P}/alternator/0/Dc/0/Power`)   updateAltPower(val);
+    else if (topic === `${P}/alternator/0/Dc/0/Current`) updateAltCurrent(val);
+    else if (topic === `${P}/alternator/0/Dc/0/Voltage`) updateAltVoltage(val);
     else if (topic === `${P}/system/0/Dc/Battery/Temperature`) updateBattTemp(val);
     else if (topic.includes('/solarcharger/') && topic.endsWith('/Yield/Power')) updateSolar(val);
     else if (topic === `${P}/vebus/276/Mode`) {
