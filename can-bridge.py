@@ -178,6 +178,13 @@ def cansend(data):
     subprocess.run(["cansend", CAN_IFACE, frame])
 
 def send_can(instance, payload):
+    # The water pump (inst 2C) is a switch-type output that ignores the "ramp up" ON
+    # command (cmd 05) — confirmed via candump it only latches on via an explicit
+    # set-level. Translate its "on" to a 100% set-level so it reliably turns back on
+    # (notably after drive mode, which was leaving the pump off). "off" (ramp down)
+    # works fine, so leave it alone.
+    if instance == LIGHTS["pump"] and payload == "on":
+        payload = "100"
     if payload in ("off", "0"):
         cansend(f"{instance}FF0006FF00FFFF")
     elif payload == "on":
