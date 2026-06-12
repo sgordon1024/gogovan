@@ -5646,7 +5646,7 @@ function openPOIDirections(e) {
   e.stopPropagation();
   if (!currentPoiResult) return;
   const { lat, lng } = currentPoiResult;
-  window.open(`https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`, '_blank');
+  window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`, '_blank');
 }
 
 function startRestStopUpdates() {
