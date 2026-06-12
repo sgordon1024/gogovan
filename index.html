@@ -6151,10 +6151,70 @@ function showLocalFact() {
 
 let _factAudio = null;       // <audio> element used so playback routes to CarPlay
 let _factAudioActive = false;
+let _audioUnlocked = false;
+
+// iOS only lets <audio> and speechSynthesis play after a real user gesture, and it
+// only routes web audio to CarPlay when the page owns an active media session. Prime
+// both engines on the first touch so later playback (including the async TTS-failure
+// fallback to SpeechSynthesis) isn't silently blocked.
+function _ensureFactAudio() {
+  if (!_factAudio) {
+    _factAudio = new Audio();
+    _factAudio.setAttribute('playsinline', '');
+    // Google's translate_tts returns 404 for any request carrying a Referer header,
+    // which a browser <audio> normally sends — so suppress it or playback never starts.
+    _factAudio.setAttribute('referrerpolicy', 'no-referrer');
+    _factAudio.referrerPolicy = 'no-referrer';
+    _factAudio.preload = 'auto';
+  }
+  return _factAudio;
+}
+function _unlockAudioOnce() {
+  if (_audioUnlocked) return;
+  _audioUnlocked = true;
+  // Silent 0.05s WAV — playing it inside the gesture unlocks the element for later programmatic play().
+  const SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+  try {
+    const a = _ensureFactAudio();
+    a.src = SILENT;
+    const p = a.play();
+    if (p && p.catch) p.catch(() => {});
+  } catch (e) {}
+  try {
+    if (window.speechSynthesis) {
+      const u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0;
+      window.speechSynthesis.speak(u);
+    }
+  } catch (e) {}
+}
+window.addEventListener('pointerdown', _unlockAudioOnce, { capture: true });
+window.addEventListener('touchstart', _unlockAudioOnce, { capture: true });
+
+// Tell iOS this is Now-Playing media so it grabs the CarPlay route and shows controls.
+function _factMediaSession(playing) {
+  if (!('mediaSession' in navigator)) return;
+  try {
+    if (playing) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: 'Fun Fact',
+        artist: explorePlace || 'GoGoVan',
+        album: 'Local Facts'
+      });
+      navigator.mediaSession.playbackState = 'playing';
+      navigator.mediaSession.setActionHandler('nexttrack', () => { _cancelUtter(); _factAdvance(); speakLocalFact(); });
+      navigator.mediaSession.setActionHandler('pause', () => { _cancelUtter(); });
+      navigator.mediaSession.setActionHandler('play',  () => { speakLocalFact(); });
+    } else {
+      navigator.mediaSession.playbackState = 'none';
+    }
+  } catch (e) {}
+}
 
 function _factSpeakingUI() {
   const hintEl = document.getElementById('explore-facts-hint');
   if (hintEl) { hintEl.textContent = '▶ reading…'; hintEl.classList.add('speaking'); }
+  _factMediaSession(true);
 }
 function _factAdvance() {
   localFactIdx = (localFactIdx + 1) % localFacts.length;
@@ -6171,6 +6231,7 @@ function _cancelUtter() {
   if (window.speechSynthesis) window.speechSynthesis.cancel();
   if (_factAudio) { try { _factAudio.onended = null; _factAudio.onerror = null; _factAudio.onplaying = null; _factAudio.pause(); } catch(e){} }
   _factAudioActive = false;
+  _factMediaSession(false);
 }
 
 function tapLocalFact() {
@@ -6210,22 +6271,31 @@ function speakLocalFact() {
   // whereas SpeechSynthesis stays on the phone. Fall back to SpeechSynthesis if the
   // audio source fails (e.g. no internet).
   const chunks = chunkFactText(text, 180);
-  if (!_factAudio) { _factAudio = new Audio(); _factAudio.setAttribute('playsinline', ''); }
-  const audio = _factAudio;
-  let idx = 0, started = false;
+  const audio = _ensureFactAudio();
+  let idx = 0, started = false, stallTimer = null;
   _factAudioActive = true;
 
-  const finish = () => { audio.onended = audio.onerror = audio.onplaying = null; _factAudioActive = false; };
+  const finish = () => { clearTimeout(stallTimer); audio.onended = audio.onerror = audio.onplaying = null; _factAudioActive = false; };
+  const fail = () => { if (started) return; finish(); speakFactViaSynthesis(text); };
   const playNext = () => {
     if (!_factAudioActive) return;
     if (idx >= chunks.length) { finish(); _factAdvance(); return; }
     const c = chunks[idx++];
-    audio.src = `https://translate.google.com/translate_tts?ie=UTF-8&tl=en&client=tw-ob&q=${encodeURIComponent(c)}`;
-    audio.onplaying = () => { started = true; _factSpeakingUI(); };
+    // On HTTPS, go through the Pi's nginx /tts proxy — it strips the Referer header
+    // server-side (Google translate_tts 404s on any Referer). On the local HTTP path
+    // there's no proxy, so hit Google directly and rely on referrerpolicy=no-referrer.
+    const q = `ie=UTF-8&tl=en&client=tw-ob&q=${encodeURIComponent(c)}`;
+    audio.src = (location.protocol === 'https:')
+      ? `/tts?${q}`
+      : `https://translate.google.com/translate_tts?${q}`;
+    audio.onplaying = () => { started = true; clearTimeout(stallTimer); _factSpeakingUI(); };
     audio.onended   = playNext;
-    audio.onerror   = () => { if (!started) { finish(); speakFactViaSynthesis(text); } else { finish(); _factAdvance(); } };
+    audio.onerror   = () => { if (!started) fail(); else { finish(); _factAdvance(); } };
+    // If the TTS fetch stalls (flaky cell while driving), don't sit silent — fall back.
+    clearTimeout(stallTimer);
+    stallTimer = setTimeout(fail, 4000);
     const p = audio.play();
-    if (p && p.catch) p.catch(() => { if (!started) { finish(); speakFactViaSynthesis(text); } });
+    if (p && p.catch) p.catch(fail);
   };
   playNext();
 }
