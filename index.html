@@ -2934,25 +2934,15 @@ safe-buffer/index.js:
   <!-- TAB: INTERNET -->
   <div id="tab-internet" class="tab-panel" hidden>
     <span class="section-label section-label-solo">Internet</span>
-    <!-- Status card -->
-    <div class="card" style="margin-bottom:12px">
-      <div class="net-status-row">
-        <div class="net-status-icon" id="netStatusIcon"><svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg></div>
-        <div>
-          <div class="net-status-label" id="netStatusLabel">Detecting…</div>
-          <div class="net-status-sub" id="netStatusSub">Checking upstream</div>
-        </div>
-      </div>
-    </div>
     <!-- Network selector -->
     <div class="net-selector">
       <button class="net-btn" id="netBtnTmobile" onclick="switchNetwork('tmobile')">
-        <div class="net-btn-icon"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg></div>
+        <div class="net-btn-icon"><span style="font-size:30px;font-weight:800;line-height:1;">T</span></div>
         <div class="net-btn-name">T-Mobile</div>
         <div class="net-btn-sub">Primary</div>
       </button>
       <button class="net-btn" id="netBtnStarlink" onclick="switchNetwork('starlink')">
-        <div class="net-btn-icon"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+        <div class="net-btn-icon"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12,2 14.9,8.6 22,9.2 16.6,13.9 18.2,21 12,17.3 5.8,21 7.4,13.9 2,9.2 9.1,8.6"/></svg></div>
         <div class="net-btn-name">Starlink</div>
         <div class="net-btn-sub">Fallback</div>
       </button>
@@ -3000,50 +2990,6 @@ safe-buffer/index.js:
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/></svg>
       Coverage Map
     </button>
-
-    <!-- Starlink power section -->
-    <span class="section-label section-label-solo">Starlink</span>
-    <div class="card" style="margin-bottom:12px">
-      <div class="starlink-power-row">
-        <div class="starlink-power-info">
-          <div class="starlink-power-label" id="starlinkPowerLabel">Unknown</div>
-          <div class="starlink-power-sub" id="starlinkPowerSub">Plug not yet configured</div>
-        </div>
-        <button class="starlink-toggle" id="starlinkToggleBtn" onclick="toggleStarlink()">
-          <div class="starlink-toggle-knob"></div>
-        </button>
-      </div>
-    </div>
-    <!-- T-Mobile signal + auto row -->
-    <div class="card">
-      <div class="starlink-auto-row">
-        <div class="starlink-signal-wrap">
-          <div class="starlink-signal-label">T-Mobile</div>
-          <div class="starlink-signal-val" id="starlinkSignalVal">—</div>
-        </div>
-        <div class="starlink-auto-toggle-wrap">
-          <div class="starlink-auto-label">Auto-switch</div>
-          <button class="starlink-auto-btn" id="starlinkAutoBtn" onclick="toggleStarlinkAuto()">
-            <div class="starlink-auto-knob"></div>
-          </button>
-        </div>
-      </div>
-      <!-- Threshold slider — only active when auto is on -->
-      <div class="starlink-thresh-row disabled" id="starlinkThreshRow">
-        <span class="thresh-label">Min T-Mobile speed</span>
-        <div class="thresh-slider-wrap">
-          <span class="thresh-end-label">0</span>
-          <input type="range" class="dim-slider" id="threshSlider"
-            min="0" max="50" value="5" style="--pct:10%"
-            oninput="onThreshInput(this)" onchange="onThreshChange(this)"
-            aria-label="Minimum T-Mobile download speed in Mbps">
-          <span class="thresh-end-label">50</span>
-        </div>
-        <span class="thresh-val-label" id="threshVal">5</span><span style="font-size:11px;color:var(--txt2);margin-left:2px">Mbps</span>
-      </div>
-      <div class="net-hint" id="starlinkAutoHint" style="padding:0 16px 14px;text-align:left">Auto-switch decides by real download speed. While on Starlink, the van switches back to T-Mobile only when T-Mobile actually delivers at least <span id="threshHintVal">5</span> Mbps (0 = switch back whenever T-Mobile has any working internet).</div>
-      <div class="net-hint" id="starlinkManualHint" style="padding:0 16px 14px;text-align:left" hidden>Auto-switch off — the power button controls the dish directly. No automatic switching or loops.</div>
-    </div>
   </div>
 
   <!-- SPEED HISTORY OVERLAY -->
@@ -5183,6 +5129,7 @@ function enterDrivingMode(manual = false) {
   refreshModeChip();
   updateDriveModeToggle();
   updateAltColumn();
+  _settleBottomBars();   // drive-nav is fixed;bottom:0 — pin it to the real screen bottom
   startRestStopUpdates();
   startExploreUpdates();
 
@@ -5221,6 +5168,7 @@ function exitDrivingMode() {
   refreshModeChip();
   updateDriveModeToggle();
   updateAltColumn();
+  _settleBottomBars();   // re-pin the regular tab bar after leaving the drive layout
 
   // Always restore the water pump when drive mode ends (parked).
   restorePump();
@@ -5931,6 +5879,7 @@ async function fetchRestStopState(lat, lng) {
 let exploreUpdateInterval = null;
 let lastExploreLat = null;
 let lastExploreLng = null;
+let exploreLoadOk  = false;  // did the last explore fetch actually succeed? (retry if not)
 let localFacts     = [];
 let localFactIdx   = 0;
 let explorePlace   = '';
@@ -5942,7 +5891,9 @@ function startExploreUpdates() {
   exploreUpdateInterval = setInterval(() => {
     if (lastGPSLat && lastGPSLng) {
       const moved = lastExploreLat == null || haversineM(lastExploreLat, lastExploreLng, lastGPSLat, lastGPSLng) > 5000;
-      if (moved) refreshExploreData();
+      // Retry if we moved 5km+ OR the last load failed (e.g. a brief internet drop) —
+      // otherwise a single failed fetch left Explore blank until 5km of driving.
+      if (moved || !exploreLoadOk) refreshExploreData();
     }
   }, 30000);
 }
@@ -6106,6 +6057,7 @@ async function fetchLocalFacts(lat, lng) {
 
     if (!allFacts.length) {
       if (textEl) textEl.textContent = 'No local facts found for this area.';
+      exploreLoadOk = true;  // reached the API fine — just a quiet area, don't hammer retries
       return;
     }
 
@@ -6119,8 +6071,10 @@ async function fetchLocalFacts(lat, lng) {
     localFactIdx = 0;
     explorePlace = usedPlace;
     showLocalFact();
+    exploreLoadOk = true;
   } catch(e) {
     if (textEl) textEl.textContent = 'Local facts unavailable.';
+    exploreLoadOk = false;  // network/API failure — interval will retry every 30s
   }
 }
 
@@ -6354,39 +6308,19 @@ let currentUpstream = null;
 
 function updateNetworkUI(upstream) {
   currentUpstream = upstream;
-  const label = document.getElementById('netStatusLabel');
-  const sub   = document.getElementById('netStatusSub');
-  const icon  = document.getElementById('netStatusIcon');
-  const btnT  = document.getElementById('netBtnTmobile');
-  const btnS  = document.getElementById('netBtnStarlink');
-  btnT.classList.remove('active', 'switching');
-  btnS.classList.remove('active', 'switching');
-  if (upstream === 'tmobile') {
-    label.textContent = 'T-Mobile';
-    sub.textContent   = 'Primary upstream active';
-    icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg>';
-    btnT.classList.add('active');
-  } else if (upstream === 'starlink') {
-    label.textContent = 'Starlink';
-    sub.textContent   = 'Fallback upstream active';
-    icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>';
-    btnS.classList.add('active');
-  } else {
-    label.textContent = 'Unknown';
-    sub.textContent   = 'Detecting upstream…';
-    icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>';
-  }
+  const btnT = document.getElementById('netBtnTmobile');
+  const btnS = document.getElementById('netBtnStarlink');
+  btnT?.classList.remove('active', 'switching');
+  btnS?.classList.remove('active', 'switching');
+  if (upstream === 'tmobile')       btnT?.classList.add('active');
+  else if (upstream === 'starlink') btnS?.classList.add('active');
 }
 
 function switchNetwork(target) {
   if (target === currentUpstream) return;
   if (!mqttClient?.connected) return;
-  const btnT = document.getElementById('netBtnTmobile');
-  const btnS = document.getElementById('netBtnStarlink');
-  btnT.classList.add('switching');
-  btnS.classList.add('switching');
-  document.getElementById('netStatusLabel').textContent = 'Switching…';
-  document.getElementById('netStatusSub').textContent   = target === 'starlink' ? 'May take ~1 minute' : 'Please wait…';
+  document.getElementById('netBtnTmobile')?.classList.add('switching');
+  document.getElementById('netBtnStarlink')?.classList.add('switching');
   // Picking a carrier by hand means "stay here" — disable auto-failover so the
   // bridge doesn't re-switch us 30 min later and drop the connection.
   mqttClient.publish('van/starlink/auto', 'off');
@@ -7118,11 +7052,12 @@ function closeObdEverything() {
 function updateStarlinkPower(state) {
   starlinkOn = (state === 'on');
   const btn   = document.getElementById('starlinkToggleBtn');
+  if (!btn) return;  // Starlink power UI removed — state tracked, nothing to render
   const label = document.getElementById('starlinkPowerLabel');
   const sub   = document.getElementById('starlinkPowerSub');
   btn.classList.toggle('on', starlinkOn);
-  label.textContent = starlinkOn ? 'Starlink On' : 'Starlink Off';
-  sub.textContent   = starlinkSubLabel();
+  if (label) label.textContent = starlinkOn ? 'Starlink On' : 'Starlink Off';
+  if (sub) sub.textContent = starlinkSubLabel();
 }
 
 // Live T-Mobile signal: used only to know whether it's in range (-1 = out of range).
@@ -7166,11 +7101,10 @@ function updateTmobileSignal(sig) {
 
 function updateStarlinkAuto(on) {
   starlinkAuto = on;
-  document.getElementById('starlinkAutoBtn').classList.toggle('on', on);
-  document.getElementById('starlinkThreshRow').classList.toggle('disabled', !on);
-  document.getElementById('starlinkAutoHint').hidden   = !on;
-  document.getElementById('starlinkManualHint').hidden = on;
-  // Re-render power sub-label so it reflects manual vs auto mode
+  document.getElementById('starlinkAutoBtn')?.classList.toggle('on', on);
+  document.getElementById('starlinkThreshRow')?.classList.toggle('disabled', !on);
+  const ah = document.getElementById('starlinkAutoHint');   if (ah) ah.hidden = !on;
+  const mh = document.getElementById('starlinkManualHint'); if (mh) mh.hidden = on;
   const sub = document.getElementById('starlinkPowerSub');
   if (sub) sub.textContent = starlinkSubLabel();
 }
@@ -7183,16 +7117,16 @@ function updateStarlinkThreshold(val) {
     const max = parseInt(el.max) || 50;        // fill % is value/range, NOT the raw value
     el.style.setProperty('--pct', Math.round(val / max * 100) + '%');
   }
-  document.getElementById('threshVal').textContent = val;
-  document.getElementById('threshHintVal').textContent = val;
+  const tv = document.getElementById('threshVal');     if (tv) tv.textContent = val;
+  const thv = document.getElementById('threshHintVal'); if (thv) thv.textContent = val;
 }
 
 function onThreshInput(el) {
   const val = parseInt(el.value);
   const max = parseInt(el.max) || 50;          // fill % is value/range, NOT the raw value
   el.style.setProperty('--pct', Math.round(val / max * 100) + '%');
-  document.getElementById('threshVal').textContent = val;
-  document.getElementById('threshHintVal').textContent = val;
+  const tv = document.getElementById('threshVal');     if (tv) tv.textContent = val;
+  const thv = document.getElementById('threshHintVal'); if (thv) thv.textContent = val;
 }
 
 function onThreshChange(el) {
@@ -7770,15 +7704,27 @@ setTimeout(dismissSplash, 5000); // fallback: dismiss splash if MQTT never conne
 function _settleBottomBars() {
   const b = document.body;
   if (!b) return;
+  // Force the page taller than the viewport, reflow, then nudge the scroll position.
+  // The scroll nudge is what makes iOS standalone recompute the layout viewport so
+  // position:fixed;bottom:0 bars snap to the REAL screen bottom (a content-height
+  // change alone — e.g. tapping a tab — is what used to trigger this by accident).
   b.style.minHeight = 'calc(100dvh + 60px)';
   void b.offsetHeight;                 // synchronous reflow
   requestAnimationFrame(() => {
-    window.scrollTo(0, 0);
-    b.style.minHeight = '';            // revert to the stylesheet's min-height
+    window.scrollTo(0, 1);
+    requestAnimationFrame(() => {
+      window.scrollTo(0, 0);
+      b.style.minHeight = '';          // revert to the stylesheet's min-height
+    });
   });
 }
 window.addEventListener('load', _settleBottomBars);
 window.addEventListener('pageshow', _settleBottomBars);   // standalone relaunch / bfcache restore
+// Layout can still be settling after 'load' (fonts, MQTT splash) — retry a couple times
+// so the bar reaches the bottom without the user having to tap a tab first.
+window.addEventListener('load', () => { setTimeout(_settleBottomBars, 120); setTimeout(_settleBottomBars, 500); });
+window.addEventListener('resize', _settleBottomBars);
+window.addEventListener('orientationchange', () => setTimeout(_settleBottomBars, 80));
 
 // ── Splash ────────────────────────────────────────
 function dismissSplash() {
