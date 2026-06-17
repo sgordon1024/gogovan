@@ -3788,6 +3788,7 @@ const LUCIDE_PATHS = {
   x:                `<path d="M18 6 6 18"/><path d="m6 6 12 12"/>`,
   'shopping-cart':  `<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>`,
   tent:             `<path d="M3.5 21 14 3"/><path d="M20.5 21 10 3"/><path d="M15.5 21 12 15l-3.5 6"/><path d="M2 21h20"/>`,
+  leaf:             `<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>`,
 };
 function lucideIcon(name, size = 16, sw = 2) {
   const p = LUCIDE_PATHS[name] || LUCIDE_PATHS.star;
@@ -5531,6 +5532,20 @@ out center;`,
 );
 out center;`,
     defaultName: 'BLM Site',
+  },
+  {
+    id: 'dispensary', label: 'Dispensary', icon: 'leaf',
+    emptyMsg: 'No dispensaries nearby',
+    radius: 80000,
+    query: (r, lat, lng) => `[out:json][timeout:12];
+(
+  node["shop"="cannabis"](around:${r},${lat},${lng});
+  way["shop"="cannabis"](around:${r},${lat},${lng});
+  node["shop"="weed"](around:${r},${lat},${lng});
+  way["shop"="weed"](around:${r},${lat},${lng});
+);
+out center;`,
+    defaultName: 'Dispensary',
   },
 ];
 
