@@ -1602,23 +1602,17 @@
 
     /* Power strip expands to fill all remaining card space so
        divider lines reach the very bottom of the card */
+    /* 2 columns, rows flow as needed. 1px gap over a border-colored background draws
+       clean grid lines for any tile count (4 parked-idle, 6 while driving). */
     body.driving #powerStrip {
       flex: 1;
       min-height: 0;
-      position: relative;
       grid-template-columns: 1fr 1fr !important;
-      grid-template-rows: 1fr 1fr;
+      grid-template-rows: none !important;
+      grid-auto-rows: 1fr;
       align-items: stretch;
-    }
-    body.driving #powerStrip::before {
-      content: '';
-      position: absolute;
-      left: 0; right: 0;
-      top: 50%;
-      height: 1px;
+      gap: 1px;
       background: var(--border);
-      pointer-events: none;
-      z-index: 1;
     }
 
     /* Center content within taller cells, scale text to fill space */
@@ -1627,19 +1621,20 @@
       align-items: center;
       text-align: center;
       padding: 0 clamp(8px,2vw,16px);
-      gap: 6px;
+      gap: 4px;
+      background: var(--surface);
     }
     body.driving .power-label {
-      font-size: clamp(16px,4vw,26px);
+      font-size: clamp(13px,3.2vw,20px);
       white-space: nowrap;
     }
     body.driving .power-value {
-      font-size: clamp(30px,7.5vw,54px) !important;
+      font-size: clamp(24px,6vw,42px) !important;
       letter-spacing: -1px;
       white-space: nowrap;
     }
     body.driving .power-sub {
-      font-size: clamp(13px,2.8vw,20px);
+      font-size: clamp(11px,2.4vw,16px);
       white-space: nowrap;
     }
 
@@ -1647,45 +1642,6 @@
     body.driving #drive-mode-card {
       flex: 0 0 auto;
     }
-
-    /* Wakespeed / battery temp strip — drive mode only, fixed above drive nav */
-    #drive-alt-strip { display: none; }
-    body.driving #drive-alt-strip {
-      display: grid;
-      grid-template-columns: 1fr;
-      position: fixed;
-      left: 0; right: 0;
-      bottom: calc(88px + env(safe-area-inset-bottom));
-      height: 68px;
-      z-index: 45;
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-    /* Push tab-power up to leave room for the alt strip */
-    body.driving #tab-power {
-      bottom: calc(156px + env(safe-area-inset-bottom));
-    }
-    .alt-cell {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 10px 8px;
-      gap: 2px;
-      position: relative;
-    }
-    .alt-cell:not(:last-child)::after {
-      content: '';
-      position: absolute;
-      right: 0; top: 20%; bottom: 20%;
-      width: 1px;
-      background: var(--border);
-    }
-    .alt-cell-label { font-size: 12px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; color: var(--txt2); }
-    .alt-cell-value { font-size: 18px; font-weight: 700; color: var(--txt); }
-    .alt-cell-sub   { font-size: 11px; color: var(--txt2); }
 
     body.driving #tab-internet {
       padding-left: 0;
@@ -1826,77 +1782,112 @@
       background: rgba(255,23,68,0.12);
     }
 
-    #engine-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+    /* ── Old-car needle gauges ─────────────────────── */
+    #engine-gauges {
       flex: 1;
       min-height: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: clamp(10px, 2.2vh, 22px);
+      padding: clamp(12px, 2.5vh, 22px) 18px;
     }
-    .engine-cell {
+    .gauge-top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .gauge-label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.9px;
+      text-transform: uppercase;
+      color: var(--txt2);
+    }
+    .gauge-val {
+      font-size: clamp(20px, 5vw, 26px);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.5px;
+      color: var(--txt);
+    }
+    .gauge-track {
+      position: relative;
+      height: 18px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      /* zone gradient set inline per gauge */
+    }
+    .gauge-ticks {
+      position: absolute;
+      inset: 0;
+      background-image: repeating-linear-gradient(90deg, rgba(0,0,0,0.28) 0 1px, transparent 1px 5%);
+      border-radius: 4px;
+      pointer-events: none;
+    }
+    .gauge-needle {
+      position: absolute;
+      top: -4px; bottom: -4px;
+      left: 0%;
+      width: 3px;
+      margin-left: -1.5px;
+      background: var(--txt);
+      border-radius: 2px;
+      box-shadow: 0 0 4px rgba(0,0,0,0.6);
+      transition: left 0.35s cubic-bezier(0.34, 1.4, 0.64, 1);
+    }
+    .gauge-needle::before {
+      content: '';
+      position: absolute;
+      top: -5px; left: 50%;
+      transform: translateX(-50%);
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 6px solid var(--txt);
+    }
+    .gauge-scale {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--txt2);
+      font-variant-numeric: tabular-nums;
+    }
+
+    #engine-readouts {
+      display: flex;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .engine-ro {
+      flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      padding: clamp(8px, 2vw, 16px);
-      gap: 6px;
+      gap: 4px;
+      padding: 11px 6px;
       border-right: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
     }
-    .engine-cell:nth-child(even) { border-right: none; }
-    .engine-cell:nth-child(3),
-    .engine-cell:nth-child(4) { border-bottom: none; }
-    .engine-value {
-      font-size: clamp(32px, 8vw, 54px);
-      font-weight: 200;
+    .engine-ro:last-child { border-right: none; }
+    .engine-ro-val {
+      font-size: clamp(20px, 5.5vw, 28px);
+      font-weight: 300;
       font-variant-numeric: tabular-nums;
-      letter-spacing: -1px;
+      letter-spacing: -0.5px;
       line-height: 1;
       color: var(--txt);
       transition: color 0.4s;
     }
-    #engine-rpm-cell .engine-value {
-      font-size: clamp(36px, 9vw, 64px);
-    }
-    .engine-label {
-      font-size: clamp(11px, 2.8vw, 15px);
+    .engine-ro-val.warn  { color: var(--amber); }
+    .engine-ro-val.alert { color: var(--red); }
+    .engine-ro-label {
+      font-size: 11px;
       font-weight: 700;
-      letter-spacing: 0.8px;
+      letter-spacing: 0.6px;
       text-transform: uppercase;
       color: var(--txt2);
-    }
-    .engine-value.warn  { color: var(--amber); }
-    .engine-value.alert { color: var(--red); }
-
-    #engine-throttle-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 16px;
-      border-top: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    #engine-throttle-row .engine-label { white-space: nowrap; }
-    #engine-throttle-bar {
-      flex: 1;
-      height: 8px;
-      background: rgba(255,255,255,0.1);
-      border-radius: 4px;
-      overflow: hidden;
-    }
-    #engine-throttle-fill {
-      height: 100%;
-      width: 0%;
-      background: var(--amber);
-      border-radius: 4px;
-      transition: width 0.4s ease-out;
-    }
-    #engine-throttle-val {
-      font-size: 14px;
-      font-weight: 600;
-      font-variant-numeric: tabular-nums;
-      color: var(--txt);
-      min-width: 36px;
-      text-align: right;
     }
 
     #engine-dtc-row {
@@ -2694,6 +2685,16 @@ safe-buffer/index.js:
           <div class="power-value" id="altW">— W</div>
           <div class="power-sub">Engine</div>
         </div>
+        <div class="power-cell" id="battTempCell" style="display:none">
+          <div class="power-label">Batt Temp</div>
+          <div class="power-value" id="powerBattTemp">—</div>
+          <div class="power-sub">Battery</div>
+        </div>
+        <div class="power-cell" id="elevCell" style="display:none">
+          <div class="power-label">Elevation</div>
+          <div class="power-value" id="powerElev">—</div>
+          <div class="power-sub">Above sea level</div>
+        </div>
         <div class="power-cell">
           <div class="power-label">Net Power</div>
           <div class="power-value" id="battA"><span class="skel">&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
@@ -3144,14 +3145,6 @@ safe-buffer/index.js:
     </button>
   </nav>
 
-  <!-- Battery temp strip — drive mode only, fixed above drive nav -->
-  <div id="drive-alt-strip">
-    <div class="alt-cell">
-      <div class="alt-cell-label">Batt Temp</div>
-      <div class="alt-cell-value" id="battTempF">—</div>
-      <div class="alt-cell-sub">Battery</div>
-    </div>
-  </div>
 
   <!-- Drive-mode nav — shown only while driving -->
   <nav id="drive-nav">
@@ -3230,36 +3223,49 @@ safe-buffer/index.js:
       <span id="engine-title">Engine</span>
       <span id="engine-status-pill">● Searching…</span>
     </div>
-    <div id="engine-grid">
-      <div class="engine-cell" id="engine-rpm-cell">
-        <div class="engine-value" id="engine-rpm">—</div>
-        <div class="engine-label">RPM</div>
+    <div id="engine-gauges">
+      <!-- Old-car needle gauges. Zone boundaries reflect the OM654 2.0L turbodiesel:
+           peak power ~3,800–4,200 rpm, redline ~4,500. Adjustable in GAUGES config. -->
+      <div class="gauge">
+        <div class="gauge-top"><span class="gauge-label">RPM</span><span class="gauge-val" id="g-rpm-val">—</span></div>
+        <div class="gauge-track" style="background:linear-gradient(90deg,var(--tog-off) 0 80%,var(--amber) 80% 90%,var(--red) 90% 100%)">
+          <div class="gauge-ticks"></div><div class="gauge-needle" id="g-rpm-needle"></div>
+        </div>
+        <div class="gauge-scale"><span>0</span><span>2.5k</span><span>5k</span></div>
       </div>
-      <div class="engine-cell" id="engine-fuel-cell">
-        <div class="engine-value" id="engine-fuel">—</div>
-        <div class="engine-label">Fuel</div>
+      <div class="gauge">
+        <div class="gauge-top"><span class="gauge-label">Accelerator</span><span class="gauge-val" id="g-accel-val">—</span></div>
+        <div class="gauge-track" style="background:linear-gradient(90deg,var(--tog-off) 0 80%,var(--amber) 80% 95%,var(--red) 95% 100%)">
+          <div class="gauge-ticks"></div><div class="gauge-needle" id="g-accel-needle"></div>
+        </div>
+        <div class="gauge-scale"><span>0</span><span>50</span><span>100%</span></div>
       </div>
-      <div class="engine-cell" id="engine-coolant-cell">
-        <div class="engine-value" id="engine-coolant">—</div>
-        <div class="engine-label">Coolant</div>
+      <div class="gauge">
+        <div class="gauge-top"><span class="gauge-label">Engine Load</span><span class="gauge-val" id="g-load-val">—</span></div>
+        <div class="gauge-track" style="background:linear-gradient(90deg,var(--tog-off) 0 75%,var(--amber) 75% 90%,var(--red) 90% 100%)">
+          <div class="gauge-ticks"></div><div class="gauge-needle" id="g-load-needle"></div>
+        </div>
+        <div class="gauge-scale"><span>0</span><span>50</span><span>100%</span></div>
       </div>
-      <div class="engine-cell" id="engine-voltage-cell">
-        <div class="engine-value" id="engine-voltage">—</div>
-        <div class="engine-label">Alternator</div>
+      <div class="gauge">
+        <div class="gauge-top"><span class="gauge-label">Fuel</span><span class="gauge-val" id="g-fuel-val">—</span></div>
+        <div class="gauge-track" style="background:linear-gradient(90deg,var(--red) 0 10%,var(--amber) 10% 25%,var(--tog-off) 25% 100%)">
+          <div class="gauge-ticks"></div><div class="gauge-needle" id="g-fuel-needle"></div>
+        </div>
+        <div class="gauge-scale"><span>E</span><span>½</span><span>F</span></div>
       </div>
-      <div class="engine-cell" id="engine-load-cell">
-        <div class="engine-value" id="engine-load">—</div>
-        <div class="engine-label">Engine Load</div>
-      </div>
-      <div class="engine-cell" id="engine-mpg-cell">
-        <div class="engine-value" id="engine-mpg">—</div>
-        <div class="engine-label">MPG</div>
+      <div class="gauge">
+        <div class="gauge-top"><span class="gauge-label">MPG</span><span class="gauge-val" id="g-mpg-val">—</span></div>
+        <div class="gauge-track" style="background:linear-gradient(90deg,var(--red) 0 40%,var(--amber) 40% 60%,var(--tog-off) 60% 100%)">
+          <div class="gauge-ticks"></div><div class="gauge-needle" id="g-mpg-needle"></div>
+        </div>
+        <div class="gauge-scale"><span>0</span><span>12</span><span>25</span></div>
       </div>
     </div>
-    <div id="engine-throttle-row">
-      <span class="engine-label">Accelerator</span>
-      <div id="engine-throttle-bar"><div id="engine-throttle-fill"></div></div>
-      <span id="engine-throttle-val">—</span>
+    <div id="engine-readouts">
+      <div class="engine-ro"><span class="engine-ro-val" id="engine-coolant">—</span><span class="engine-ro-label">Coolant</span></div>
+      <div class="engine-ro"><span class="engine-ro-val" id="engine-voltage">—</span><span class="engine-ro-label">Alternator</span></div>
+      <div class="engine-ro"><span class="engine-ro-val" id="engine-batt-temp">—</span><span class="engine-ro-label">Batt Temp</span></div>
     </div>
     <div id="engine-dtc-row">
       <span id="engine-mil-icon"></span>
@@ -5045,6 +5051,12 @@ function onGPSUpdate(pos) {
   if (pos.coords.heading != null && !isNaN(pos.coords.heading)) {
     lastGPSHeading = pos.coords.heading;
   }
+  // Current elevation: GPS altitude is live + offline; the open-meteo lookup (below)
+  // refines it to accurate above-sea-level terrain elevation when online.
+  if (pos.coords.altitude != null && !isNaN(pos.coords.altitude)) {
+    updateElevation(pos.coords.altitude);
+  }
+  maybeFetchElevation(lastGPSLat, lastGPSLng);
   if (raw == null) {
     setGPSStatus('Speed unavailable — check GPS permissions');
     currentSpeedMph = 0;
@@ -5317,14 +5329,19 @@ function updateAltColumn() {
   const el     = document.getElementById('altW');
   if (!strip || !cell || !el) return;
 
+  // Battery Temp + Elevation tiles show only on the drive-mode power view.
+  const battCell = document.getElementById('battTempCell');
+  const elevCell = document.getElementById('elevCell');
+  if (battCell) battCell.style.display = drivingMode ? '' : 'none';
+  if (elevCell) elevCell.style.display = drivingMode ? '' : 'none';
+
   if (active) {
     const altW = Math.max(0, Math.round(battPower - currentSolarW));
     el.textContent = altW + ' W';
     el.style.color = altW > 50 ? 'var(--green)' : 'var(--txt2)';
     cell.style.display = '';
-    strip.className = 'power-strip-4';
-    // Note: the drive-mode alt strip's Alt W is driven by the real alternator
-    // service topic (updateAltPower), not this battery-minus-solar proxy.
+    // Note: alt strip Alt W driven by the real alternator topic (updateAltPower).
+    strip.className = 'power-strip-4';  // overridden to 2-col grid by body.driving CSS
   } else {
     cell.style.display = 'none';
     strip.className = 'power-strip-3';
@@ -5332,11 +5349,39 @@ function updateAltColumn() {
 }
 
 // ── Drive-mode battery temp strip ─────────────────
-// Victron publishes battery temperature in °C → show °F in the strip.
+// Victron publishes battery temperature in °C → show °F. Shown as a tile on the
+// drive-mode power grid and as a readout on the engine tab (nowhere else).
+let lastBattTempF = null;
 function updateBattTemp(c) {
   if (c == null || isNaN(c)) return;
-  const el = document.getElementById('battTempF');
-  if (el) el.textContent = Math.round(c * 9 / 5 + 32) + '°F';
+  const f = Math.round(c * 9 / 5 + 32) + '°F';
+  lastBattTempF = f;
+  const tile = document.getElementById('powerBattTemp');   // drive power grid tile
+  if (tile) tile.textContent = f;
+  const eng = document.getElementById('engine-batt-temp'); // engine readouts row
+  if (eng) eng.textContent = f;
+}
+
+// ── Current elevation (drive-mode power tile) ─────
+function updateElevation(meters) {
+  if (meters == null || isNaN(meters)) return;
+  const el = document.getElementById('powerElev');
+  if (el) el.textContent = Math.round(meters * 3.28084).toLocaleString() + ' ft';
+}
+let _elevFetchAt = 0, _elevFetchLat = null, _elevFetchLng = null;
+// Accurate above-sea-level elevation from open-meteo, throttled (≥60s and ~moved 1km).
+function maybeFetchElevation(lat, lng) {
+  if (lat == null || lng == null) return;
+  const now = Date.now();
+  const movedKm = _elevFetchLat == null ? Infinity
+    : haversineM(_elevFetchLat, _elevFetchLng, lat, lng) / 1000;
+  if (now - _elevFetchAt < 60000 && movedKm < 1) return;
+  _elevFetchAt = now; _elevFetchLat = lat; _elevFetchLng = lng;
+  fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lng}`,
+        { signal: AbortSignal.timeout(8000) })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => { const m = d?.elevation?.[0]; if (m != null) updateElevation(m); })
+    .catch(() => {});  // offline → keep the GPS-altitude value
 }
 
 function refreshModeChip() {
@@ -6857,6 +6902,28 @@ function starlinkSubLabel() {
   return starlinkOn ? 'Plug is powered on' : 'Plug is powered off';
 }
 
+// ── Engine gauges (needle sweeps left→right; zones baked into the track gradient) ──
+// RPM zones tuned to the OM654 2.0L turbodiesel: peak power ~3,800–4,200 rpm,
+// caution 4,000–4,500, redline 4,500–5,000. Tweak max/fmt here to recalibrate.
+const GAUGES = {
+  rpm:   { min: 0, max: 5000, fmt: v => Math.round(v).toLocaleString() },
+  accel: { min: 0, max: 100,  fmt: v => Math.round(v) + '%' },
+  load:  { min: 0, max: 100,  fmt: v => Math.round(v) + '%' },
+  fuel:  { min: 0, max: 100,  fmt: v => Math.round(v) + '%' },
+  mpg:   { min: 0, max: 25,   fmt: v => (Number(v) || 0).toFixed(1) },
+};
+function setGauge(key, value) {
+  const g = GAUGES[key];
+  if (!g || value == null || isNaN(value)) return;
+  const valEl  = document.getElementById('g-' + key + '-val');
+  const needle = document.getElementById('g-' + key + '-needle');
+  if (valEl)  valEl.textContent = g.fmt(value);
+  if (needle) {
+    const pct = Math.max(0, Math.min(100, (value - g.min) / (g.max - g.min) * 100));
+    needle.style.left = pct + '%';
+  }
+}
+
 let obdData = {};            // every OBD value, for the "All engine data" page
 let obdEverythingOpen = false;
 function updateOBDUI(key, val) {
@@ -6880,8 +6947,7 @@ function updateOBDUI(key, val) {
       break;
     }
     case 'rpm': {
-      const el = document.getElementById('engine-rpm');
-      if (el) el.textContent = parseInt(val).toLocaleString();
+      setGauge('rpm', parseInt(val));
       evaluateDriveState();
       break;
     }
@@ -6895,25 +6961,17 @@ function updateOBDUI(key, val) {
       if (!el) break;
       const t = parseInt(val);
       el.textContent = t + '°F';
-      el.className = 'engine-value' + (t >= 230 ? ' alert' : t >= 210 ? ' warn' : '');
+      el.className = 'engine-ro-val' + (t >= 230 ? ' alert' : t >= 210 ? ' warn' : '');
       break;
     }
     case 'fuel-level': {
-      const el = document.getElementById('engine-fuel');
-      if (!el) break;
-      const pct = parseInt(val);
-      el.textContent = pct + '%';
-      el.className = 'engine-value' + (pct <= 15 ? ' alert' : pct <= 25 ? ' warn' : '');
+      setGauge('fuel', parseInt(val));
       break;
     }
     case 'accel-pos': {
       // Accelerator pedal position — the real driver input on this diesel
       // (THROTTLE_POS reads a stuck ~13% on the Sprinter, so we show the pedal instead).
-      const pct = parseInt(val);
-      const fill = document.getElementById('engine-throttle-fill');
-      const lbl  = document.getElementById('engine-throttle-val');
-      if (fill) fill.style.width = Math.max(0, Math.min(100, pct)) + '%';
-      if (lbl)  lbl.textContent  = pct + '%';
+      setGauge('accel', parseInt(val));
       recordDriveSample();   // feed throttle-variability drive detection
       break;
     }
@@ -6922,7 +6980,7 @@ function updateOBDUI(key, val) {
       if (!el) break;
       const v = parseFloat(val);
       el.textContent = v.toFixed(1) + 'V';
-      el.className = 'engine-value' + (v < 12.0 ? ' alert' : v < 13.0 ? ' warn' : '');
+      el.className = 'engine-ro-val' + (v < 12.0 ? ' alert' : v < 13.0 ? ' warn' : '');
       break;
     }
     case 'mil': {
@@ -6953,18 +7011,12 @@ function updateOBDUI(key, val) {
       break;
     }
     case 'engine-load': {
-      const el = document.getElementById('engine-load');
-      if (el) {
-        const p = parseInt(val);
-        el.textContent = p + '%';
-        el.className = 'engine-value' + (p >= 90 ? ' alert' : p >= 75 ? ' warn' : '');
-      }
+      setGauge('load', parseInt(val));
       recordDriveSample();   // feed throttle/load-variability drive detection
       break;
     }
     case 'mpg': {
-      const el = document.getElementById('engine-mpg');
-      if (el) el.textContent = (parseFloat(val) || 0).toFixed(1);
+      setGauge('mpg', parseFloat(val));
       break;
     }
     case 'range': {
