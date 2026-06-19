@@ -127,7 +127,14 @@ def save_threshold(val: int):
     except Exception as e:
         print(f"save_threshold error: {e}")
 
+# Auto-failover is HARD DISABLED by user request (2026-06-19): being auto-switched
+# was leaving them stuck without internet. Carrier switching is MANUAL only now
+# (van/network/upstream still works). Flip this to False to re-enable auto someday.
+AUTO_FAILOVER_DISABLED = True
+
 def load_auto() -> bool:
+    if AUTO_FAILOVER_DISABLED:
+        return False
     try:
         return open(AUTO_FILE).read().strip() == "on"
     except Exception:
@@ -736,6 +743,13 @@ def on_message(client, userdata, msg):
         return
 
     if topic == "van/starlink/auto":
+        # Hard-disabled: ignore any request to turn auto on; always report/keep off.
+        if AUTO_FAILOVER_DISABLED:
+            auto_mode = False
+            save_auto(False)
+            pub("van/status/starlink/auto", "off")
+            print("Auto-failover is hard-disabled — ignoring request, staying OFF")
+            return
         auto_mode = (payload == "on")
         save_auto(auto_mode)
         pub("van/status/starlink/auto", "on" if auto_mode else "off")
