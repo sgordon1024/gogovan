@@ -31,7 +31,7 @@ Pi CAN HAT (Waveshare 2-CH CAN HAT+)
 
 | Device | Address | Notes |
 |---|---|---|
-| Raspberry Pi 4 | 192.168.4.1 (GoGoVan) / 100.98.52.107 (Tailscale) | Dashboard host, SSH: sgordon1024 / windows |
+| Raspberry Pi 4 | 192.168.8.106 (Apple Pie/GL.iNet, via eth0) / 100.98.52.107 (Tailscale) | Dashboard host, SSH: sgordon1024 / windows. 192.168.4.1 = legacy GoGoVan hotspot (masked) |
 | Victron Cerbo GX | 192.168.12.140 | VRM Portal ID: 48e7da875e6c |
 | Firefly G12 controller | SA=0x9B | Controls lights, HVAC, awning, pump, tank heater |
 | G12 LCD ("Bed Wall") | SA=0x9F | Touchscreen panel, Bluetooth to VegaTouch Mira |
@@ -52,14 +52,25 @@ Pi CAN HAT (Waveshare 2-CH CAN HAT+)
 
 ## Pi Network / Routing
 
-The Pi acts as a Wi-Fi hotspot and travel router:
+**CURRENT SETUP (as of 2026-06-19): the van Wi-Fi network is a separate GL.iNet travel router, NOT the Pi.**
+
+- The van's Wi-Fi network is **"Apple Pie"**, served by a **GL.iNet travel router** — admin at **http://192.168.8.1** (gl-ui), LAN `192.168.8.x`. The GL.iNet repeats an upstream (Starlink / T-Mobile) as its WAN and distributes to the van's devices.
+- The **Pi is a client on the GL.iNet LAN** via `eth0` (`192.168.8.106`, DHCP) — this is how the dashboard and SSH/deploy are reached (`deploy-to-pi.sh` calls it the "apple pi network").
+- The Pi's **own `GoGoVan` hotspot is RETIRED** — `hostapd.service` is **masked on purpose**. Do **not** unmask/re-enable it: it adds an unwanted AP and contends with `wlan0` on the Pi's single radio. (The NAT/DHCP/hostapd config below is still present but inactive — kept for reference / fallback only.)
+- The Pi's `wlan0` still connects to **Starlink (`PhiladelphiaCollins`) / T-Mobile (`preconfigured`)** for the **Pi's own** internet (telemetry, deploys, TTS proxy, etc.).
+
+**If van devices have no internet but the Pi does:** the break is the **GL.iNet router's WAN/repeater**, not the Pi. Fix on the GL.iNet (http://192.168.8.1 or the GL.iNet app → Internet → Repeater → reconnect to Starlink/T-Mobile). Requires the user's GL.iNet admin login — cannot be done from the Pi.
+
+### Legacy Pi hotspot (inactive — `hostapd` masked)
+
+The Pi was previously the travel router itself. That config still exists but the hotspot is off:
 
 | Interface | IP | Purpose |
 |---|---|---|
-| `uap0` | 192.168.4.1/24 | GoGoVan hotspot (hostapd) |
+| `uap0` | 192.168.4.1/24 | GoGoVan hotspot (hostapd) — **masked/inactive** |
 | `wlan0` | DHCP (upstream) | WAN: T-Mobile / Starlink / campground Wi-Fi |
 
-- **hostapd** creates the `GoGoVan` SSID on `uap0`
+- **hostapd** created the `GoGoVan` SSID on `uap0` (now masked)
 - **dnsmasq** provides DHCP (192.168.4.2–50) to clients on `uap0`; Cerbo GX has a static lease: `dhcp-host=26:d7:db:55:a4:3f,192.168.4.25`
 - **iptables NAT** (MASQUERADE on wlan0) routes client traffic through wlan0
 - **IP forwarding** enabled persistently: `/etc/sysctl.d/99-ipforward.conf` → `net.ipv4.ip_forward=1`
@@ -75,9 +86,11 @@ The Pi acts as a Wi-Fi hotspot and travel router:
 
 | Context | URL |
 |---|---|
-| On GoGoVan network | http://vanpi.local |
+| On the van "Apple Pie" (GL.iNet) network | http://192.168.8.106 |
 | Via Tailscale (HTTP) | http://100.98.52.107 |
 | Via Tailscale (HTTPS) | https://vanpi.tail27a0b4.ts.net |
+
+> Note: `http://vanpi.local` only resolved on the old GoGoVan hotspot (Avahi is restricted to `uap0`, now masked). On the Apple Pie network, reach the dashboard at `192.168.8.106` or via Tailscale.
 
 **Use the HTTPS URL whenever GPS/speedometer is needed** — iOS Safari blocks the Geolocation API on plain HTTP pages (reports as "permission denied" regardless of what the user taps). The HTTPS URL uses a Tailscale-issued Let's Encrypt cert served by nginx on the Pi.
 

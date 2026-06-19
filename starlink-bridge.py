@@ -1,22 +1,53 @@
 #!/usr/bin/env python3
 """
-starlink-bridge.py — Starlink smart plug (Tuya X5P) MQTT bridge.
+starlink-bridge.py — Peplink-style dual-WAN failover controller.
 
-Controls the Tuya smart plug via tinytuya local API.
-Monitors T-Mobile signal and auto-powers Starlink when signal is poor.
-Monitors connectivity quality when Starlink is active upstream.
+THE single authority for switching the Pi's wlan0 uplink between T-Mobile and
+Starlink. The old `gogovan-watchdog` must be disabled — this replaces it.
 
-MQTT topics (subscribe):
-  van/starlink/power     — "on" / "off"  (manual control from dashboard)
-  van/starlink/auto      — "on" / "off"  (enable/disable auto-switch)
-  van/starlink/threshold — "0"-"100"     (signal level below which Starlink turns on)
+Design principles
+-----------------
+1. T-Mobile is the DEFAULT (cheaper, lower power). Starlink dish is powered OFF
+   whenever we're happily on T-Mobile.
+2. ALL switching decisions are based on ACTUAL INTERNET reachability (ping to
+   8.8.8.8 / 1.1.1.1), never on signal bars alone. Signal is only used as a
+   cheap pre-filter to avoid pointlessly interrupting Starlink to test a
+   T-Mobile that isn't even there.
+3. Plug control is BEST-EFFORT. If the Tuya plug is unreachable, network
+   failover still happens — we never let a missing plug strand the connection.
 
-MQTT topics (publish, retained):
-  van/status/starlink/power          — "on" / "off" / "unknown"
-  van/status/starlink/tmobile-signal — "0"-"100" or "-1" if unknown
-  van/status/starlink/auto           — "on" / "off"
-  van/status/starlink/threshold      — "0"-"100"
-  van/status/starlink/quality        — "good" / "poor" / "unknown"
+Behavior
+--------
+- On T-Mobile: every HEALTH_POLL_INTERVAL, test internet. FAIL_CONFIRM
+  consecutive failures → fail over to Starlink (power plug on → wait for dish
+  warmup → switch routing).
+- On Starlink: every HEALTH_POLL_INTERVAL, test internet (publish quality).
+  Every TMOBILE_RECHECK_INTERVAL, briefly switch to T-Mobile and measure its
+  REAL download speed — if it meets min_speed (Mbps), stay on T-Mobile and power
+  the dish off; if it's slower, fall back to Starlink. If Starlink itself fails,
+  try T-Mobile right away (no speed gate — any working T-Mobile beats none).
+- Manual override (van/network/upstream): forces a side and suspends auto for
+  MANUAL_OVERRIDE_SECS. Never powers off the dish unless the target's internet
+  is confirmed (no stranding).
+
+States: tmobile | starlink | warming_up | reverting | checking_tmobile | unknown
+
+MQTT subscribe:
+  van/starlink/power     — "on"/"off"            manual plug control
+  van/starlink/auto      — "on"/"off"            enable/disable auto failover
+  van/starlink/threshold — "0"-"50"              min T-Mobile download (Mbps) to prefer it
+  van/network/upstream   — "tmobile"/"starlink"  manual routing override
+
+MQTT publish (all retained):
+  van/status/starlink/power           — "on"/"off"/"unknown"
+  van/status/starlink/tmobile-signal  — "0"-"100" or "-1"
+  van/status/starlink/auto            — "on"/"off"
+  van/status/starlink/threshold       — "0"-"50" (min T-Mobile Mbps)
+  van/status/starlink/quality         — "good"/"poor"/"unknown"
+  van/status/starlink/state           — state machine state
+  van/status/starlink/warmup_eta      — seconds remaining (warming_up only)
+  van/status/network/upstream         — "tmobile"/"starlink"/"unknown"
+  van/status/starlink/manual-override — "on"/"off"
 """
 
 import os
@@ -26,285 +57,785 @@ import time
 import paho.mqtt.client as mqtt
 import tinytuya
 
-# ── Configuration ──────────────────────────────────────────────────────────
+# ── Network connection names (NetworkManager profiles on wlan0) ──────────────
+TMOBILE_CONN  = "preconfigured"        # T-Mobile Home Internet
+STARLINK_CONN = "PhiladelphiaCollins"  # Starlink Wi-Fi (5GHz-locked in NM profile)
+
+# ── MQTT ─────────────────────────────────────────────────────────────────────
 MQTT_HOST = "localhost"
 MQTT_PORT = 1883
 
-PLUG_DEV_ID    = "eb21e6caef01e8582972u9"
-PLUG_ADDRESS   = "192.168.4.34"
-PLUG_LOCAL_KEY = "knGT9!<jN3jA~npU"
-PLUG_VERSION   = 3.3
+# ── Tuya plug (Starlink dish power) ──────────────────────────────────────────
+PLUG_CLOUD_NAME       = "Smart Socket 3"            # Tuya cloud name of the dish plug — used to auto-refresh id+key
+PLUG_DEV_ID           = "eb826ee30e0fd77018gwq2"    # local id (rotates on re-pair; auto-refreshed from cloud at startup)
+PLUG_LOCAL_KEY        = "HlYX{/Y-Pv-M':)7"          # fallback key; auto-refreshed from cloud at startup
+PLUG_VERSION          = 3.3
+PLUG_ADDRESS_FALLBACK = "192.168.8.248"             # plug's reserved DHCP IP on the Apple Pi network
+PLUG_ADDRESS_FILE     = os.path.expanduser("~/.starlink_plug_address")
+PLUG_CREDS_FILE       = os.path.expanduser("~/.starlink_plug_creds")   # cached {id,key} from last cloud fetch
+TUYA_CFG_FILE         = os.path.expanduser("~/tinytuya.json")          # saved Tuya cloud API creds
 
-THRESH_FILE            = os.path.expanduser("~/.starlink_threshold")
-DEFAULT_ON_THRESH      = 35      # signal below this → Starlink ON
-HYSTERESIS             = 20      # off threshold = on_thresh + HYSTERESIS
-SIGNAL_POLL_INTERVAL   = 30      # seconds between T-Mobile signal polls
-QUALITY_CHECK_INTERVAL = 120     # seconds between ping quality checks (when on Starlink)
-QUALITY_PING_TIMEOUT   = 15      # total seconds for ping subprocess
+# ── Persistence ──────────────────────────────────────────────────────────────
+THRESH_FILE = os.path.expanduser("~/.starlink_threshold")   # min T-Mobile speed (Mbps)
+AUTO_FILE   = os.path.expanduser("~/.starlink_auto")        # auto on/off, survives restart
 
-# ── Helpers ────────────────────────────────────────────────────────────────
+# ── Timing / thresholds ──────────────────────────────────────────────────────
+PING_HOSTS               = ["8.8.8.8", "1.1.1.1"]
+HEALTH_POLL_INTERVAL     = 20        # seconds between internet health checks
+FAIL_CONFIRM             = 3         # consecutive failed checks before failover (~60s)
+TMOBILE_RECHECK_INTERVAL = 20 * 60   # seconds between T-Mobile recovery attempts on Starlink
+DEFAULT_MIN_SPEED       = 5         # min T-Mobile download (Mbps) to prefer it over Starlink
+MAX_MIN_SPEED           = 50        # slider/clamp ceiling for the min-speed threshold (Mbps)
+WARMUP_MAX_SECS          = 180       # max wait for Starlink dish to boot
+WARMUP_POLL_SECS         = 10        # seconds between SSID scans during warmup
+ROUTING_TIMEOUT          = 60        # seconds for an nmcli 'up' to succeed
+MANUAL_OVERRIDE_SECS     = 30 * 60   # manual switch suspends auto this long
+MANUAL_BAD_MBPS          = 2.0       # a manual speed test below this (or an error) triggers a source switch
+
+# ── Module state ─────────────────────────────────────────────────────────────
+state                   = "unknown"  # see States above
+starlink_plug           = None       # "on" / "off" / None(unknown)
+auto_mode               = False      # auto failover armed (persisted to AUTO_FILE); default OFF
+min_speed               = DEFAULT_MIN_SPEED
+tmobile_signal          = -1
+tmobile_ssid            = ""
+warmup_start            = 0.0
+fail_count              = 0          # consecutive internet failures on current link
+tmobile_stable_count    = 0          # consecutive good T-Mobile checks (gates dish power-off)
+last_tmobile_recheck    = 0.0
+manual_override         = False
+manual_override_expires = 0.0
+manual_test_pending     = 0.0       # epoch of last manual speed-test request (gates failover-on-result)
+driving                 = False     # van is driving → weight Starlink more (set via van/network/driving)
+transitioning           = False     # True while a switch is in progress
+
+_state_lock = threading.Lock()
+mqtt_client = None
+
+
+# ── Persistence helpers ──────────────────────────────────────────────────────
 
 def load_threshold() -> int:
     try:
-        return max(0, min(100, int(open(THRESH_FILE).read().strip())))
+        return max(0, min(MAX_MIN_SPEED, int(float(open(THRESH_FILE).read().strip()))))
     except Exception:
-        return DEFAULT_ON_THRESH
+        return DEFAULT_MIN_SPEED
 
 def save_threshold(val: int):
     try:
-        with open(THRESH_FILE, "w") as f:
-            f.write(str(val))
+        open(THRESH_FILE, "w").write(str(val))
     except Exception as e:
         print(f"save_threshold error: {e}")
 
-# ── State ──────────────────────────────────────────────────────────────────
-starlink_power     = None    # "on" / "off" / None (unknown)
-auto_mode          = False
-tmobile_signal     = -1
-signal_on_thresh   = load_threshold()
-network_upstream   = "unknown"   # from van/status/network/upstream
-last_quality_check = 0.0         # timestamp of last connectivity check
+# Auto-failover is HARD DISABLED by user request (2026-06-19): being auto-switched
+# was leaving them stuck without internet. Carrier switching is MANUAL only now
+# (van/network/upstream still works). Flip this to False to re-enable auto someday.
+AUTO_FAILOVER_DISABLED = True
 
-# ── Plug control ───────────────────────────────────────────────────────────
-
-def make_device():
-    d = tinytuya.OutletDevice(
-        dev_id=PLUG_DEV_ID,
-        address=PLUG_ADDRESS,
-        local_key=PLUG_LOCAL_KEY,
-        version=PLUG_VERSION
-    )
-    d.set_socketTimeout(5)
-    d.set_socketRetryLimit(2)
-    return d
-
-
-def plug_set(on: bool) -> bool:
-    """Set plug state. Returns True on success."""
-    global starlink_power
+def load_auto() -> bool:
+    if AUTO_FAILOVER_DISABLED:
+        return False
     try:
-        d = make_device()
-        result = d.set_value(1, on)
-        if "Error" not in str(result):
-            starlink_power = "on" if on else "off"
-            print(f"Plug → {'ON' if on else 'OFF'}: {result}")
-            return True
-        else:
-            print(f"Plug set error: {result}")
-            return False
+        return open(AUTO_FILE).read().strip() == "on"
+    except Exception:
+        return False  # default OFF — manual carrier switching only
+
+def save_auto(on: bool):
+    try:
+        open(AUTO_FILE, "w").write("on" if on else "off")
     except Exception as e:
-        print(f"plug_set exception: {e}")
+        print(f"save_auto error: {e}")
+
+
+# ── MQTT publish helper ──────────────────────────────────────────────────────
+
+def pub(topic, payload, retain=True):
+    if mqtt_client:
+        mqtt_client.publish(topic, str(payload), retain=retain)
+
+
+# ── Internet / connectivity ──────────────────────────────────────────────────
+
+def internet_up() -> bool:
+    """True if ANY ping host is reachable through the current uplink."""
+    for host in PING_HOSTS:
+        try:
+            r = subprocess.run(["ping", "-c", "2", "-W", "2", "-q", host],
+                               capture_output=True, timeout=8)
+            if r.returncode == 0:
+                return True
+        except Exception:
+            pass
+    return False
+
+
+def measure_download_mbps(budget: float = 5.0) -> float:
+    """
+    Quick ~3 MB Cloudflare download over the CURRENT uplink → download Mbps.
+    Mirrors run-speedtest.py --lite (small, low-data). Returns the measured
+    Mbps, or -1.0 if the measurement itself failed (no internet / tooling) — so
+    callers can distinguish "too slow" (>=0, below target) from "couldn't tell".
+    """
+    import urllib.request
+    try:
+        received = 0
+        t0 = time.time()
+        req = urllib.request.Request("https://speed.cloudflare.com/__down?bytes=3000000",
+                                     headers={"User-Agent": "gogovan-starlink"})
+        with urllib.request.urlopen(req, timeout=budget + 4) as r:
+            while time.time() - t0 < budget:
+                chunk = r.read(65536)
+                if not chunk:
+                    break
+                received += len(chunk)
+        elapsed = time.time() - t0
+        if received > 0 and elapsed > 0:
+            return round(received * 8 / elapsed / 1_000_000, 1)
+        return -1.0
+    except Exception as e:
+        print(f"measure_download_mbps error: {e}")
+        return -1.0
+
+
+# ── nmcli helpers ────────────────────────────────────────────────────────────
+
+def get_current_upstream() -> str:
+    """Return 'tmobile', 'starlink', or 'unknown' from the active wlan0 profile."""
+    try:
+        r = subprocess.run(["nmcli", "-t", "-f", "DEVICE,CONNECTION", "device", "status"],
+                           capture_output=True, text=True, timeout=5)
+        for line in r.stdout.splitlines():
+            parts = line.split(":")
+            if len(parts) >= 2 and parts[0] == "wlan0":
+                conn = parts[1]
+                if conn == TMOBILE_CONN:
+                    return "tmobile"
+                if conn == STARLINK_CONN:
+                    return "starlink"
+                return "unknown"
+    except Exception as e:
+        print(f"get_current_upstream error: {e}")
+    return "unknown"
+
+def nmcli_up(conn: str) -> bool:
+    """Bring up a NetworkManager connection. Returns True on success."""
+    try:
+        r = subprocess.run(["sudo", "nmcli", "connection", "up", conn],
+                           capture_output=True, text=True, timeout=ROUTING_TIMEOUT + 5)
+        ok = r.returncode == 0
+        print(f"nmcli up {conn}: {'ok' if ok else 'FAILED'} | {r.stderr.strip()}")
+        return ok
+    except Exception as e:
+        print(f"nmcli_up({conn}) error: {e}")
         return False
 
-
-def plug_get_state() -> str:
-    """Query current plug state. Returns 'on', 'off', or 'unknown'."""
+def get_tmobile_ssid() -> str:
     try:
-        d = make_device()
-        status = d.status()
-        if "dps" in status:
-            return "on" if status["dps"].get("1", False) else "off"
-        return "unknown"
+        r = subprocess.run(["nmcli", "-g", "802-11-wireless.ssid", "connection", "show", TMOBILE_CONN],
+                           capture_output=True, text=True, timeout=5)
+        return r.stdout.strip()
     except Exception as e:
-        print(f"plug_get_state exception: {e}")
-        return "unknown"
-
-
-# ── T-Mobile signal ────────────────────────────────────────────────────────
+        print(f"get_tmobile_ssid error: {e}")
+    return ""
 
 def get_tmobile_signal() -> int:
     """
-    Returns 0-100 signal level for T-Mobile, or -1 if not visible.
-    Checks both connected signal (nmcli dev show) and scan results.
+    0-100 signal for T-Mobile, or -1 if not visible. Works while on Starlink
+    (scans), or reads live signal directly when already on T-Mobile.
     """
-    try:
-        # First: check if wlan0 is currently on T-Mobile (fastest path)
-        result = subprocess.run(
-            ["nmcli", "-t", "-f", "GENERAL.CONNECTION,GENERAL.SIGNAL",
-             "dev", "show", "wlan0"],
-            capture_output=True, text=True, timeout=5
-        )
-        for line in result.stdout.splitlines():
-            if "SIGNAL" in line:
-                try:
-                    return int(line.split(":")[-1])
-                except ValueError:
-                    pass
+    if get_current_upstream() == "tmobile":
+        try:
+            r = subprocess.run(["nmcli", "-t", "-f", "GENERAL.SIGNAL", "dev", "show", "wlan0"],
+                               capture_output=True, text=True, timeout=5)
+            for line in r.stdout.splitlines():
+                if "SIGNAL" in line:
+                    try:
+                        return int(line.split(":")[-1])
+                    except ValueError:
+                        pass
+        except Exception as e:
+            print(f"get_tmobile_signal(direct) error: {e}")
 
-        # Fallback: scan for T-Mobile SSID
-        result = subprocess.run(
-            ["nmcli", "-t", "-f", "SSID,SIGNAL", "dev", "wifi", "list"],
-            capture_output=True, text=True, timeout=10
-        )
+    try:
+        r = subprocess.run(["nmcli", "-t", "-f", "SSID,SIGNAL", "dev", "wifi", "list", "--rescan", "yes"],
+                           capture_output=True, text=True, timeout=20)
         best = -1
-        for line in result.stdout.splitlines():
+        for line in r.stdout.splitlines():
             idx = line.rfind(":")
             if idx < 0:
                 continue
-            ssid = line[:idx].lower()
-            if "t-mobile" in ssid or "tmobile" in ssid or ssid == "tmobile":
+            ssid_part, sig_part = line[:idx], line[idx + 1:]
+            is_match = ((tmobile_ssid and ssid_part == tmobile_ssid)
+                        or "t-mobile" in ssid_part.lower()
+                        or "tmobile" in ssid_part.lower())
+            if is_match:
                 try:
-                    sig = int(line[idx + 1:])
-                    best = max(best, sig)
+                    best = max(best, int(sig_part))
                 except ValueError:
                     pass
         return best
     except Exception as e:
-        print(f"get_tmobile_signal error: {e}")
-        return -1
+        print(f"get_tmobile_signal(scan) error: {e}")
+    return -1
 
-
-# ── Connectivity quality check ─────────────────────────────────────────────
-
-def check_connectivity() -> str:
-    """
-    Ping 8.8.8.8 three times and assess quality.
-    Returns 'good', 'poor', or 'unknown'.
-    Typical healthy Starlink: 20-80 ms avg.
-    Obstructed / degraded: fails to respond or >2000 ms avg.
-    """
+def starlink_ssid_visible() -> bool:
     try:
-        result = subprocess.run(
-            ["ping", "-c", "3", "-W", "3", "-q", "8.8.8.8"],
-            capture_output=True, text=True, timeout=QUALITY_PING_TIMEOUT
-        )
-        if result.returncode != 0:
-            return "poor"
-        # Parse "rtt min/avg/max/mdev = X/X/X/X ms" line
-        for line in result.stdout.splitlines():
-            if "/" in line and ("rtt" in line or "round-trip" in line):
+        r = subprocess.run(["nmcli", "-t", "-f", "SSID", "dev", "wifi", "list", "--rescan", "yes"],
+                           capture_output=True, text=True, timeout=20)
+        return any(line.strip() == STARLINK_CONN for line in r.stdout.splitlines())
+    except Exception as e:
+        print(f"starlink_ssid_visible error: {e}")
+        return False
+
+
+# ── Tuya plug (best-effort) ──────────────────────────────────────────────────
+
+_plug_address = None
+
+def refresh_plug_creds():
+    """
+    Re-pairing the plug in the Smart Life app rotates its local id AND key.
+    On startup, fetch the current id+key from the Tuya cloud (matched by the
+    device's cloud name) so we auto-recover from re-pairs. Falls back to a
+    cached file, then the hardcoded constants. Best-effort — never raises.
+    """
+    global PLUG_DEV_ID, PLUG_LOCAL_KEY
+    import json
+    # 1. Try the cloud (needs internet + saved API creds in tinytuya.json)
+    try:
+        c = json.load(open(TUYA_CFG_FILE))
+        cloud = tinytuya.Cloud(apiRegion=c["apiRegion"], apiKey=c["apiKey"], apiSecret=c["apiSecret"])
+        res = cloud.getdevices(True)
+        devs = res.get("result", []) if isinstance(res, dict) else res
+        for d in devs:
+            if d.get("name") == PLUG_CLOUD_NAME:
+                i = d.get("id"); k = d.get("local_key") or d.get("key")
+                if i and k:
+                    PLUG_DEV_ID, PLUG_LOCAL_KEY = i, k
+                    try:
+                        open(PLUG_CREDS_FILE, "w").write(json.dumps({"id": i, "key": k}))
+                    except Exception:
+                        pass
+                    print(f"Plug creds refreshed from cloud: id={i}")
+                    return
+        print(f"Cloud reachable but '{PLUG_CLOUD_NAME}' not found — keeping current creds")
+    except Exception as e:
+        print(f"Cloud plug-cred refresh skipped ({e}) — using cached/hardcoded")
+    # 2. Fall back to cached creds from the last successful cloud fetch
+    try:
+        cached = json.load(open(PLUG_CREDS_FILE))
+        if cached.get("id") and cached.get("key"):
+            PLUG_DEV_ID, PLUG_LOCAL_KEY = cached["id"], cached["key"]
+            print(f"Using cached plug creds: id={PLUG_DEV_ID}")
+            return
+    except Exception:
+        pass
+    print(f"Using hardcoded plug creds: id={PLUG_DEV_ID}")
+
+def discover_plug_address() -> str:
+    global _plug_address
+    if _plug_address:
+        return _plug_address
+    try:
+        print("Scanning for Starlink plug…")
+        found = tinytuya.deviceScan(verbose=False, maxretry=5)
+        for ip, info in found.items():
+            if info.get("gwId") == PLUG_DEV_ID or info.get("id") == PLUG_DEV_ID:
+                print(f"Plug found at {ip}")
+                _plug_address = ip
                 try:
-                    avg_ms = float(line.split("=")[1].strip().split("/")[1])
-                    return "poor" if avg_ms > 2000 else "good"
+                    open(PLUG_ADDRESS_FILE, "w").write(ip)
                 except Exception:
                     pass
-        return "good"
+                return ip
     except Exception as e:
-        print(f"check_connectivity error: {e}")
-        return "unknown"
+        print(f"Plug scan error: {e}")
+    try:
+        addr = open(PLUG_ADDRESS_FILE).read().strip()
+        if addr:
+            _plug_address = addr
+            return addr
+    except Exception:
+        pass
+    _plug_address = PLUG_ADDRESS_FALLBACK
+    return PLUG_ADDRESS_FALLBACK
+
+def _make_device():
+    d = tinytuya.OutletDevice(dev_id=PLUG_DEV_ID, address=discover_plug_address(),
+                              local_key=PLUG_LOCAL_KEY, version=PLUG_VERSION)
+    d.set_socketTimeout(5)
+    d.set_socketRetryLimit(2)
+    return d
+
+def plug_set(on: bool) -> bool:
+    """Best-effort plug control. Returns True on success, False if unreachable."""
+    global starlink_plug, _plug_address
+    try:
+        result = _make_device().set_value(1, on)
+        if "Error" not in str(result):
+            starlink_plug = "on" if on else "off"
+            pub("van/status/starlink/power", starlink_plug)
+            print(f"Plug → {'ON' if on else 'OFF'}")
+            return True
+        print(f"Plug set error: {result}")
+        _plug_address = None
+    except Exception as e:
+        print(f"plug_set error: {e}")
+        _plug_address = None
+    return False
+
+def plug_get_state() -> str:
+    try:
+        status = _make_device().status()
+        if "dps" in status:
+            return "on" if status["dps"].get("1", False) else "off"
+    except Exception as e:
+        print(f"plug_get_state error: {e}")
+    return "unknown"
 
 
-# ── Signal monitor loop ────────────────────────────────────────────────────
+# ── State helpers ────────────────────────────────────────────────────────────
 
-def signal_monitor(client):
-    global tmobile_signal, starlink_power, last_quality_check
+def set_state(new_state: str):
+    global state
+    with _state_lock:
+        state = new_state
+    pub("van/status/starlink/state", new_state)
+    print(f"State → {new_state}")
+
+def _begin_transition() -> bool:
+    """Claim the transition lock. Returns False if a switch is already running."""
+    global transitioning
+    with _state_lock:
+        if transitioning:
+            return False
+        transitioning = True
+    return True
+
+def _end_transition():
+    global transitioning
+    with _state_lock:
+        transitioning = False
+
+
+# ── Transitions ──────────────────────────────────────────────────────────────
+
+# Victron MQTT portal (matches the dashboard) — used to turn the inverter back on.
+PORTAL_ID = "c0619ab5dcfb"
+
+def ensure_inverter_on():
+    """The Starlink dish runs off the inverter's AC. Before powering the dish on, make
+    sure the MultiPlus is ON (mode 3) — if the user turned the inverter off, powering the
+    Tuya plug would do nothing. Idempotent (harmless if already on). Published as a Victron
+    write, bridged to the Cerbo through the local mosquitto (same path the dashboard uses)."""
+    if mqtt_client:
+        mqtt_client.publish(f"W/{PORTAL_ID}/vebus/276/Mode", '{"value": 3}')
+        print("Ensuring inverter ON (mode 3) so the Starlink dish has AC power")
+
+
+def switch_to_starlink(reason: str) -> bool:
+    """Power on dish → warmup → route to Starlink → verify. Returns True if Starlink has internet."""
+    global warmup_start, fail_count
+    if not _begin_transition():
+        print("switch_to_starlink: already transitioning, skip")
+        return False
+    try:
+        print(f"FAILOVER → Starlink ({reason})")
+
+        # The dish runs off the inverter's AC, so make sure the inverter is on first
+        # (if the user turned it off, the Tuya plug would be dead and the dish can't power).
+        ensure_inverter_on()
+
+        # Power the dish on (best-effort), retrying for a bit since the plug may have been
+        # unpowered and needs to boot + rejoin Wi-Fi after the inverter just came on.
+        # Don't abort if it stays unreachable — the dish may already be powered.
+        powered = False
+        for _attempt in range(8):              # up to ~40s
+            if plug_set(True):
+                powered = True
+                break
+            time.sleep(5)
+        if not powered:
+            print("Plug unreachable — continuing failover anyway (dish may already be on)")
+
+        # Wait for the Starlink SSID to appear (dish boot), then connect.
+        warmup_start = time.time()
+        set_state("warming_up")
+        pub("van/status/starlink/warmup_eta", WARMUP_MAX_SECS)
+        deadline = warmup_start + WARMUP_MAX_SECS
+        while time.time() < deadline:
+            remaining = max(0, int(deadline - time.time()))
+            pub("van/status/starlink/warmup_eta", remaining)
+            if starlink_ssid_visible():
+                print("Starlink SSID visible — connecting")
+                break
+            print(f"Warmup: waiting for Starlink… {remaining}s left")
+            time.sleep(WARMUP_POLL_SECS)
+        pub("van/status/starlink/warmup_eta", 0)
+
+        ok = nmcli_up(STARLINK_CONN)
+        if not ok:
+            time.sleep(10)
+            ok = nmcli_up(STARLINK_CONN)
+        result = False
+        if ok:
+            set_state("starlink")
+            pub("van/status/network/upstream", "starlink")
+            time.sleep(4)
+            result = internet_up()
+            pub("van/status/starlink/quality", "good" if result else "poor")
+        else:
+            print("Could not connect to Starlink — leaving state unknown")
+            set_state("unknown")
+        fail_count = 0
+        return result
+    finally:
+        _end_transition()
+
+def switch_to_tmobile(reason: str, power_off_dish: bool = True, min_mbps: float = 0.0) -> bool:
+    """
+    Route to T-Mobile and verify internet. Only powers the dish off if T-Mobile
+    internet is confirmed (never strand the connection). Returns True if we
+    ended up on a working T-Mobile.
+
+    min_mbps > 0 (recovery paths) adds a SPEED gate: after ping confirms, measure
+    T-Mobile's real download and bail back to Starlink if it's below min_mbps. A
+    failed/inconclusive measurement (-1) keeps T-Mobile (ping already passed), so a
+    tooling hiccup never strands us. Emergency / explicit-manual calls pass 0 (no
+    gate) — any working T-Mobile beats none.
+    """
+    global fail_count
+    if not _begin_transition():
+        print("switch_to_tmobile: already transitioning, skip")
+        return False
+    try:
+        print(f"→ T-Mobile ({reason})")
+        set_state("reverting")
+        if not nmcli_up(TMOBILE_CONN):
+            print("nmcli T-Mobile failed — falling back to Starlink")
+            nmcli_up(STARLINK_CONN)
+            set_state("starlink")
+            return False
+
+        time.sleep(4)
+        if internet_up():
+            # Speed gate (recovery paths only): T-Mobile is reachable, but is it
+            # fast enough to prefer over Starlink? A failed (-1) or slow measurement
+            # reverts to Starlink — DNS failure means T-Mobile has no real internet
+            # even if ping passes (ICMP to raw IPs bypasses DNS).
+            if min_mbps > 0:
+                mbps = measure_download_mbps()
+                if mbps < min_mbps:
+                    reason = f"measurement failed (DNS/TCP down)" if mbps < 0 else f"only {mbps} Mbps (< {min_mbps} required)"
+                    print(f"T-Mobile {reason} — staying on Starlink")
+                    nmcli_up(STARLINK_CONN)
+                    set_state("starlink")
+                    pub("van/status/network/upstream", "starlink")
+                    return False
+                print(f"T-Mobile speed {mbps} Mbps (>= {min_mbps}) — switching")
+            set_state("tmobile")
+            pub("van/status/network/upstream", "tmobile")
+            pub("van/status/starlink/quality", "unknown")
+            fail_count = 0
+            if power_off_dish:
+                # We have working T-Mobile — safe to drop the dish to save power.
+                if not plug_set(False):
+                    print("Plug unreachable — dish left on (can't power off)")
+            return True
+        else:
+            print("T-Mobile has no internet — staying on Starlink")
+            nmcli_up(STARLINK_CONN)
+            set_state("starlink")
+            pub("van/status/network/upstream", "starlink")
+            return False
+    finally:
+        _end_transition()
+
+def handle_bad_connection(reason: str):
+    """
+    A manual speed test reported the current link is bad/down. Switch to the
+    OTHER source. If that source also has no usable internet, raise an alert
+    toast on the dashboard. Works with no internet on the current link (the
+    switch + verification are all local nmcli/ping).
+    """
+    with _state_lock:
+        if transitioning:
+            print("handle_bad_connection: transition in progress — skipping")
+            return
+    cur = get_current_upstream()
+    print(f"Manual speed test says current link ({cur}) is bad ({reason}) — switching source")
+    if cur == "starlink":
+        ok = switch_to_tmobile(f"manual test: {reason}")
+    else:
+        ok = switch_to_starlink(f"manual test: {reason}")
+    if ok:
+        pub("van/status/network/alert", "", retain=False)   # clear any warning
+    else:
+        msg = "Both T-Mobile and Starlink have no usable internet right now."
+        print("ALERT: " + msg)
+        pub("van/status/network/alert", msg, retain=False)
+
+
+# ── Control loop ─────────────────────────────────────────────────────────────
+
+def control_loop():
+    global tmobile_signal, fail_count, last_tmobile_recheck, tmobile_stable_count
+    global manual_override, manual_override_expires
 
     while True:
-        time.sleep(SIGNAL_POLL_INTERVAL)
+        time.sleep(HEALTH_POLL_INTERVAL)
         try:
+            # Manual override countdown
+            if manual_override:
+                if time.time() < manual_override_expires:
+                    continue
+                manual_override = False
+                pub("van/status/starlink/manual-override", "off")
+                print("Manual override expired — auto resumed")
+
+            if not auto_mode:
+                continue
+
+            with _state_lock:
+                if transitioning:
+                    continue
+                cur = state
+
+            # Resolve from transient states by reading the actual interface
+            if cur in ("unknown", "warming_up", "reverting", "checking_tmobile"):
+                cur = get_current_upstream()
+
+            # Refresh T-Mobile signal for the dashboard (cheap scan)
             sig = get_tmobile_signal()
             if sig != tmobile_signal:
                 tmobile_signal = sig
-                client.publish("van/status/starlink/tmobile-signal",
-                               str(tmobile_signal), retain=True)
-                print(f"T-Mobile signal → {tmobile_signal}")
+                pub("van/status/starlink/tmobile-signal", sig)
 
-            if auto_mode:
-                off_thresh = min(signal_on_thresh + HYSTERESIS, 95)
-                if sig != -1 and sig < signal_on_thresh and starlink_power != "on":
-                    print(f"Auto: signal {sig} < {signal_on_thresh} → Starlink ON")
-                    if plug_set(True):
-                        client.publish("van/status/starlink/power", "on", retain=True)
+            # ── On T-Mobile: watch its internet ───────────────────────────
+            if cur == "tmobile":
+                if internet_up():
+                    fail_count = 0
+                    tmobile_stable_count += 1
+                    # Power-saving: once T-Mobile has been solidly up (~1 min), the
+                    # Starlink dish isn't needed — power it off (best-effort).
+                    # Power-saving: drop the dish once T-Mobile is solidly up — but NOT while
+                    # driving (keep the dish warm so switching is instant; power isn't a concern).
+                    if starlink_plug == "on" and tmobile_stable_count >= 3 and not driving:
+                        print("T-Mobile stable — powering Starlink dish off (power saving)")
+                        plug_set(False)
+                else:
+                    fail_count += 1
+                    tmobile_stable_count = 0
+                    need = 2 if driving else FAIL_CONFIRM   # fail over to Starlink faster while driving
+                    print(f"T-Mobile internet check failed ({fail_count}/{need})")
+                    if fail_count >= need:
+                        fail_count = 0
+                        threading.Thread(target=switch_to_starlink,
+                                         args=("T-Mobile internet down",), daemon=True).start()
 
-                elif sig != -1 and sig > off_thresh and starlink_power == "on":
-                    print(f"Auto: signal {sig} > {off_thresh} → Starlink OFF")
-                    if plug_set(False):
-                        client.publish("van/status/starlink/power", "off", retain=True)
-                        client.publish("van/status/starlink/quality",
-                                       "unknown", retain=True)
+            # ── On Starlink: monitor + periodically try to get back to T-Mobile ──
+            elif cur == "starlink":
+                sl_ok = internet_up()
+                pub("van/status/starlink/quality", "good" if sl_ok else "poor")
 
-            # Quality check: only when Starlink plug is on AND Pi is routing through it
-            now = time.time()
-            if (starlink_power == "on"
-                    and network_upstream == "starlink"
-                    and now - last_quality_check >= QUALITY_CHECK_INTERVAL):
-                last_quality_check = now
-                quality = check_connectivity()
-                print(f"Starlink quality → {quality}")
-                client.publish("van/status/starlink/quality", quality, retain=True)
+                if not sl_ok:
+                    # Starlink itself is failing — try T-Mobile right away (any working
+                    # T-Mobile beats a dead Starlink, so NO speed gate on this path).
+                    fail_count += 1
+                    print(f"Starlink internet check failed ({fail_count}/{FAIL_CONFIRM})")
+                    if fail_count >= FAIL_CONFIRM:
+                        fail_count = 0
+                        threading.Thread(target=switch_to_tmobile,
+                                         args=("Starlink down, trying T-Mobile",), daemon=True).start()
+                        continue
+                else:
+                    fail_count = 0
+
+                # Periodic T-Mobile recovery attempt — skipped while driving (we weight
+                # Starlink and don't bother switching back to T-Mobile to save power).
+                if not driving and time.time() - last_tmobile_recheck >= TMOBILE_RECHECK_INTERVAL:
+                    last_tmobile_recheck = time.time()
+                    # Speed-based recovery: briefly hop to T-Mobile and measure real
+                    # download; switch_to_tmobile reverts to Starlink if it's slower
+                    # than min_speed. (No signal pre-gate — the scan reads -1 on
+                    # Starlink 5 GHz and used to block this recheck entirely.)
+                    print(f"T-Mobile recheck: testing real speed (need >= {min_speed} Mbps)…")
+                    set_state("checking_tmobile")
+                    threading.Thread(target=switch_to_tmobile,
+                                     args=("periodic recovery check",),
+                                     kwargs={"min_mbps": min_speed}, daemon=True).start()
+
+            # ── Unknown: establish a link, preferring T-Mobile ────────────
+            else:
+                print("No clear upstream — establishing (prefer T-Mobile)…")
+                if not switch_to_tmobile("startup/recover", power_off_dish=False):
+                    threading.Thread(target=switch_to_starlink,
+                                     args=("T-Mobile unavailable",), daemon=True).start()
 
         except Exception as e:
-            print(f"signal_monitor error: {e}")
+            print(f"control_loop error: {e}")
 
 
-# ── MQTT callbacks ─────────────────────────────────────────────────────────
+# ── MQTT callbacks ───────────────────────────────────────────────────────────
 
 def on_connect(client, userdata, flags, rc):
-    global tmobile_signal, starlink_power
+    global mqtt_client, starlink_plug, min_speed, tmobile_ssid, tmobile_signal, auto_mode
+    global last_tmobile_recheck
+    mqtt_client = client
     print(f"MQTT connected (rc={rc})")
+
+    # On (re)start, recover toward the T-Mobile default reasonably soon if we
+    # come up on Starlink — short grace (~3 min) to avoid disrupting a freshly
+    # established link on every restart, then recheck T-Mobile.
+    last_tmobile_recheck = time.time() - TMOBILE_RECHECK_INTERVAL + 180
+
+    min_speed   = load_threshold()
+    auto_mode    = load_auto()
+    tmobile_ssid = get_tmobile_ssid()
+    print(f"T-Mobile SSID: '{tmobile_ssid}' | auto={auto_mode} | min_speed={min_speed} Mbps")
 
     client.subscribe("van/starlink/power")
     client.subscribe("van/starlink/auto")
     client.subscribe("van/starlink/threshold")
-    client.subscribe("van/status/network/upstream")  # track upstream for quality check
+    client.subscribe("van/network/upstream")
+    client.subscribe("van/network/speedtest")          # manual/lite test trigger
+    client.subscribe("van/status/network/speedtest")   # test result (react to manual/lite ones)
+    client.subscribe("van/network/driving")            # drive mode → weight Starlink more
 
-    state = plug_get_state()
-    starlink_power = state if state != "unknown" else None
-    client.publish("van/status/starlink/power",
-                   starlink_power or "unknown", retain=True)
+    # Initial plug + upstream snapshot
+    plug_state    = plug_get_state()
+    starlink_plug = plug_state if plug_state != "unknown" else None
+    pub("van/status/starlink/power", starlink_plug or "unknown")
+
+    upstream = get_current_upstream()
+    pub("van/status/network/upstream", upstream)
+    set_state(upstream if upstream in ("tmobile", "starlink") else "unknown")
 
     tmobile_signal = get_tmobile_signal()
-    client.publish("van/status/starlink/tmobile-signal",
-                   str(tmobile_signal), retain=True)
-    client.publish("van/status/starlink/auto",
-                   "on" if auto_mode else "off", retain=True)
-    client.publish("van/status/starlink/threshold",
-                   str(signal_on_thresh), retain=True)
-    # Clear quality on (re)start so stale "poor" doesn't persist if plug is off
-    if starlink_power != "on":
-        client.publish("van/status/starlink/quality", "unknown", retain=True)
+    pub("van/status/starlink/tmobile-signal", tmobile_signal)
+    pub("van/status/starlink/auto", "on" if auto_mode else "off")
+    pub("van/status/starlink/threshold", min_speed)
+    pub("van/status/starlink/quality", "unknown")
+    pub("van/status/starlink/manual-override", "on" if manual_override else "off")
 
-    print(f"Initial: plug={starlink_power}, tmobile={tmobile_signal}, "
-          f"thresh={signal_on_thresh}, auto={auto_mode}")
+    print(f"Init: upstream={upstream}, plug={starlink_plug}, signal={tmobile_signal}")
+    threading.Thread(target=control_loop, daemon=True).start()
 
-    t = threading.Thread(target=signal_monitor, args=(client,), daemon=True)
-    t.start()
+
+def _arm_manual_override():
+    global manual_override, manual_override_expires
+    manual_override         = True
+    manual_override_expires = time.time() + MANUAL_OVERRIDE_SECS
+    pub("van/status/starlink/manual-override", "on")
+    print(f"Manual override armed — auto suspended {MANUAL_OVERRIDE_SECS // 60} min")
 
 
 def on_message(client, userdata, msg):
-    global starlink_power, auto_mode, signal_on_thresh, network_upstream
+    global auto_mode, min_speed, manual_override, manual_test_pending, last_tmobile_recheck, driving
     topic   = msg.topic
     payload = msg.payload.decode().strip().lower()
 
     if topic == "van/starlink/power":
-        print(f"Manual: Starlink → {payload}")
-        on = (payload == "on")
-        if plug_set(on):
-            client.publish("van/status/starlink/power",
-                           "on" if on else "off", retain=True)
-            if not on:
-                client.publish("van/status/starlink/quality",
-                               "unknown", retain=True)
+        print(f"Manual plug → {payload}")
+        plug_set(payload == "on")
+        if payload != "on":
+            pub("van/status/starlink/quality", "unknown")
         return
 
     if topic == "van/starlink/auto":
+        # Hard-disabled: ignore any request to turn auto on; always report/keep off.
+        if AUTO_FAILOVER_DISABLED:
+            auto_mode = False
+            save_auto(False)
+            pub("van/status/starlink/auto", "off")
+            print("Auto-failover is hard-disabled — ignoring request, staying OFF")
+            return
         auto_mode = (payload == "on")
-        client.publish("van/status/starlink/auto",
-                       "on" if auto_mode else "off", retain=True)
-        print(f"Auto-mode → {auto_mode}")
+        save_auto(auto_mode)
+        pub("van/status/starlink/auto", "on" if auto_mode else "off")
+        print(f"Auto → {auto_mode}")
+        if auto_mode:
+            manual_override = False
+            pub("van/status/starlink/manual-override", "off")
         return
 
     if topic == "van/starlink/threshold":
         try:
-            val = max(0, min(100, int(payload)))
-            signal_on_thresh = val
-            save_threshold(val)
-            client.publish("van/status/starlink/threshold",
-                           str(val), retain=True)
-            print(f"Threshold → {val}")
+            min_speed = max(0, min(MAX_MIN_SPEED, int(float(payload))))
+            save_threshold(min_speed)
+            pub("van/status/starlink/threshold", min_speed)
+            print(f"Min T-Mobile speed → {min_speed} Mbps")
         except ValueError:
             pass
         return
 
-    if topic == "van/status/network/upstream":
-        network_upstream = payload
-        # Reset quality check timer when upstream changes so we check quickly
-        global last_quality_check
-        last_quality_check = 0.0
+    if topic == "van/network/upstream":
+        print(f"Manual upstream → {payload}")
+        _arm_manual_override()
+        if payload == "starlink":
+            threading.Thread(target=switch_to_starlink, args=("manual override",), daemon=True).start()
+        elif payload == "tmobile":
+            # Manual T-Mobile: don't power dish off unless T-Mobile internet confirmed.
+            threading.Thread(target=switch_to_tmobile, args=("manual override",), daemon=True).start()
+        return
+
+    if topic == "van/network/driving":
+        driving = (payload == "on")
+        print(f"Driving → {driving} (weighting Starlink {'more' if driving else 'normally'})")
+        return
+
+    if topic == "van/network/speedtest":
+        if payload in ("run", "lite"):
+            manual_test_pending = time.time()
+            print(f"Speed test requested ({payload}) — will check its result for failover")
+        return
+
+    if topic == "van/status/network/speedtest":
+        # Only react to a RECENT manual test — ignore the retained/periodic results
+        if time.time() - manual_test_pending > 150:
+            return
+        try:
+            import json as _json
+            res = _json.loads(msg.payload.decode())   # raw payload (not lowercased)
+        except Exception:
+            return
+        manual_test_pending = 0.0   # consume this request
+        dl  = res.get("download")
+        err = res.get("error")
+        low_speed   = isinstance(dl, (int, float)) and dl < MANUAL_BAD_MBPS
+        # An error may be a genuinely dead link OR just a tooling/transient hiccup.
+        # Only treat it as "bad" if a real ping ALSO fails — never false-failover.
+        no_internet = bool(err) and not internet_up()
+        if low_speed or no_internet:
+            why = "no internet" if no_internet else f"only {dl} Mbps"
+            print(f"Manual speed test BAD ({why}) — switching source")
+            threading.Thread(target=handle_bad_connection, args=(why,), daemon=True).start()
+            return
+
+        # Current link tested OK. T-Mobile is the *preferred* default, so if we're on the
+        # Starlink fallback a manual test is also our cue to re-check T-Mobile and switch
+        # back to it when it has real internet. switch_to_tmobile() pings to verify and
+        # reverts to Starlink on its own if T-Mobile is actually dead (never strands us).
+        cur = get_current_upstream()
+        if cur == "starlink" and auto_mode and not manual_override and not driving:
+            # (While driving we weight Starlink and skip switching back to T-Mobile.)
+            print(f"Manual test OK on Starlink ({dl} Mbps) — re-checking T-Mobile to switch back…")
+            last_tmobile_recheck = time.time()          # reset the periodic recheck clock
+            set_state("checking_tmobile")
+            threading.Thread(target=switch_to_tmobile,
+                             args=("manual test: prefer T-Mobile",),
+                             kwargs={"min_mbps": min_speed}, daemon=True).start()
+        else:
+            note = f"error but internet OK ({err})" if err else f"{dl} Mbps"
+            print(f"Manual speed test not actionable ({note}, on {cur}) — no switch")
         return
 
 
-# ── Main ───────────────────────────────────────────────────────────────────
+# ── Main ─────────────────────────────────────────────────────────────────────
+
+min_speed = load_threshold()
+auto_mode  = load_auto()
+refresh_plug_creds()   # pull current plug id+key from Tuya cloud (auto-recovers from re-pairs)
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
 client.on_connect = on_connect

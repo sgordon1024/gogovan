@@ -10,6 +10,7 @@ MQTT_HOST = "localhost"
 MQTT_PORT = 1883
 CAN_IFACE = "can1"
 SA = "44"
+PORTAL_ID = "c0619ab5dcfb"
 
 LIGHTS = {
     "kitchen":  "16",
@@ -43,12 +44,147 @@ AC_CAN_ID = "19FEF944"
 # Module-level MQTT client reference (set in on_connect)
 mqtt_client_ref = None
 
+# ── AC sleep timer ────────────────────────────────────────────────────────────
+# Runs server-side so the AC turns off at the scheduled time even when the phone
+# is asleep / the dashboard is closed (a browser setTimeout would not fire then).
+ac_timer = None
+ac_timer_lock = threading.Lock()
+
+def _clear_ac_timer():
+    global ac_timer
+    with ac_timer_lock:
+        if ac_timer is not None:
+            ac_timer.cancel()
+            ac_timer = None
+
+def _fire_ac_timer():
+    global ac_timer
+    with ac_timer_lock:
+        ac_timer = None
+    print("AC sleep timer expired → turning AC off")
+    _clear_ac_cycle()            # also stop any running duty cycle
+    send_ac("00C0FFFFFFFFFFFF")  # System OFF
+    if mqtt_client_ref:
+        mqtt_client_ref.publish("van/status/ac/mode", "off", retain=True)
+        mqtt_client_ref.publish("van/status/ac/timer", "", retain=True)
+
+# ── AC sleep cycle (sensor-independent duty cycling) ──────────────────────────
+# Alternates Cool-ON (on Low) / System-OFF on a fixed timer so cooling doesn't depend
+# on the temp sensor (the bathroom door blocks it). Runs server-side so it keeps
+# cycling while the phone is asleep.
+ac_cycle_timer = None
+ac_cycle_spec  = None   # (on_min, off_min) or None
+ac_cycle_phase = None   # "on" / "off" — the phase currently running
+ac_cycle_total = 0      # total seconds of the current phase (for scrub/seek + playhead)
+ac_cycle_lock  = threading.Lock()
+
+def _clear_ac_cycle(publish_status=True):
+    global ac_cycle_timer, ac_cycle_spec, ac_cycle_phase, ac_cycle_total
+    with ac_cycle_lock:
+        if ac_cycle_timer is not None:
+            ac_cycle_timer.cancel()
+            ac_cycle_timer = None
+        ac_cycle_spec = None
+        ac_cycle_phase = None
+        ac_cycle_total = 0
+    if publish_status and mqtt_client_ref:
+        mqtt_client_ref.publish("van/status/ac/cycle", "", retain=True)
+        mqtt_client_ref.publish("van/status/ac/cycle-phase", "", retain=True)
+
+def _ac_cycle_step(phase):
+    """Run one phase of the duty cycle, then schedule the next."""
+    global ac_cycle_timer, ac_cycle_phase, ac_cycle_total
+    with ac_cycle_lock:
+        spec = ac_cycle_spec
+    if spec is None:
+        return
+    on_min, off_min = spec
+    if phase == "on":
+        send_ac("00F1FFFFFFFFFFFF")  # Cool ON
+        send_ac("00DF64FFFFFFFFFF")  # Fan LOW
+        if mqtt_client_ref:
+            mqtt_client_ref.publish("van/status/ac/mode", "cool", retain=True)
+            mqtt_client_ref.publish("van/status/ac/fan", "low", retain=True)
+        nxt, secs, label = "off", on_min * 60, "cool"
+    else:
+        send_ac("00C0FFFFFFFFFFFF")  # System OFF
+        if mqtt_client_ref:
+            mqtt_client_ref.publish("van/status/ac/mode", "off", retain=True)
+        nxt, secs, label = "on", off_min * 60, "off"
+    with ac_cycle_lock:
+        if ac_cycle_spec is None:
+            return
+        ac_cycle_phase = phase
+        ac_cycle_total = secs
+        ac_cycle_timer = threading.Timer(secs, _ac_cycle_step, args=(nxt,))
+        ac_cycle_timer.daemon = True
+        ac_cycle_timer.start()
+    # Tell the dashboard the current phase ("cool" = blowing, "off" = resting), when it
+    # started and ends (epoch ms) — drives the playhead progress + countdown + icon.
+    if mqtt_client_ref:
+        now = time.time()
+        start_ms, end_ms = int(now * 1000), int((now + secs) * 1000)
+        mqtt_client_ref.publish("van/status/ac/cycle-phase", f"{label}/{start_ms}/{end_ms}", retain=True)
+
+def _start_ac_cycle(on_min, off_min):
+    global ac_cycle_spec
+    _clear_ac_cycle(publish_status=False)
+    with ac_cycle_lock:
+        ac_cycle_spec = (on_min, off_min)
+    if mqtt_client_ref:
+        mqtt_client_ref.publish("van/status/ac/cycle", f"{on_min}/{off_min}", retain=True)
+    print(f"AC cycle started: {on_min} min on / {off_min} min off")
+    _ac_cycle_step("on")   # begin with an on-phase immediately
+
+def _seek_ac_cycle(frac):
+    """Scrub the current phase to progress fraction `frac` (0..1). Forward scrubs
+    shorten the phase (skip toward the next part); at ~the end it flips to the next
+    phase immediately. Re-actuates nothing — same phase, just a new end time."""
+    global ac_cycle_timer
+    with ac_cycle_lock:
+        spec, phase, total = ac_cycle_spec, ac_cycle_phase, ac_cycle_total
+    if spec is None or phase is None or total <= 0:
+        return
+    frac = max(0.0, min(1.0, frac))
+    remaining = total * (1.0 - frac)
+    nxt = "off" if phase == "on" else "on"
+    if remaining <= 1.0:
+        with ac_cycle_lock:
+            if ac_cycle_timer is not None:
+                ac_cycle_timer.cancel(); ac_cycle_timer = None
+        print(f"AC cycle: scrubbed to end of {phase}-phase → next phase now")
+        _ac_cycle_step(nxt)   # flip immediately (actuates the next phase)
+        return
+    with ac_cycle_lock:
+        if ac_cycle_spec is None:
+            return
+        if ac_cycle_timer is not None:
+            ac_cycle_timer.cancel()
+        ac_cycle_timer = threading.Timer(remaining, _ac_cycle_step, args=(nxt,))
+        ac_cycle_timer.daemon = True
+        ac_cycle_timer.start()
+    print(f"AC cycle: scrubbed {phase}-phase to {int(frac*100)}% ({int(remaining)}s left)")
+    if mqtt_client_ref:
+        now = time.time()
+        # Keep the bar width = the phase total; only the playhead position moves.
+        end_ms   = int((now + remaining) * 1000)
+        start_ms = int((now + remaining - total) * 1000)
+        label    = "cool" if phase == "on" else "off"
+        mqtt_client_ref.publish("van/status/ac/cycle-phase", f"{label}/{start_ms}/{end_ms}", retain=True)
+
 def cansend(data):
     frame = f"19FEDB{SA}#{data}"
     print(f"cansend {CAN_IFACE} {frame}")
     subprocess.run(["cansend", CAN_IFACE, frame])
 
 def send_can(instance, payload):
+    # The water pump (inst 2C) is a switch-type output that ignores the "ramp up" ON
+    # command (cmd 05) — confirmed via candump it only latches on via an explicit
+    # set-level. Translate its "on" to a 100% set-level so it reliably turns back on
+    # (notably after drive mode, which was leaving the pump off). "off" (ramp down)
+    # works fine, so leave it alone.
+    if instance == LIGHTS["pump"] and payload == "on":
+        payload = "100"
     if payload in ("off", "0"):
         cansend(f"{instance}FF0006FF00FFFF")
     elif payload == "on":
@@ -87,11 +223,18 @@ def handle_ac(key, payload):
       Byte 5: setpoint step (0xF9=step down; 0xFA=step up, hypothesized)
       All other bytes: 0xFF (don't-care)
     """
+    global ac_timer
     if key == "mode":
+        # A manual mode change means the user is taking control — stop any duty cycle.
+        _clear_ac_cycle()
         if payload == "cool":
             send_ac("00F1FFFFFFFFFFFF")  # Cool ON
         elif payload == "off":
             send_ac("00C0FFFFFFFFFFFF")  # System OFF
+            # Manually turning the AC off cancels any pending sleep timer.
+            _clear_ac_timer()
+            if mqtt_client_ref:
+                mqtt_client_ref.publish("van/status/ac/timer", "", retain=True)
     elif key == "fan":
         if payload == "high":
             send_ac("00D5C8FFFFFFFFFF")  # Fan HIGH (0xC8 = 100%)
@@ -105,6 +248,49 @@ def handle_ac(key, payload):
             send_ac("00FFFFFFFFFAFFFF")
         elif payload == "down":
             send_ac("00FFFFFFFFF9FFFF")  # Confirmed step -1°F
+    elif key == "timer":
+        # payload = minutes until AC auto-off ("0"/"off" cancels)
+        try:
+            minutes = int(float(payload))
+        except ValueError:
+            minutes = 0
+        _clear_ac_timer()
+        if minutes > 0:
+            secs   = minutes * 60
+            end_ms = int((time.time() + secs) * 1000)
+            with ac_timer_lock:
+                ac_timer = threading.Timer(secs, _fire_ac_timer)
+                ac_timer.daemon = True
+                ac_timer.start()
+            print(f"AC sleep timer set: {minutes} min")
+            if mqtt_client_ref:
+                mqtt_client_ref.publish("van/status/ac/timer", str(end_ms), retain=True)
+        else:
+            print("AC sleep timer cancelled")
+            if mqtt_client_ref:
+                mqtt_client_ref.publish("van/status/ac/timer", "", retain=True)
+    elif key == "cycle":
+        # payload = "ON/OFF" minutes (e.g. "30/20"), or "off"/"0" to stop.
+        if payload in ("off", "0", ""):
+            _clear_ac_cycle()
+            print("AC cycle cancelled")
+        else:
+            try:
+                on_s, off_s = payload.split("/")
+                on_min, off_min = int(on_s), int(off_s)
+            except (ValueError, AttributeError):
+                on_min = off_min = 0
+            if on_min > 0 and off_min > 0:
+                _start_ac_cycle(on_min, off_min)
+            else:
+                print(f"AC cycle: bad spec '{payload}' — ignored")
+    elif key == "cycle-seek":
+        # payload = target progress fraction (0..1) of the current phase — scrub the
+        # playhead to skip toward the next part of the cycle.
+        try:
+            _seek_ac_cycle(float(payload))
+        except ValueError:
+            pass
 
 def get_current_upstream():
     """Detect which upstream Wi-Fi connection wlan0 is using via nmcli."""
@@ -128,63 +314,25 @@ def get_current_upstream():
     return "unknown"
 
 def handle_network(key, payload):
-    """Switch upstream Wi-Fi or trigger speed test."""
-    global mqtt_client_ref
-    if key == "upstream":
-        if payload == "tmobile":
-            conn_name = "preconfigured"
-        elif payload == "starlink":
-            conn_name = "wifi-blaster"
-        else:
-            print(f"Unknown network target: {payload}")
-            return
-        print(f"Switching upstream to {payload} ({conn_name})")
-        subprocess.run(["sudo", "nmcli", "connection", "up", conn_name])
-        time.sleep(5)
-        upstream = get_current_upstream()
-        if mqtt_client_ref is not None:
-            mqtt_client_ref.publish("van/status/network/upstream", upstream, retain=True)
-            print(f"Network upstream → {upstream}")
-    elif key == "speedtest":
-        # Run speed test in background thread so MQTT loop stays alive
-        t = threading.Thread(target=run_speedtest, daemon=True)
+    """Handle network commands. Upstream switching is owned by starlink-bridge.py;
+    this handler only triggers speed tests."""
+    if key == "speedtest":
+        lite = (payload == "lite")   # small, low-data test (driving checks)
+        t = threading.Thread(target=run_speedtest, args=(lite,), daemon=True)
         t.start()
+    # upstream switching is handled by starlink-bridge.py via van/network/upstream
 
-def run_speedtest():
-    """Run speedtest-cli and publish results to MQTT."""
-    global mqtt_client_ref
-    if mqtt_client_ref is None:
-        return
-    print("Speed test starting…")
-    mqtt_client_ref.publish("van/status/network/speedtest/running", "true", retain=True)
-    upstream = get_current_upstream()
+def run_speedtest(lite=False):
+    """Manual trigger — run the SAME Ookla-based script the periodic timer uses
+    (run-speedtest.py). It handles its own MQTT publish (running + result).
+    `lite=True` runs the small low-data variant (--lite) used while driving."""
     try:
-        r = subprocess.run(
-            ["speedtest-cli", "--json", "--secure"],
-            capture_output=True, text=True, timeout=120
-        )
-        import json as _json
-        data = _json.loads(r.stdout)
-        result = {
-            "download": round(data["download"] / 1e6, 1),
-            "upload":   round(data["upload"]   / 1e6, 1),
-            "ping":     round(data["ping"]),
-            "server":   data.get("server", {}).get("sponsor", "Unknown"),
-            "upstream": upstream,
-            "timestamp": data.get("timestamp", ""),
-            "error":    None
-        }
-        print(f"Speed test: ↓{result['download']} ↑{result['upload']} ping={result['ping']}ms via {upstream}")
+        cmd = ["python3", "/home/sgordon1024/run-speedtest.py"]
+        if lite:
+            cmd.append("--lite")
+        subprocess.run(cmd, timeout=180)
     except Exception as e:
-        result = {
-            "download": None, "upload": None, "ping": None,
-            "server": None, "upstream": upstream,
-            "timestamp": "", "error": str(e)
-        }
-        print(f"Speed test failed: {e}")
-    import json as _json
-    mqtt_client_ref.publish("van/status/network/speedtest", _json.dumps(result), retain=True)
-    mqtt_client_ref.publish("van/status/network/speedtest/running", "false", retain=True)
+        print(f"run_speedtest error: {e}")
 
 def can_listener(mqtt_client):
     """
@@ -298,24 +446,31 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe("van/light/+")
     client.subscribe("van/motor/+")
     client.subscribe("van/ac/+")
-    client.subscribe("van/network/+")
-    print("Subscribed to van/light/+, van/motor/+, van/ac/+, van/network/+")
+    client.subscribe("van/network/speedtest")  # only speedtest; upstream owned by starlink-bridge
+    print("Subscribed to van/light/+, van/motor/+, van/ac/+, van/network/speedtest")
+    # A restart loses any in-memory sleep timer / cycle — clear their retained status so
+    # the dashboard doesn't show a countdown or active cycle that will never fire.
+    client.publish("van/status/ac/timer", "", retain=True)
+    client.publish("van/status/ac/cycle", "", retain=True)
+    client.publish("van/status/ac/cycle-phase", "", retain=True)
     subprocess.run(["cansend", CAN_IFACE, f"18EEFF{SA}#0000000000008000"])
-
-    # Publish initial upstream status
-    upstream = get_current_upstream()
-    client.publish("van/status/network/upstream", upstream, retain=True)
-    print(f"Initial network upstream → {upstream}")
 
     t = threading.Thread(target=can_listener, args=(client,), daemon=True)
     t.start()
 
 def on_message(client, userdata, msg):
-    parts = msg.topic.split("/")
+    topic   = msg.topic
+    payload = msg.payload.decode().strip().lower()
+
+    # Direct speedtest trigger (subscribed as van/network/speedtest)
+    if topic == "van/network/speedtest":
+        handle_network("speedtest", payload)
+        return
+
+    parts = topic.split("/")
     if len(parts) != 3:
         return
     category, name = parts[1], parts[2]
-    payload = msg.payload.decode().strip().lower()
 
     if category == "light":
         if name == "tank-heater":
@@ -335,9 +490,19 @@ def on_message(client, userdata, msg):
     elif category == "ac":
         print(f"ac/{name} -> {payload}")
         handle_ac(name, payload)
-    elif category == "network":
-        print(f"network/{name} -> {payload}")
-        handle_network(name, payload)
+
+def _cerbo_keepalive():
+    """Periodically publish Victron keepalive so Cerbo keeps transmitting telemetry even when no browser is open."""
+    time.sleep(10)
+    while True:
+        try:
+            if mqtt_client_ref and mqtt_client_ref.is_connected():
+                mqtt_client_ref.publish(f"R/{PORTAL_ID}/keepalive", "")
+        except Exception:
+            pass
+        time.sleep(30)
+
+threading.Thread(target=_cerbo_keepalive, daemon=True, name="cerbo-keepalive").start()
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
 client.on_connect = on_connect
