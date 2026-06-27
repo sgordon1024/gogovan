@@ -1716,9 +1716,11 @@
       flex-direction: column;
       background: var(--surface);
       z-index: 20;
-      overflow: hidden;
+      overflow-y: auto;            /* scrollable — 8 gauges won't all fit on screen */
+      -webkit-overflow-scrolling: touch;
     }
     #drive-engine-panel.active { display: flex; }
+    #engine-header { position: sticky; top: 0; background: var(--surface); z-index: 2; }
 
     #engine-all-btn {
       flex-shrink: 0; margin: 8px 16px calc(8px + env(safe-area-inset-bottom));
@@ -1784,13 +1786,11 @@
 
     /* ── Old-car needle gauges ─────────────────────── */
     #engine-gauges {
-      flex: 1;
-      min-height: 0;
+      flex: 0 0 auto;
       display: flex;
       flex-direction: column;
-      justify-content: center;
-      gap: clamp(10px, 2.2vh, 22px);
-      padding: clamp(12px, 2.5vh, 22px) 18px;
+      gap: 18px;
+      padding: 16px 18px;
     }
     .gauge-top {
       display: flex;
@@ -1854,40 +1854,6 @@
       font-weight: 600;
       color: var(--txt2);
       font-variant-numeric: tabular-nums;
-    }
-
-    #engine-readouts {
-      display: flex;
-      border-top: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    .engine-ro {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      padding: 11px 6px;
-      border-right: 1px solid var(--border);
-    }
-    .engine-ro:last-child { border-right: none; }
-    .engine-ro-val {
-      font-size: clamp(20px, 5.5vw, 28px);
-      font-weight: 300;
-      font-variant-numeric: tabular-nums;
-      letter-spacing: -0.5px;
-      line-height: 1;
-      color: var(--txt);
-      transition: color 0.4s;
-    }
-    .engine-ro-val.warn  { color: var(--amber); }
-    .engine-ro-val.alert { color: var(--red); }
-    .engine-ro-label {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.6px;
-      text-transform: uppercase;
-      color: var(--txt2);
     }
 
     #engine-dtc-row {
@@ -3261,11 +3227,27 @@ safe-buffer/index.js:
         </div>
         <div class="gauge-scale"><span>0</span><span>12</span><span>25</span></div>
       </div>
-    </div>
-    <div id="engine-readouts">
-      <div class="engine-ro"><span class="engine-ro-val" id="engine-coolant">—</span><span class="engine-ro-label">Coolant</span></div>
-      <div class="engine-ro"><span class="engine-ro-val" id="engine-voltage">—</span><span class="engine-ro-label">Alternator</span></div>
-      <div class="engine-ro"><span class="engine-ro-val" id="engine-batt-temp">—</span><span class="engine-ro-label">Batt Temp</span></div>
+      <div class="gauge">
+        <div class="gauge-top"><span class="gauge-label">Coolant</span><span class="gauge-val" id="g-coolant-val">—</span></div>
+        <div class="gauge-track" style="background:linear-gradient(90deg,var(--tog-off) 0 69%,var(--amber) 69% 81%,var(--red) 81% 100%)">
+          <div class="gauge-ticks"></div><div class="gauge-needle" id="g-coolant-needle"></div>
+        </div>
+        <div class="gauge-scale"><span>100</span><span>180</span><span>260°F</span></div>
+      </div>
+      <div class="gauge">
+        <div class="gauge-top"><span class="gauge-label">Alternator</span><span class="gauge-val" id="g-alt-val">—</span></div>
+        <div class="gauge-track" style="background:linear-gradient(90deg,var(--red) 0 33%,var(--amber) 33% 50%,var(--tog-off) 50% 83%,var(--amber) 83% 100%)">
+          <div class="gauge-ticks"></div><div class="gauge-needle" id="g-alt-needle"></div>
+        </div>
+        <div class="gauge-scale"><span>10</span><span>13</span><span>16V</span></div>
+      </div>
+      <div class="gauge">
+        <div class="gauge-top"><span class="gauge-label">Batt Temp</span><span class="gauge-val" id="g-batt-val">—</span></div>
+        <div class="gauge-track" style="background:linear-gradient(90deg,var(--red) 0 23%,var(--tog-off) 23% 79%,var(--amber) 79% 89%,var(--red) 89% 100%)">
+          <div class="gauge-ticks"></div><div class="gauge-needle" id="g-batt-needle"></div>
+        </div>
+        <div class="gauge-scale"><span>0</span><span>70</span><span>140°F</span></div>
+      </div>
     </div>
     <div id="engine-dtc-row">
       <span id="engine-mil-icon"></span>
@@ -5354,12 +5336,12 @@ function updateAltColumn() {
 let lastBattTempF = null;
 function updateBattTemp(c) {
   if (c == null || isNaN(c)) return;
-  const f = Math.round(c * 9 / 5 + 32) + '°F';
+  const fNum = Math.round(c * 9 / 5 + 32);
+  const f = fNum + '°F';
   lastBattTempF = f;
   const tile = document.getElementById('powerBattTemp');   // drive power grid tile
   if (tile) tile.textContent = f;
-  const eng = document.getElementById('engine-batt-temp'); // engine readouts row
-  if (eng) eng.textContent = f;
+  setGauge('batt', fNum);   // engine tab battery-temp gauge (live from Victron, never reset)
 }
 
 // ── Current elevation (drive-mode power tile) ─────
@@ -6906,11 +6888,14 @@ function starlinkSubLabel() {
 // RPM zones tuned to the OM654 2.0L turbodiesel: peak power ~3,800–4,200 rpm,
 // caution 4,000–4,500, redline 4,500–5,000. Tweak max/fmt here to recalibrate.
 const GAUGES = {
-  rpm:   { min: 0, max: 5000, fmt: v => Math.round(v).toLocaleString() },
-  accel: { min: 0, max: 100,  fmt: v => Math.round(v) + '%' },
-  load:  { min: 0, max: 100,  fmt: v => Math.round(v) + '%' },
-  fuel:  { min: 0, max: 100,  fmt: v => Math.round(v) + '%' },
-  mpg:   { min: 0, max: 25,   fmt: v => (Number(v) || 0).toFixed(1) },
+  rpm:     { min: 0,   max: 5000, fmt: v => Math.round(v).toLocaleString() },
+  accel:   { min: 0,   max: 100,  fmt: v => Math.round(v) + '%' },
+  load:    { min: 0,   max: 100,  fmt: v => Math.round(v) + '%' },
+  fuel:    { min: 0,   max: 100,  fmt: v => Math.round(v) + '%' },
+  mpg:     { min: 0,   max: 25,   fmt: v => (Number(v) || 0).toFixed(1) },
+  coolant: { min: 100, max: 260,  fmt: v => Math.round(v) + '°F' },
+  alt:     { min: 10,  max: 16,   fmt: v => Number(v).toFixed(1) + 'V' },
+  batt:    { min: 0,   max: 140,  fmt: v => Math.round(v) + '°F' },
 };
 function setGauge(key, value) {
   const g = GAUGES[key];
@@ -6921,6 +6906,28 @@ function setGauge(key, value) {
   if (needle) {
     const pct = Math.max(0, Math.min(100, (value - g.min) / (g.max - g.min) * 100));
     needle.style.left = pct + '%';
+  }
+}
+// When the engine/OBD is off (van shut off → bridge reports searching/error), the
+// retained OBD values go stale. Clear the OBD-fed gauges so they reflect reality.
+// Battery Temp is NOT reset — it comes live from Victron, independent of the engine.
+function resetEngineGauges() {
+  ['rpm','accel','load','fuel','mpg','coolant','alt'].forEach(key => {
+    const valEl  = document.getElementById('g-' + key + '-val');
+    const needle = document.getElementById('g-' + key + '-needle');
+    if (valEl)  valEl.textContent = '—';
+    if (needle) needle.style.left = '0%';
+  });
+}
+// Watchdog backup: if OBD data stops arriving entirely (e.g. the Pi/bridge dies and
+// never publishes 'error'), clear the gauges after 12s of silence.
+let _obdLastSeen = 0, _obdLiveWatchdog = null;
+function _obdSeen() {
+  _obdLastSeen = Date.now();
+  if (!_obdLiveWatchdog) {
+    _obdLiveWatchdog = setInterval(() => {
+      if (Date.now() - _obdLastSeen > 12000) resetEngineGauges();
+    }, 4000);
   }
 }
 
@@ -6939,14 +6946,17 @@ function updateOBDUI(key, val) {
       } else if (val === 'error') {
         pill.textContent = '● Error';
         pill.className = 'error';
+        resetEngineGauges();   // van off / OBD lost — don't show frozen values
       } else {
         pill.textContent = '● Searching…';
         pill.className = '';
+        resetEngineGauges();
       }
       evaluateDriveState();
       break;
     }
     case 'rpm': {
+      _obdSeen();
       setGauge('rpm', parseInt(val));
       evaluateDriveState();
       break;
@@ -6957,30 +6967,26 @@ function updateOBDUI(key, val) {
       break;
     }
     case 'coolant-temp': {
-      const el = document.getElementById('engine-coolant');
-      if (!el) break;
-      const t = parseInt(val);
-      el.textContent = t + '°F';
-      el.className = 'engine-ro-val' + (t >= 230 ? ' alert' : t >= 210 ? ' warn' : '');
+      _obdSeen();
+      setGauge('coolant', parseInt(val));
       break;
     }
     case 'fuel-level': {
+      _obdSeen();
       setGauge('fuel', parseInt(val));
       break;
     }
     case 'accel-pos': {
       // Accelerator pedal position — the real driver input on this diesel
       // (THROTTLE_POS reads a stuck ~13% on the Sprinter, so we show the pedal instead).
+      _obdSeen();
       setGauge('accel', parseInt(val));
       recordDriveSample();   // feed throttle-variability drive detection
       break;
     }
     case 'voltage': {
-      const el = document.getElementById('engine-voltage');
-      if (!el) break;
-      const v = parseFloat(val);
-      el.textContent = v.toFixed(1) + 'V';
-      el.className = 'engine-ro-val' + (v < 12.0 ? ' alert' : v < 13.0 ? ' warn' : '');
+      _obdSeen();
+      setGauge('alt', parseFloat(val));
       break;
     }
     case 'mil': {
@@ -7011,11 +7017,13 @@ function updateOBDUI(key, val) {
       break;
     }
     case 'engine-load': {
+      _obdSeen();
       setGauge('load', parseInt(val));
       recordDriveSample();   // feed throttle/load-variability drive detection
       break;
     }
     case 'mpg': {
+      _obdSeen();
       setGauge('mpg', parseFloat(val));
       break;
     }
